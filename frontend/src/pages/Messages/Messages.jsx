@@ -11,6 +11,7 @@ import ReplyIcon from '@mui/icons-material/Reply';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import apiClient from '../../api/client';
+import AIProviderStatus from '../../components/AIProviderStatus';
 
 export default function Messages() {
   const [messages, setMessages] = useState([]);
@@ -82,14 +83,17 @@ export default function Messages() {
 
   return (
     <Box sx={{ width: '100%', flexGrow: 1 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-        <Box>
-          <Typography variant="h4" gutterBottom>
-            Messages
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            View and manage all message communications
-          </Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2, mb: 4, flexWrap: 'wrap' }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+          <Box>
+            <Typography variant="h4" gutterBottom>
+              Messages
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              View and manage all message communications
+            </Typography>
+          </Box>
+          <AIProviderStatus compact />
         </Box>
         <IconButton onClick={fetchMessages}>
           <RefreshIcon />
@@ -255,10 +259,7 @@ export default function Messages() {
       {/* AI Reply Dialog */}
       <Dialog open={openAIDialog} onClose={() => setOpenAIDialog(false)} maxWidth="sm" fullWidth>
         <DialogTitle>
-          <Stack direction="row" alignItems="center" spacing={1}>
-            <AutoAwesomeIcon color="primary" />
-            <Typography variant="h6">AI Reply Suggestions</Typography>
-          </Stack>
+          <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}><AutoAwesomeIcon color="primary" /><Typography variant="h6">AI Reply Suggestions</Typography></Stack><AIProviderStatus compact sx={{ mb: 2 }} />
         </DialogTitle>
         <DialogContent>
           {selectedMessage && (

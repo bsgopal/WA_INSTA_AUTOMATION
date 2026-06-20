@@ -102,7 +102,9 @@ const ConversationMessageSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
-  
+
+  widgetData: mongoose.Schema.Types.Mixed,
+
   templateId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Template'

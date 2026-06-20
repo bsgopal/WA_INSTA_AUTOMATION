@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Typography, Box, Paper, Grid, Card, CardContent, CardActions,
   Button, TextField, Stack, Chip, LinearProgress, Alert,
@@ -12,6 +12,7 @@ import PsychologyIcon from '@mui/icons-material/Psychology';
 import TimelineIcon from '@mui/icons-material/Timeline';
 import SentimentSatisfiedIcon from '@mui/icons-material/SentimentSatisfied';
 import apiClient from '../../api/client';
+import AIProviderStatus from '../../components/AIProviderStatus';
 
 export default function AIFeatures() {
   const [selectedFeature, setSelectedFeature] = useState(null);
@@ -19,6 +20,28 @@ export default function AIFeatures() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [openDialog, setOpenDialog] = useState(false);
+  const [customers, setCustomers] = useState([]);
+  const [selectedCustomerId, setSelectedCustomerId] = useState('');
+
+  useEffect(() => {
+    const fetchCustomers = async () => {
+      try {
+        const response = await apiClient.get('/customers?limit=100');
+        setCustomers(response.data?.customers || []);
+      } catch (err) {
+        console.error('Failed to load customers for AI tools:', err);
+      }
+    };
+    fetchCustomers();
+  }, []);
+
+  const isInputValid = () => {
+    if (!selectedFeature) return false;
+    if (['churn', 'ltv', 'optimal-time'].includes(selectedFeature.id)) {
+      return !!selectedCustomerId;
+    }
+    return !!input.trim();
+  };
 
   const features = [
     {
@@ -77,7 +100,7 @@ export default function AIFeatures() {
   };
 
   const handleAnalyze = async () => {
-    if (!input.trim()) return;
+    if (!isInputValid()) return;
 
     try {
       setLoading(true);
@@ -96,6 +119,18 @@ export default function AIFeatures() {
           response = await apiClient.post('/ai/categorize-query', { messageText: input });
           setResult(response?.data || { category: 'INQUIRY', confidence: 0.85 });
           break;
+        case 'churn':
+          response = await apiClient.get(`/ai/churn-risk/${selectedCustomerId}`);
+          setResult(response?.data || { risk: 'unknown', score: 0 });
+          break;
+        case 'ltv':
+          response = await apiClient.get(`/ai/lifetime-value/${selectedCustomerId}`);
+          setResult(response?.data || { ltv: 0, confidence: 'low' });
+          break;
+        case 'optimal-time':
+          response = await apiClient.get(`/ai/optimal-send-time/${selectedCustomerId}`);
+          setResult(response?.data || { hour: 10, minute: 0, confidence: 'low' });
+          break;
         default:
           setResult({ message: 'Feature not implemented yet' });
           break;
@@ -111,19 +146,23 @@ export default function AIFeatures() {
   const handleClose = () => {
     setOpenDialog(false);
     setInput('');
+    setSelectedCustomerId('');
     setResult(null);
     setSelectedFeature(null);
   };
 
   return (
     <Box sx={{ width: '100%', flexGrow: 1 }}>
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" gutterBottom>
-          AI-Powered Features
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Leverage artificial intelligence for smarter automation
-        </Typography>
+      <Box sx={{ mb: 4, display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <Box>
+          <Typography variant="h4" gutterBottom>
+            AI-Powered Features
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Leverage artificial intelligence for smarter automation
+          </Typography>
+        </Box>
+        <AIProviderStatus compact />
       </Box>
 
       <Grid container spacing={3}>
@@ -177,20 +216,46 @@ export default function AIFeatures() {
           </Stack>
         </DialogTitle>
         <DialogContent>
-          <Typography variant="body2" color="text.secondary" mb={3}>
-            {selectedFeature?.description}
-          </Typography>
+          <Stack spacing={1} mb={3}>
+            <Typography variant="body2" color="text.secondary">
+              {selectedFeature?.description}
+            </Typography>
+            <AIProviderStatus compact />
+          </Stack>
 
-          <TextField
-            fullWidth
-            multiline
-            rows={4}
-            label="Input"
-            placeholder="Enter text to analyze..."
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            disabled={loading}
-          />
+          {selectedFeature && ['churn', 'ltv', 'optimal-time'].includes(selectedFeature.id) ? (
+            <TextField
+              select
+              fullWidth
+              label="Select Customer"
+              value={selectedCustomerId}
+              onChange={(e) => setSelectedCustomerId(e.target.value)}
+              disabled={loading}
+              SelectProps={{
+                native: true,
+              }}
+              variant="outlined"
+              helperText="Select a customer to analyze using predictive AI models"
+            >
+              <option value="">-- Choose Customer --</option>
+              {customers.map((c) => (
+                <option key={c._id} value={c._id}>
+                  {c.firstName} {c.lastName} ({c.phone || c.email})
+                </option>
+              ))}
+            </TextField>
+          ) : (
+            <TextField
+              fullWidth
+              multiline
+              rows={4}
+              label="Input"
+              placeholder="Enter text to analyze..."
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              disabled={loading}
+            />
+          )}
 
           {result && (
             <Box sx={{ mt: 3 }}>
@@ -216,7 +281,7 @@ export default function AIFeatures() {
             variant="contained"
             startIcon={<AutoAwesomeIcon />}
             onClick={handleAnalyze}
-            disabled={!input.trim() || loading}
+            disabled={!isInputValid() || loading}
             disableElevation
           >
             {loading ? 'Analyzing...' : selectedFeature?.action}

@@ -122,6 +122,7 @@ const MessageSchema = new mongoose.Schema({
   
   // Metadata
   variables: mongoose.Schema.Types.Mixed,
+  widgetData: mongoose.Schema.Types.Mixed,
   tags: [String],
   notes: String,
   

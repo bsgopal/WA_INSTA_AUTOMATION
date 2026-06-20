@@ -14,17 +14,7 @@ app.use(helmet({
   contentSecurityPolicy: false
 }));
 app.use(cors({ 
-  origin: [
-    'http://localhost:3000',
-    'http://localhost:5173',
-    'http://localhost:5174',
-    'http://localhost:5175',
-    'http://127.0.0.1:3000',
-    'http://127.0.0.1:5173',
-    'http://127.0.0.1:5174',
-    'http://127.0.0.1:5175',
-    process.env.CLIENT_URL || 'http://localhost:3000'
-  ], 
+  origin: true, 
   credentials: true 
 }));
 app.use(express.json({ limit: '10mb' }));
@@ -47,8 +37,11 @@ app.use('/api/workflows', require('./middlewares/auth-middleware'), require('./r
 app.use('/api/categories', require('./middlewares/auth-middleware'), require('./routes/categories'));
 app.use('/api/catalog', require('./middlewares/auth-middleware'), require('./routes/catalog'));
 app.use('/api/conversations', require('./middlewares/auth-middleware'), require('./routes/conversations'));
+app.use('/api/shop-config', require('./middlewares/auth-middleware'), require('./routes/shopConfigRoutes'));
 app.use('/api/quick-replies', require('./middlewares/auth-middleware'), require('./routes/quickReplies'));
 app.use('/api/ai-chat', require('./middlewares/auth-middleware'), require('./routes/aiChat'));
+app.use('/api/response-rules', require('./middlewares/auth-middleware'), require('./routes/responseRules'));
+app.use('/api/knowledge-documents', require('./middlewares/auth-middleware'), require('./routes/knowledgeDocuments'));
 // app.use('/api/multilingual', require('./middlewares/auth-middleware'), require('./routes/multilingual'));
 app.use('/api/webhooks', require('./routes/webhooks'));
 
@@ -83,6 +76,32 @@ const startServer = async () => {
 
     console.log('✅ MongoDB connected successfully');
     console.log(`📍 Connected to: ${process.env.NODE_ENV === 'development' ? 'Local MongoDB' : 'MongoDB Atlas'}`);
+
+    // Seed default admin user if no user exists
+    try {
+      const User = require('./models/User');
+      const adminPhone = '9876543210';
+      const adminEmail = 'admin@renic.com';
+      const existingUser = await User.findOne({ $or: [{ phone: adminPhone }, { email: adminEmail }] });
+      
+      if (!existingUser) {
+        const adminUser = new User({
+          firstName: 'Admin',
+          lastName: 'User',
+          email: adminEmail,
+          phone: adminPhone,
+          password: 'Password123!',
+          role: 'ADMIN',
+          companyName: 'Renic Technology'
+        });
+        await adminUser.save();
+        console.log('✅ Default admin user seeded successfully: 9876543210 / Password123!');
+      } else {
+        console.log('ℹ️ Admin user already exists. Seeding skipped.');
+      }
+    } catch (seedErr) {
+      console.error('⚠️ Default admin user seeding failed:', seedErr.message);
+    }
 
     // Initialize WAHA WhatsApp service
     try {

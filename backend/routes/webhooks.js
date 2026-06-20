@@ -4,35 +4,152 @@ const router = express.Router();
 const WhatsAppService = require('../services/WhatsAppService');
 const InstagramService = require('../services/InstagramService');
 const aiChatHandler = require('../services/aiChatHandler');
-const aiSmartFeatures = require('../services/aiSmartFeatures');
+const messageQueueService = require('../services/messageQueueService');
+
+const isQueueEnabled = () => process.env.AI_QUEUE_ENABLED !== 'false';
+
+const getDefaultUserId = async () => {
+  let userId = process.env.DEFAULT_USER_ID;
+  if (!userId || userId === '000000000000000000000000') {
+    const User = require('../models/User');
+    const defaultUser = await User.findOne({ role: 'ADMIN' });
+    userId = defaultUser ? defaultUser._id : '000000000000000000000000';
+  }
+  return userId;
+};
+
+const processOrQueueMessage = async payload => {
+  if (isQueueEnabled()) {
+    try {
+      const queued = await messageQueueService.enqueueIncomingMessage(payload);
+      return {
+        success: true,
+        queued: true,
+        ...queued
+      };
+    } catch (error) {
+      console.error('AI queue unavailable, processing inline:', error.message);
+    }
+  }
+
+  const result = await aiChatHandler.handleCustomerMessage(
+    payload.phoneNumber,
+    payload.messageBody,
+    payload.channel,
+    payload.userId,
+    payload.mediaUrl || null,
+    payload.options || {}
+  );
+
+  return {
+    ...result,
+    queued: false
+  };
+};
+
+const firstText = (...values) => {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim();
+    }
+  }
+  return '';
+};
+
+const normalizeInteractiveReply = data => {
+  const raw = data || {};
+  const rawData = raw._data || {};
+  const buttonReply = raw.buttonReply || raw.selectedButton || rawData.buttonReply || rawData.selectedButton || {};
+  const listReply = raw.listReply || raw.selectedRow || rawData.listReply || rawData.selectedRow || {};
+  const interactive = raw.interactive || rawData.interactive || {};
+  const interactiveButton = interactive.button_reply || interactive.buttonReply || {};
+  const interactiveList = interactive.list_reply || interactive.listReply || {};
+  const nativeFlow = interactive.nfm_reply || interactive.nativeFlowReply || {};
+
+  const selectedId = firstText(
+    raw.selectedButtonId,
+    raw.selectedRowId,
+    raw.buttonId,
+    raw.button?.id,
+    rawData.selectedButtonId,
+    rawData.selectedRowId,
+    rawData.buttonId,
+    rawData.button?.id,
+    buttonReply.id,
+    buttonReply.buttonId,
+    listReply.id,
+    listReply.rowId,
+    interactiveButton.id,
+    interactiveList.id,
+    nativeFlow.name
+  );
+
+  const selectedText = firstText(
+    raw.selectedButtonText,
+    raw.selectedRowTitle,
+    raw.buttonText,
+    raw.button?.text,
+    rawData.selectedButtonText,
+    rawData.selectedRowTitle,
+    rawData.buttonText,
+    rawData.button?.text,
+    buttonReply.text,
+    buttonReply.title,
+    listReply.title,
+    listReply.description,
+    interactiveButton.title,
+    interactiveList.title,
+    nativeFlow.body
+  );
+
+  const body = firstText(raw.body, raw.text, raw.caption, rawData.body, rawData.text, rawData.caption);
+  const interactiveText = selectedId || selectedText;
+
+  if (!interactiveText) {
+    return {
+      body,
+      interactive: null
+    };
+  }
+
+  const numericMatch = interactiveText.match(/^[^\d]*([1-9])(?:\D|$)/);
+  const normalizedBody = numericMatch ? numericMatch[1] : interactiveText;
+
+  return {
+    body: normalizedBody,
+    interactive: {
+      id: selectedId || null,
+      text: selectedText || null,
+      originalBody: body || null
+    }
+  };
+};
 
 // ============ WHATSAPP WEBHOOK (WAHA) ============
 router.post('/whatsapp', async (req, res) => {
   try {
     const { event } = req.body;
     const data = req.body.payload || req.body.data;
-    console.log(`ðŸ“¥ Incoming WAHA Webhook: event="${event}"`, JSON.stringify(req.body).substring(0, 300));
+    console.log(`Incoming WAHA Webhook: event="${event}"`, JSON.stringify(req.body).substring(0, 300));
 
-    // Handle incoming message
     if (event === 'message' && data) {
-      const { from, body, hasMedia, media, fromMe, _data } = data;
+      const { from, hasMedia, media, fromMe, _data } = data;
+      const normalizedReply = normalizeInteractiveReply(data);
 
       if (!from) {
         return res.status(200).send('OK');
       }
 
       if (fromMe === true) {
-        console.log('â„¹ï¸ Ignoring message sent by ourselves (fromMe = true)');
+        console.log('Ignoring message sent by ourselves (fromMe = true)');
         return res.status(200).send('OK');
       }
 
-      // Ignore group chats and status broadcasts
       if (from.includes('@g.us') || from.includes('status@broadcast')) {
-        console.log(`â„¹ï¸ Ignoring group/broadcast message from: ${from}`);
+        console.log(`Ignoring group/broadcast message from: ${from}`);
         return res.status(200).send('OK');
       }
 
-      // Extract phone number or keep LID JID directly
       let resolvedFrom = from;
       let originalLid = null;
 
@@ -40,10 +157,10 @@ router.post('/whatsapp', async (req, res) => {
         originalLid = '+' + from.replace('@lid', '') + '@lid';
         if (_data?.key?.remoteJidAlt) {
           resolvedFrom = _data.key.remoteJidAlt;
-          console.log(`â„¹ï¸ Resolved LID "${from}" to phone JID "${resolvedFrom}" via remoteJidAlt`);
+          console.log(`Resolved LID "${from}" to phone JID "${resolvedFrom}" via remoteJidAlt`);
         } else if (_data?.key?.participantAlt) {
           resolvedFrom = _data.key.participantAlt;
-          console.log(`â„¹ï¸ Resolved LID "${from}" to phone JID "${resolvedFrom}" via participantAlt`);
+          console.log(`Resolved LID "${from}" to phone JID "${resolvedFrom}" via participantAlt`);
         }
       }
 
@@ -58,63 +175,59 @@ router.post('/whatsapp', async (req, res) => {
         phoneNumber = resolvedFrom;
       }
 
-      // Retrieve default userId or lookup first ADMIN user from database dynamically
-      let userId = process.env.DEFAULT_USER_ID;
-      if (!userId || userId === '000000000000000000000000') {
-        const User = require('../models/User');
-        const defaultUser = await User.findOne({ role: 'ADMIN' });
-        if (defaultUser) {
-          userId = defaultUser._id;
-        } else {
-          userId = '000000000000000000000000';
-        }
-      }
+      const userId = await getDefaultUserId();
+      const externalMessageId = data.id || _data?.id?.id || _data?.key?.id || null;
 
-      // Process message with AI chat handler
-      const result = await aiChatHandler.handleCustomerMessage(
+      const result = await processOrQueueMessage({
         phoneNumber,
-        body,
-        'whatsapp',
+        messageBody: normalizedReply.body || '',
+        channel: 'whatsapp',
         userId,
-        hasMedia && media ? media.url : null,
-        {
+        mediaUrl: hasMedia && media ? media.url : null,
+        externalMessageId,
+        timestamp: data.timestamp || Date.now(),
+        options: {
           pushName: _data?.pushName,
-          whatsappLid: originalLid
+          whatsappLid: originalLid,
+          interactiveReply: normalizedReply.interactive,
+          rawMessageType: data.type || _data?.type || null
         }
-      );
+      });
 
-      if (result.success) {
-        console.log('âœ… WhatsApp Message Processed:', {
+      if (result.queued) {
+        console.log('WhatsApp message queued:', {
+          jobId: result.jobId,
+          phoneNumber
+        });
+      } else if (result.success) {
+        console.log('WhatsApp message processed inline:', {
           customerId: result.customerId,
-          intent: result.analysis.intent,
-          leadScore: result.leadScore.score,
+          intent: result.analysis?.intent,
+          leadScore: result.leadScore?.score,
           escalated: result.escalated
         });
       } else {
-        console.error('âŒ Message Processing Failed:', result.error);
+        console.error('WhatsApp message processing failed:', result.error);
       }
     }
 
-    // Handle session status update (e.g. mobile logout or connection failure)
     if (event === 'session.status') {
       const { status } = data || {};
-      console.log(`â„¹ï¸ Webhook: Session status updated to "${status}"`);
+      console.log(`Webhook session status updated to "${status}"`);
       if (status === 'FAILED') {
-        console.log('âš ï¸ Webhook: Session is FAILED. Triggering auto-logout to reset stale credentials...');
         try {
           await WhatsAppService.logout();
-          console.log('âœ… Webhook auto-logout completed successfully.');
+          console.log('Webhook auto-logout completed successfully.');
         } catch (err) {
-          console.error(`âŒ Webhook: Failed to logout failed session: ${err.message}`);
+          console.error(`Webhook failed to logout failed session: ${err.message}`);
         }
       }
     }
 
-    // Handle message status update
     if (event === 'message.status') {
       const { id, status } = data;
       await WhatsAppService.updateMessageStatus(id, status);
-      console.log(`ðŸ“Š Message ${id} status updated to ${status}`);
+      console.log(`Message ${id} status updated to ${status}`);
     }
 
     res.status(200).send('OK');
@@ -147,7 +260,6 @@ router.get('/instagram', (req, res) => {
 // ============ INSTAGRAM WEBHOOK ============
 router.post('/instagram', async (req, res) => {
   try {
-    // Verify signature
     const signature = req.headers['x-hub-signature-256'];
     const rawBody = JSON.stringify(req.body);
     const isValid = InstagramService.verifyWebhookSignature(signature, rawBody);
@@ -186,34 +298,31 @@ router.post('/instagram', async (req, res) => {
 
           await InstagramService.markAsSeen(senderId);
 
-          let userId = process.env.DEFAULT_USER_ID;
-          if (!userId || userId === '000000000000000000000000') {
-            const User = require('../models/User');
-            const defaultUser = await User.findOne({ role: 'ADMIN' });
-            if (defaultUser) {
-              userId = defaultUser._id;
-            } else {
-              userId = '000000000000000000000000';
-            }
-          }
-
-          const result = await aiChatHandler.handleCustomerMessage(
-            senderId,
-            messageText,
-            'instagram',
+          const userId = await getDefaultUserId();
+          const result = await processOrQueueMessage({
+            phoneNumber: senderId,
+            messageBody: messageText,
+            channel: 'instagram',
             userId,
-            mediaUrl
-          );
+            mediaUrl,
+            externalMessageId: event.message.mid || null,
+            timestamp: event.timestamp || Date.now()
+          });
 
-          if (result.success) {
-            console.log('Instagram Message Processed:', {
+          if (result.queued) {
+            console.log('Instagram message queued:', {
+              jobId: result.jobId,
+              senderId
+            });
+          } else if (result.success) {
+            console.log('Instagram message processed inline:', {
               customerId: result.customerId,
               intent: result.analysis?.intent,
               leadScore: result.leadScore?.score,
               escalated: result.escalated
             });
           } else {
-            console.error('Instagram Message Processing Failed:', result.error);
+            console.error('Instagram message processing failed:', result.error);
           }
         }
       }
@@ -230,6 +339,7 @@ router.post('/instagram', async (req, res) => {
 router.get('/health', (req, res) => {
   res.json({
     status: 'ok',
+    queueEnabled: isQueueEnabled(),
     webhooks: {
       whatsapp: 'active (WAHA)',
       instagram: 'active'

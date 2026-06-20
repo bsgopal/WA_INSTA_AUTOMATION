@@ -540,7 +540,7 @@ router.delete('/catalog/:id', async (req, res) => {
 router.post('/test-ai-response', async (req, res) => {
   try {
     const userId = req.user._id;
-    const { message } = req.body;
+    const { message, widgetData = null } = req.body;
     
     if (!message) {
       return res.status(400).json({ success: false, error: 'Message content is required' });
@@ -577,8 +577,13 @@ router.post('/test-ai-response', async (req, res) => {
       rfmSegment: 'NEW'
     };
     
+    const triggerMessage = widgetData?.interactiveReply?.triggerText
+      || widgetData?.interactiveReply?.actionValue
+      || widgetData?.interactiveReply?.id
+      || message;
+
     const analysis = await aiMessageAnalyzer.analyzeMessage(
-      message,
+      triggerMessage,
       [], // no history
       mockCustomer
     );
@@ -588,7 +593,7 @@ router.post('/test-ai-response', async (req, res) => {
       analysis,
       mockCustomer,
       analysis.language || 'en',
-      message
+      triggerMessage
     );
     
     // Check if name capture is triggered in the sandbox
@@ -605,6 +610,9 @@ router.post('/test-ai-response', async (req, res) => {
       analysis,
       aiResponse: aiResponse.text,
       mediaUrl: aiResponse.mediaUrl || null,
+      buttons: aiResponse.buttons || [],
+      list: aiResponse.list || null,
+      widgetData: widgetData || null,
       isCatalogPrompt: aiResponse.isCatalogPrompt || false,
       catalogMatches: aiResponse.scrapedProducts && aiResponse.scrapedProducts.length > 0
         ? aiResponse.scrapedProducts.map((p, idx) => ({

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Typography, Box, Paper, Grid, TextField, Button, Switch,
   FormControlLabel, Divider, Stack, Card, CardContent, Alert,
@@ -46,6 +47,7 @@ function TabPanel(props) {
 }
 
 export default function Settings() {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(0);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
   const [loadingConfig, setLoadingConfig] = useState(false);
@@ -64,6 +66,10 @@ export default function Settings() {
           twilioToken: parsed.twilioToken || '',
           instagramToken: parsed.instagramToken || '',
           geminiKey: parsed.geminiKey || '',
+          useAnthropic: parsed.useAnthropic !== undefined ? parsed.useAnthropic : false,
+          anthropicApiKey: parsed.anthropicApiKey || '',
+          anthropicModel: parsed.anthropicModel || 'claude-3-haiku-20240307',
+          geminiModel: parsed.geminiModel || 'gemini-1.5-flash',
           emailNotifications: parsed.emailNotifications !== undefined ? parsed.emailNotifications : true,
           smsNotifications: parsed.smsNotifications !== undefined ? parsed.smsNotifications : false,
           campaignAlerts: parsed.campaignAlerts !== undefined ? parsed.campaignAlerts : true,
@@ -80,6 +86,10 @@ export default function Settings() {
       twilioToken: '',
       instagramToken: '',
       geminiKey: '',
+      useAnthropic: false,
+      anthropicApiKey: '',
+      anthropicModel: 'claude-3-haiku-20240307',
+      geminiModel: 'gemini-1.5-flash',
       emailNotifications: true,
       smsNotifications: false,
       campaignAlerts: true,
@@ -152,6 +162,63 @@ export default function Settings() {
     error: null
   });
   const [loadingInstagram, setLoadingInstagram] = useState(false);
+
+  const [knowledgeDocs, setKnowledgeDocs] = useState([]);
+  const [loadingDocs, setLoadingDocs] = useState(false);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+
+  const fetchKnowledgeDocs = async () => {
+    try {
+      setLoadingDocs(true);
+      const response = await apiClient.get('/knowledge-documents');
+      setKnowledgeDocs(response.data || []);
+    } catch (error) {
+      console.error('Failed to load knowledge documents:', error);
+      setSnackbar({ open: true, message: 'Could not load knowledge documents.', severity: 'error' });
+    } finally {
+      setLoadingDocs(false);
+    }
+  };
+
+  const handleUploadDoc = async (file) => {
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setSnackbar({ open: true, message: 'File is too large. Maximum size is 5MB.', severity: 'warning' });
+      return;
+    }
+    const fileExt = file.name.split('.').pop().toLowerCase();
+    if (!['txt', 'pdf', 'csv'].includes(fileExt)) {
+      setSnackbar({ open: true, message: 'Unsupported file type. Please upload .txt, .pdf, or .csv.', severity: 'warning' });
+      return;
+    }
+    try {
+      setUploadingDoc(true);
+      const formData = new FormData();
+      formData.append('file', file);
+      const response = await apiClient.post('/knowledge-documents/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      setKnowledgeDocs(prev => [response.data, ...prev]);
+      setSnackbar({ open: true, message: `${file.name} uploaded and ingested successfully!`, severity: 'success' });
+    } catch (error) {
+      console.error('Failed to upload document:', error);
+      const errorMsg = error.response?.data?.error || 'Failed to upload document.';
+      setSnackbar({ open: true, message: errorMsg, severity: 'error' });
+    } finally {
+      setUploadingDoc(false);
+    }
+  };
+
+  const handleDeleteDoc = async (docId) => {
+    try {
+      await apiClient.delete(`/knowledge-documents/${docId}`);
+      setKnowledgeDocs(prev => prev.filter(d => d._id !== docId));
+      setSnackbar({ open: true, message: 'Knowledge document deleted successfully.', severity: 'success' });
+    } catch (error) {
+      console.error('Failed to delete document:', error);
+      setSnackbar({ open: true, message: 'Failed to delete knowledge document.', severity: 'error' });
+    }
+  };
 
   const fetchWhatsappQr = async () => {
     try {
@@ -245,6 +312,7 @@ export default function Settings() {
     fetchCatalog();
     fetchWhatsappStatus();
     fetchInstagramStatus();
+    fetchKnowledgeDocs();
     // Poll WhatsApp status every 12 seconds
     const interval = setInterval(fetchWhatsappStatus, 12000);
     return () => clearInterval(interval);
@@ -263,6 +331,15 @@ export default function Settings() {
       const response = await apiClient.get('/ai-chat/shop-config');
       if (response.data.success && response.data.config) {
         setShopConfig(response.data.config);
+        const config = response.data.config || {};
+        setIntegrations(prev => ({
+          ...prev,
+          geminiKey: config.geminiApiKey ?? prev.geminiKey,
+          useAnthropic: config.useAnthropic ?? prev.useAnthropic,
+          anthropicApiKey: config.anthropicApiKey ?? prev.anthropicApiKey,
+          anthropicModel: config.anthropicModel ?? prev.anthropicModel,
+          geminiModel: config.geminiModel ?? prev.geminiModel
+        }));
       }
     } catch (error) {
       console.error('Failed to load shop config:', error);
@@ -288,9 +365,27 @@ export default function Settings() {
   };
 
   // Save integrations to localStorage
-  const handleSaveIntegrations = () => {
+  const handleSaveIntegrations = async () => {
     localStorage.setItem('renic_settings', JSON.stringify(integrations));
-    setSnackbar({ open: true, message: 'Integration settings saved locally!', severity: 'success' });
+    try {
+      setSavingConfig(true);
+      const response = await apiClient.put('/ai-chat/shop-config', {
+        geminiApiKey: integrations.geminiKey,
+        useAnthropic: integrations.useAnthropic,
+        anthropicApiKey: integrations.anthropicApiKey,
+        anthropicModel: integrations.anthropicModel,
+        geminiModel: integrations.geminiModel
+      });
+      if (response.data.success) {
+        setShopConfig(response.data.config);
+        setSnackbar({ open: true, message: 'Integration settings saved and synced to database!', severity: 'success' });
+      }
+    } catch (err) {
+      console.error('Failed to sync settings to database:', err);
+      setSnackbar({ open: true, message: 'Settings saved locally, but database sync failed.', severity: 'warning' });
+    } finally {
+      setSavingConfig(false);
+    }
   };
 
   // Save shop config to MongoDB
@@ -411,9 +506,12 @@ export default function Settings() {
   };
 
   // Send message in sandbox
-  const handleSendSandbox = async (presetText = null) => {
-    const textToSend = presetText || sandboxInput;
-    if (!textToSend.trim()) return;
+  const handleSendSandbox = async (presetInput = null) => {
+    const payload = typeof presetInput === 'object' && presetInput !== null
+      ? presetInput
+      : { text: presetInput || sandboxInput };
+    const textToSend = (payload.text || '').trim();
+    if (!textToSend) return;
 
     // Add user message
     const userMsg = {
@@ -422,17 +520,22 @@ export default function Settings() {
       timestamp: new Date()
     };
     setSandboxMessages(prev => [...prev, userMsg]);
-    if (!presetText) setSandboxInput('');
+    if (!presetInput) setSandboxInput('');
 
     try {
       setSandboxSending(true);
-      const response = await apiClient.post('/ai-chat/test-ai-response', { message: textToSend });
+      const response = await apiClient.post('/ai-chat/test-ai-response', {
+        message: textToSend,
+        widgetData: payload.widgetData || null
+      });
       if (response.data.success) {
         const aiMsg = {
           sender: 'ai',
           text: response.data.aiResponse,
           timestamp: new Date(),
           mediaUrl: response.data.mediaUrl,
+          buttons: response.data.buttons || [],
+          list: response.data.list || null,
           isCatalogPrompt: response.data.isCatalogPrompt,
           catalogMatches: response.data.catalogMatches || [],
           nameUpdated: response.data.nameUpdated,
@@ -470,6 +573,145 @@ export default function Settings() {
     return `http://localhost:5000${url}`;
   };
 
+  const formatActionTypeLabel = (actionType, fallback = 'Quick Reply') => {
+    const normalized = String(actionType || '').trim();
+    if (!normalized) return fallback;
+    return normalized.replace(/_/g, ' ');
+  };
+
+  const renderSandboxInteractive = (msg) => {
+    const buttons = Array.isArray(msg.buttons) ? msg.buttons : [];
+    const list = msg.list || null;
+
+    if (buttons.length === 0 && !list) return null;
+
+    return (
+      <Box sx={{ mt: 1.25, display: 'flex', flexDirection: 'column', gap: 1 }}>
+        {buttons.length > 0 && (
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+            {buttons.map((btn, idx) => (
+              <Button
+                key={idx}
+                size="small"
+                variant="outlined"
+                onClick={() => {
+                  const actionValue = btn.value || btn.actionValue || btn.label;
+                  const actionType = String(btn.actionType || btn.type || 'QUICK_REPLY').toUpperCase();
+                  if (actionType === 'URL' && actionValue) {
+                    window.open(actionValue, '_blank', 'noopener,noreferrer');
+                    return;
+                  }
+                  if (actionType === 'CATALOG') {
+                    if (actionValue && /^https?:\/\//i.test(actionValue)) {
+                      window.open(actionValue, '_blank', 'noopener,noreferrer');
+                    } else {
+                      navigate('/catalog');
+                    }
+                    return;
+                  }
+                  handleSendSandbox({
+                    text: btn.label,
+                    value: actionValue,
+                        widgetData: {
+                          interactiveReply: {
+                            id: actionValue,
+                            actionValue,
+                            actionType,
+                            triggerText: btn.label,
+                            text: btn.label
+                          }
+                        }
+                      });
+                }}
+                sx={{ textTransform: 'none', borderRadius: 4, bgcolor: '#ffffff', py: 0.5, px: 1.5, fontSize: '0.75rem', fontWeight: 600, border: '1px solid #e8eef7', color: 'primary.main', '&:hover': { bgcolor: 'primary.light', color: 'primary.contrastText' } }}
+              >
+                {btn.label}
+                <Typography variant="caption" sx={{ display: 'block', fontWeight: 700, color: 'primary.main' }}>
+                  {formatActionTypeLabel(btn.actionType || btn.type, 'Quick Reply')}
+                </Typography>
+              </Button>
+            ))}
+          </Box>
+        )}
+
+        {list && (
+          <Box sx={{ border: '1px solid #e8eef7', borderRadius: 3, bgcolor: '#ffffff', p: 1.5 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
+              {list.title || 'Options'}
+            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+              {list.buttonText || 'Select'}
+            </Typography>
+            <Stack spacing={1}>
+              {(list.sections || []).map((section, sectionIdx) => (
+                <Box key={sectionIdx}>
+                  {section.title && (
+                    <Typography variant="caption" sx={{ fontWeight: 700, textTransform: 'uppercase', color: 'text.secondary' }}>
+                      {section.title}
+                    </Typography>
+                  )}
+                  <Stack spacing={1} sx={{ mt: 0.5 }}>
+                    {(section.rows || []).map((row, rowIdx) => (
+                      <Button
+                        key={rowIdx}
+                        size="small"
+                        variant="outlined"
+                        onClick={() => {
+                          const actionValue = row.actionValue || row.id || row.title;
+                          const actionType = String(row.actionType || 'CUSTOM').toUpperCase();
+                          if (actionType === 'URL' && actionValue) {
+                            window.open(actionValue, '_blank', 'noopener,noreferrer');
+                            return;
+                          }
+                          if (actionType === 'CATALOG') {
+                            if (actionValue && /^https?:\/\//i.test(actionValue)) {
+                              window.open(actionValue, '_blank', 'noopener,noreferrer');
+                            } else {
+                              navigate('/catalog');
+                            }
+                            return;
+                          }
+                          handleSendSandbox({
+                            text: row.title,
+                            value: actionValue,
+                            widgetData: {
+                              interactiveReply: {
+                                id: row.rowId || row.id || row.title,
+                                actionValue,
+                                actionType,
+                                triggerText: row.title,
+                                text: row.title
+                              }
+                            }
+                          });
+                        }}
+                        sx={{ justifyContent: 'flex-start', textTransform: 'none', borderRadius: 3, bgcolor: '#ffffff', py: 0.7, px: 1.2, fontSize: '0.75rem', fontWeight: 600, border: '1px solid #e8eef7', color: 'text.primary' }}
+                      >
+                        <Box sx={{ textAlign: 'left' }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                            {row.title}
+                          </Typography>
+                          <Typography variant="caption" color="primary.main" sx={{ display: 'block', fontWeight: 700 }}>
+                            {formatActionTypeLabel(row.actionType, 'Custom')}
+                          </Typography>
+                          {row.description && (
+                            <Typography variant="caption" color="text.secondary">
+                              {row.description}
+                            </Typography>
+                          )}
+                        </Box>
+                      </Button>
+                    ))}
+                  </Stack>
+                </Box>
+              ))}
+            </Stack>
+          </Box>
+        )}
+      </Box>
+    );
+  };
+
   return (
     <Box sx={{ width: '100%', flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
       <Box sx={{ mb: 3 }}>
@@ -503,6 +745,7 @@ export default function Settings() {
           <Tab icon={<StorefrontIcon fontSize="small" />} label="Knowledge Base" />
           <Tab icon={<ShoppingBagIcon fontSize="small" />} label="Jewelry Catalog" />
           <Tab icon={<ChatIcon fontSize="small" />} label="AI Sandbox" />
+          <Tab icon={<CloudUploadIcon fontSize="small" />} label="Knowledge Documents" />
         </Tabs>
       </Paper>
 
@@ -529,7 +772,74 @@ export default function Settings() {
                     placeholder="AIzaSy..."
                     helperText="Used to power AI conversational responses in Rupees (INR) and capture customer details."
                   />
-                  
+
+                  <Card variant="outlined" sx={{ borderRadius: 3, borderColor: '#e8eef7', bgcolor: '#fafbfd' }}>
+                    <CardContent sx={{ p: 3 }}>
+                      <Stack spacing={2}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap' }}>
+                          <Box>
+                            <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>AI Provider Routing</Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              Choose which provider powers live responses. Anthropic is used first when enabled and configured.
+                            </Typography>
+                          </Box>
+                          <Chip
+                            label={integrations.useAnthropic ? 'Anthropic active' : 'Gemini active'}
+                            color={integrations.useAnthropic ? 'secondary' : 'primary'}
+                            size="small"
+                            sx={{ fontWeight: 700, height: 24 }}
+                          />
+                        </Box>
+
+                        <FormControlLabel
+                          control={
+                            <Switch
+                              checked={integrations.useAnthropic}
+                              onChange={(e) => handleIntegrationChange('useAnthropic', e.target.checked)}
+                            />
+                          }
+                          label="Use Anthropic as primary AI provider"
+                        />
+
+                        {integrations.useAnthropic && (
+                          <TextField
+                            label="Anthropic API Key"
+                            fullWidth
+                            type="password"
+                            value={integrations.anthropicApiKey}
+                            onChange={(e) => handleIntegrationChange('anthropicApiKey', e.target.value)}
+                            placeholder="sk-ant-..."
+                            helperText="Required when Anthropic is enabled."
+                          />
+                        )}
+
+                        <TextField
+                          label="Anthropic Model"
+                          fullWidth
+                          value={integrations.anthropicModel}
+                          onChange={(e) => handleIntegrationChange('anthropicModel', e.target.value)}
+                          placeholder="claude-3-haiku-20240307"
+                          helperText="Used when Anthropic is enabled."
+                        />
+
+                        <TextField
+                          label="Gemini Model"
+                          fullWidth
+                          value={integrations.geminiModel}
+                          onChange={(e) => handleIntegrationChange('geminiModel', e.target.value)}
+                          placeholder="gemini-1.5-flash"
+                          helperText="Fallback model when Gemini is active."
+                        />
+
+                        <Alert severity={integrations.useAnthropic ? 'info' : 'success'} sx={{ borderRadius: 2 }}>
+                          {integrations.useAnthropic
+                            ? 'Anthropic will handle live AI replies when an API key is present. Gemini remains available as the configured fallback.'
+                            : 'Gemini is currently the primary provider for live AI replies.'}
+                        </Alert>
+                      </Stack>
+                    </CardContent>
+                  </Card>
+
                   <TextField
                     label="Twilio Account SID"
                     fullWidth
@@ -1601,6 +1911,8 @@ export default function Settings() {
                           </Typography>
                         </Paper>
 
+                        {!isUser && renderSandboxInteractive(msg)}
+
                         {/* Interactive Category Buttons for Catalog Prompts */}
                         {!isUser && msg.isCatalogPrompt && (
                           <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
@@ -1787,6 +2099,165 @@ export default function Settings() {
                 <Alert severity="warning" sx={{ mt: 4, '& .MuiAlert-message': { fontSize: '0.8rem' } }}>
                   Rates and catalog items will match the live database values configured in the <strong>Knowledge Base</strong> and <strong>Jewelry Catalog</strong> tabs.
                 </Alert>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+      </TabPanel>
+
+      {/* Tab 5: Knowledge Documents */}
+      <TabPanel value={activeTab} index={4}>
+        <Grid container spacing={3}>
+          {/* Uploader Section */}
+          <Grid item xs={12} md={5}>
+            <Card elevation={0} sx={{ border: '1px solid #e8eef7' }}>
+              <CardContent sx={{ p: 4 }}>
+                <Typography variant="h6" gutterBottom sx={{ fontWeight: 700 }}>
+                  Upload Knowledge Source
+                </Typography>
+                <Typography variant="body2" color="text.secondary" mb={3}>
+                  Upload store catalogs, FAQs, return policies, or price lists (.pdf, .txt, .csv) so the AI chatbot can answer custom customer queries dynamically.
+                </Typography>
+
+                {/* Drag and Drop Zone */}
+                <Box
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                      handleUploadDoc(e.dataTransfer.files[0]);
+                    }
+                  }}
+                  sx={{
+                    border: '2px dashed',
+                    borderColor: uploadingDoc ? 'primary.main' : '#cfd8dc',
+                    borderRadius: 3,
+                    p: 4,
+                    textAlign: 'center',
+                    bgcolor: '#fafbfc',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease-in-out',
+                    '&:hover': {
+                      borderColor: 'primary.main',
+                      bgcolor: '#f5f7fa',
+                    },
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    minHeight: 180
+                  }}
+                  component="label"
+                >
+                  <input
+                    type="file"
+                    accept=".pdf,.txt,.csv"
+                    style={{ display: 'none' }}
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        handleUploadDoc(e.target.files[0]);
+                      }
+                    }}
+                    disabled={uploadingDoc}
+                  />
+                  {uploadingDoc ? (
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                      <CircularProgress size={36} />
+                      <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
+                        Ingesting & Processing File...
+                      </Typography>
+                    </Box>
+                  ) : (
+                    <>
+                      <CloudUploadIcon color="primary" sx={{ fontSize: 48, mb: 1.5, opacity: 0.8 }} />
+                      <Typography variant="subtitle2" sx={{ fontWeight: 700 }} gutterBottom>
+                        Drag & drop file here
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
+                        Supports PDF, TXT, or CSV (max 5MB)
+                      </Typography>
+                      <Button variant="outlined" size="small" sx={{ textTransform: 'none', borderRadius: 2 }} disabled={uploadingDoc}>
+                        Browse Files
+                      </Button>
+                    </>
+                  )}
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Ingested Documents List Grid */}
+          <Grid item xs={12} md={7}>
+            <Card elevation={0} sx={{ border: '1px solid #e8eef7', minHeight: 330 }}>
+              <CardContent sx={{ p: 4 }}>
+                <Typography variant="h6" gutterBottom sx={{ fontWeight: 700 }}>
+                  Ingested Knowledge Base ({knowledgeDocs.length})
+                </Typography>
+                <Typography variant="body2" color="text.secondary" mb={3}>
+                  The following files have been parsed and their text is searchable by the AI RAG engine.
+                </Typography>
+
+                {loadingDocs ? (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
+                    <CircularProgress size={30} />
+                  </Box>
+                ) : knowledgeDocs.length === 0 ? (
+                  <Box sx={{ textAlign: 'center', py: 8, bgcolor: '#fafbfc', borderRadius: 3, border: '1px solid #e8eef7' }}>
+                    <InfoIcon sx={{ fontSize: 40, color: 'text.disabled', mb: 1, opacity: 0.6 }} />
+                    <Typography variant="subtitle2" sx={{ fontWeight: 600 }} color="text.secondary">
+                      No documents uploaded yet
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Your uploaded documents will appear here.
+                    </Typography>
+                  </Box>
+                ) : (
+                  <Grid container spacing={2}>
+                    {knowledgeDocs.map((doc) => {
+                      const uploadDate = new Date(doc.createdAt).toLocaleDateString(undefined, {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      });
+                      let docColor = '#1565c0'; // blue for pdf
+                      if (doc.fileType === 'txt') docColor = '#2e7d32'; // green
+                      if (doc.fileType === 'csv') docColor = '#ef6c00'; // orange
+
+                      return (
+                        <Grid item xs={12} key={doc._id}>
+                          <Card variant="outlined" sx={{ borderRadius: 2.5, borderColor: '#e8eef7', bgcolor: '#ffffff', '&:hover': { boxShadow: '0 4px 12px rgba(0,0,0,0.02)' } }}>
+                            <Box sx={{ p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                              <Stack direction="row" spacing={2} alignItems="center" sx={{ flexGrow: 1, minWidth: 0 }}>
+                                <Avatar sx={{ bgcolor: docColor, width: 42, height: 42, fontSize: '0.75rem', fontWeight: 800 }}>
+                                  {doc.fileType.toUpperCase()}
+                                </Avatar>
+                                <Box sx={{ minWidth: 0 }}>
+                                  <Typography variant="subtitle2" sx={{ fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {doc.fileName}
+                                  </Typography>
+                                  <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.5 }}>
+                                    <Chip label={doc.status} color="success" size="small" sx={{ height: 18, fontSize: '0.65rem', fontWeight: 700 }} />
+                                    <Typography variant="caption" color="text.secondary">
+                                      Uploaded {uploadDate}
+                                    </Typography>
+                                  </Stack>
+                                </Box>
+                              </Stack>
+                              <IconButton onClick={() => handleDeleteDoc(doc._id)} color="error" size="small">
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </Box>
+                          </Card>
+                        </Grid>
+                      );
+                    })}
+                  </Grid>
+                )}
               </CardContent>
             </Card>
           </Grid>

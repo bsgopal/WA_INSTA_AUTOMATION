@@ -1,4 +1,4 @@
-// renic-automation-backend/services/WAHAService.js
+﻿// renic-automation-backend/services/WAHAService.js
 // WAHA (WhatsApp HTTP API) - Open-source WhatsApp integration
 // Free, self-hosted, no approval needed
 
@@ -19,6 +19,43 @@ const extractStringId = (id) => {
   return String(id);
 };
 
+const buildReadableListFallback = (message, listConfig = {}) => {
+  const title = String(listConfig.title || 'Options').trim();
+  const sections = Array.isArray(listConfig.sections) ? listConfig.sections : [];
+
+  const lines = [];
+  const promptText = String(message || '').trim();
+  if (promptText) {
+    lines.push(promptText);
+    lines.push('');
+  }
+
+  if (title) {
+    lines.push(title);
+    lines.push('');
+  }
+
+  sections.forEach((section, sectionIndex) => {
+    const sectionTitle = String(section?.title || 'Options').trim();
+    if (sectionTitle) {
+      lines.push(sectionTitle);
+    }
+
+    (section?.rows || []).forEach(row => {
+      const rowTitle = String(row?.title || row?.label || 'Option').trim();
+      const rowDescription = String(row?.description || '').trim();
+      if (!rowTitle) return;
+      lines.push("• " + rowTitle + (rowDescription ? " - " + rowDescription : ""));
+    });
+
+    if (sectionIndex < sections.length - 1) {
+      lines.push('');
+    }
+  });
+
+  return lines.join('\n').trim();
+};
+
 const wahaClient = axios.create({
   baseURL: `${WAHA_API_URL}/api`,
   timeout: 10000,
@@ -33,29 +70,29 @@ const wahaClient = axios.create({
  */
 const initialize = async () => {
   try {
-    console.log('🔄 Initializing WAHA service...');
-    console.log(`📍 WAHA API URL: ${WAHA_API_URL}`);
-    console.log(`📱 Session Name: ${SESSION_NAME}`);
+    console.log('ðŸ”„ Initializing WAHA service...');
+    console.log(`ðŸ“ WAHA API URL: ${WAHA_API_URL}`);
+    console.log(`ðŸ“± Session Name: ${SESSION_NAME}`);
 
     // Try to get session status first
     try {
       const sessionStatus = await wahaClient.get(`/sessions/${SESSION_NAME}`);
-      console.log(`✅ WAHA session already exists: ${SESSION_NAME}`);
-      console.log(`📱 Status: ${sessionStatus.data.status}`);
-      console.log(`🔐 Authenticated: ${sessionStatus.data.status === 'WORKING'}`);
+      console.log(`âœ… WAHA session already exists: ${SESSION_NAME}`);
+      console.log(`ðŸ“± Status: ${sessionStatus.data.status}`);
+      console.log(`ðŸ” Authenticated: ${sessionStatus.data.status === 'WORKING'}`);
       
       // Auto-start if stopped or failed
       if (sessionStatus.data.status === 'STOPPED' || sessionStatus.data.status === 'FAILED') {
         if (sessionStatus.data.status === 'FAILED') {
           try {
-            console.log(`🔄 Session is FAILED. Stopping session ${SESSION_NAME} first to reset...`);
+            console.log(`ðŸ”„ Session is FAILED. Stopping session ${SESSION_NAME} first to reset...`);
             await wahaClient.post(`/sessions/${SESSION_NAME}/stop`);
             await new Promise(resolve => setTimeout(resolve, 2000));
           } catch (stopErr) {
-            console.warn(`⚠️ Failed to stop FAILED session: ${stopErr.message}`);
+            console.warn(`âš ï¸ Failed to stop FAILED session: ${stopErr.message}`);
           }
         }
-        console.log(`🔄 Session is ${sessionStatus.data.status}. Starting session: ${SESSION_NAME}...`);
+        console.log(`ðŸ”„ Session is ${sessionStatus.data.status}. Starting session: ${SESSION_NAME}...`);
         await wahaClient.post(`/sessions/${SESSION_NAME}/start`);
       }
       
@@ -72,15 +109,15 @@ const initialize = async () => {
     } catch (statusError) {
       // Session doesn't exist, try to create it
       if (statusError.response?.status === 404) {
-        console.log(`📲 Creating new WAHA session: ${SESSION_NAME}`);
+        console.log(`ðŸ“² Creating new WAHA session: ${SESSION_NAME}`);
         
         try {
           const createResponse = await wahaClient.post('/sessions', {
             name: SESSION_NAME
           });
 
-          console.log('✅ WAHA session created');
-          console.log('📸 Scan the QR code to authenticate WhatsApp');
+          console.log('âœ… WAHA session created');
+          console.log('ðŸ“¸ Scan the QR code to authenticate WhatsApp');
           
           return {
             success: true,
@@ -91,7 +128,7 @@ const initialize = async () => {
         } catch (createError) {
           // If creation fails with "already exists", session was created between checks
           if (createError.response?.status === 422 && createError.response?.data?.message?.includes('already exists')) {
-            console.log(`✅ WAHA session exists (created by another process): ${SESSION_NAME}`);
+            console.log(`âœ… WAHA session exists (created by another process): ${SESSION_NAME}`);
             await setupWebhook();
             
             return {
@@ -107,9 +144,9 @@ const initialize = async () => {
       }
     }
   } catch (error) {
-    console.error('❌ WAHA Initialization Error:', error.message);
+    console.error('âŒ WAHA Initialization Error:', error.message);
     if (error.response?.data) {
-      console.error('📋 Error Details:', error.response.data);
+      console.error('ðŸ“‹ Error Details:', error.response.data);
     }
     return {
       success: false,
@@ -124,20 +161,25 @@ const initialize = async () => {
  */
 const setupWebhook = async () => {
   try {
-    console.log('🔗 Setting up WAHA webhook...');
+    console.log('ðŸ”— Setting up WAHA webhook...');
 
     const webhookConfig = {
+      name: SESSION_NAME,
       url: WEBHOOK_URL,
       events: ['message', 'message.status', 'presence.update']
     };
 
     // Register webhook
-    await wahaClient.post(`/sessions/${SESSION_NAME}/webhooks`, webhookConfig);
+    await wahaClient.post('/webhooks', webhookConfig);
 
-    console.log(`✅ Webhook registered: ${WEBHOOK_URL}`);
+    console.log(`âœ… Webhook registered: ${WEBHOOK_URL}`);
     return { success: true };
   } catch (error) {
-    console.error('❌ Webhook Setup Error:', error.message);
+    if (error.response?.status === 404) {
+      console.log('â„¹ï¸ Webhook API registration returned 404. Relying on pre-configured webhook environment variables.');
+      return { success: true, message: 'Using environment variables' };
+    }
+    console.error('âŒ Webhook Setup Error:', error.message);
     return { success: false, error: error.message };
   }
 };
@@ -156,7 +198,7 @@ const getQRCode = async () => {
       qrCode: `data:image/png;base64,${base64Qr}`
     };
   } catch (error) {
-    console.error('❌ QR Code Error:', error.message);
+    console.error('âŒ QR Code Error:', error.message);
     return {
       success: false,
       error: error.message
@@ -173,7 +215,7 @@ const getSessionStatus = async () => {
     
     // Auto-start if stopped
     if (response.data.status === 'STOPPED') {
-      console.log(`🔄 Session is STOPPED during status check. Starting session: ${SESSION_NAME}...`);
+      console.log(`ðŸ”„ Session is STOPPED during status check. Starting session: ${SESSION_NAME}...`);
       await wahaClient.post(`/sessions/${SESSION_NAME}/start`);
       // Fetch status again
       const reResponse = await wahaClient.get(`/sessions/${SESSION_NAME}`);
@@ -187,10 +229,10 @@ const getSessionStatus = async () => {
 
     // Auto-logout if FAILED to cleanly reset and prompt for fresh QR code
     if (response.data.status === 'FAILED') {
-      console.log(`⚠️ Session is FAILED. Logging out session ${SESSION_NAME} to reset stale credentials...`);
+      console.log(`âš ï¸ Session is FAILED. Logging out session ${SESSION_NAME} to reset stale credentials...`);
       try {
         await wahaClient.post(`/sessions/${SESSION_NAME}/logout`);
-        console.log(`✅ Stale session logged out successfully.`);
+        console.log(`âœ… Stale session logged out successfully.`);
         // Fetch status again to get the fresh status (usually SCAN_QR_CODE)
         const reResponse = await wahaClient.get(`/sessions/${SESSION_NAME}`);
         return {
@@ -200,7 +242,7 @@ const getSessionStatus = async () => {
           phoneNumber: reResponse.data.me?.id || null
         };
       } catch (logoutErr) {
-        console.error(`❌ Failed to log out failed session: ${logoutErr.message}`);
+        console.error(`âŒ Failed to log out failed session: ${logoutErr.message}`);
       }
     }
 
@@ -211,7 +253,7 @@ const getSessionStatus = async () => {
       phoneNumber: response.data.me?.id || null
     };
   } catch (error) {
-    console.error('❌ Session Status Error:', error.message);
+    console.error('âŒ Session Status Error:', error.message);
     return {
       success: false,
       error: error.message
@@ -232,11 +274,9 @@ const formatPhoneNumber = (phone) => {
   }
   cleaned = cleaned.replace(/\D/g, '');
 
-  // Add country code if not present
-  if (!cleaned.startsWith('91')) {
-    if (cleaned.length === 10) {
-      cleaned = '91' + cleaned;
-    }
+  // Add country code if not present (any exactly 10-digit Indian number requires prepended country code)
+  if (cleaned.length === 10) {
+    cleaned = '91' + cleaned;
   }
 
   return cleaned + '@c.us';
@@ -250,7 +290,92 @@ const sendMessage = async (to, message, options = {}) => {
     const formattedPhone = formatPhoneNumber(to);
     let response;
 
-    if (options.mediaUrl) {
+    // 1. Handle interactive list messages
+    if (options.list) {
+      const fallbackText = buildReadableListFallback(message, options.list);
+      const allowNativeLists = String(process.env.WAHA_ENABLE_NATIVE_LISTS || '').toLowerCase() === 'true';
+
+      if (!allowNativeLists) {
+        console.warn("WAHAService: Native list messages are disabled for this WAHA setup. Sending plain text fallback.");
+        response = await wahaClient.post('/sendText', {
+          session: SESSION_NAME,
+          chatId: formattedPhone,
+          text: fallbackText
+        });
+      } else {
+        const payload = {
+          session: SESSION_NAME,
+          chatId: formattedPhone,
+          title: options.list.title || 'Options',
+          text: message,
+          button: options.list.buttonText || 'Select',
+          sections: options.list.sections || []
+        };
+        try {
+          response = await wahaClient.post('/sendList', payload);
+        } catch (err) {
+          console.warn("WAHAService: /sendList failed. Falling back to plain text formatting.");
+          response = await wahaClient.post('/sendText', {
+            session: SESSION_NAME,
+            chatId: formattedPhone,
+            text: fallbackText
+          });
+        }
+      }
+    }
+    // 1.5 Handle split sending for media card with buttons
+    else if (options.mediaUrl && options.buttons && options.buttons.length > 0) {
+      try {
+        await wahaClient.post('/sendFile', {
+          session: SESSION_NAME,
+          chatId: formattedPhone,
+          file: { url: options.mediaUrl },
+          caption: message
+        });
+      } catch (err) {
+        console.warn(`âš ï¸ WAHAService: /sendFile failed in card-button send:`, err.message);
+      }
+      const wahaButtons = options.buttons.map(b => ({
+        id: b.value,
+        reply: { id: b.value, title: b.label }
+      }));
+      response = await wahaClient.post('/sendButtons', {
+        session: SESSION_NAME,
+        chatId: formattedPhone,
+        text: 'Action buttons:',
+        buttons: wahaButtons
+      });
+    }
+    // 2. Handle interactive buttons
+    else if (options.buttons && options.buttons.length > 0) {
+      const wahaButtons = options.buttons.map(b => ({
+        id: b.value,
+        reply: { id: b.value, title: b.label }
+      }));
+      const payload = {
+        session: SESSION_NAME,
+        chatId: formattedPhone,
+        text: message,
+        buttons: wahaButtons
+      };
+      try {
+        response = await wahaClient.post('/sendButtons', payload);
+      } catch (err) {
+        console.warn(`âš ï¸ WAHAService: /sendButtons failed. Falling back to plain text formatting.`);
+        let fallbackText = message;
+        options.buttons.forEach((b, idx) => {
+          const emojiNum = ['1ï¸âƒ£', '2ï¸âƒ£', '3ï¸âƒ£'][idx] || 'ðŸ”¹';
+          fallbackText += `\n\n${emojiNum} *${b.label}* _(Reply "${b.value}")_`;
+        });
+        response = await wahaClient.post('/sendText', {
+          session: SESSION_NAME,
+          chatId: formattedPhone,
+          text: fallbackText
+        });
+      }
+    }
+    // 3. Handle file media
+    else if (options.mediaUrl) {
       const payload = {
         session: SESSION_NAME,
         chatId: formattedPhone,
@@ -264,18 +389,20 @@ const sendMessage = async (to, message, options = {}) => {
       } catch (err) {
         const errorMsg = err.response?.data?.message || '';
         if (err.response?.status === 422 && (errorMsg.includes('Plus version') || errorMsg.includes('engine') || errorMsg.includes('available only'))) {
-          console.warn(`⚠️ WAHAService: /sendFile requires Plus version. Falling back to plain text sendText.`);
+          console.warn(`âš ï¸ WAHAService: /sendFile requires Plus version. Falling back to plain text sendText.`);
           const fallbackPayload = {
             session: SESSION_NAME,
             chatId: formattedPhone,
-            text: `${message}\n\n🖼️ Catalog Banner: ${options.mediaUrl}`
+            text: `${message}\n\nðŸ–¼ï¸ Catalog Banner: ${options.mediaUrl}`
           };
           response = await wahaClient.post('/sendText', fallbackPayload);
         } else {
           throw err;
         }
       }
-    } else {
+    } 
+    // 4. Handle plain text
+    else {
       const payload = {
         session: SESSION_NAME,
         chatId: formattedPhone,
@@ -293,9 +420,9 @@ const sendMessage = async (to, message, options = {}) => {
       to: formattedPhone
     };
   } catch (error) {
-    console.error('❌ WAHA Send Error:', error.message);
+    console.error('âŒ WAHA Send Error:', error.message);
     if (error.response?.data) {
-      console.error('📋 Error details:', error.response.data);
+      console.error('ðŸ“‹ Error details:', error.response.data);
     }
     return {
       success: false,
@@ -387,7 +514,7 @@ const handleIncomingMessage = async (data) => {
       error: 'Unknown event type'
     };
   } catch (error) {
-    console.error('❌ WAHA Webhook Error:', error.message);
+    console.error('âŒ WAHA Webhook Error:', error.message);
     return {
       success: false,
       error: error.message
@@ -425,7 +552,7 @@ const handleStatusUpdate = async (data) => {
           }
         );
       } catch (syncErr) {
-        console.warn('⚠️ ConversationMessage status sync warning:', syncErr.message);
+        console.warn('âš ï¸ ConversationMessage status sync warning:', syncErr.message);
       }
 
       return {
@@ -437,7 +564,7 @@ const handleStatusUpdate = async (data) => {
 
     return { success: false };
   } catch (error) {
-    console.error('❌ Status Update Error:', error.message);
+    console.error('âŒ Status Update Error:', error.message);
     return { success: false, error: error.message };
   }
 };
@@ -478,7 +605,7 @@ const getMessageStatus = async (externalMessageId) => {
       updatedAt: message.updatedAt
     };
   } catch (error) {
-    console.error('❌ Fetch Status Error:', error.message);
+    console.error('âŒ Fetch Status Error:', error.message);
     return {
       success: false,
       error: error.message
@@ -516,7 +643,7 @@ const retryFailedMessages = async (messageIds) => {
 
     return results;
   } catch (error) {
-    console.error('❌ Retry Error:', error.message);
+    console.error('âŒ Retry Error:', error.message);
     return [];
   }
 };
@@ -537,7 +664,7 @@ const getSessions = async () => {
       sessions: response.data
     };
   } catch (error) {
-    console.error('❌ Get Sessions Error:', error.message);
+    console.error('âŒ Get Sessions Error:', error.message);
     return {
       success: false,
       error: error.message
@@ -551,10 +678,10 @@ const getSessions = async () => {
 const logout = async () => {
   try {
     await wahaClient.post(`/sessions/${SESSION_NAME}/logout`);
-    console.log(`✅ Session ${SESSION_NAME} logged out`);
+    console.log(`âœ… Session ${SESSION_NAME} logged out`);
     return { success: true };
   } catch (error) {
-    console.error('❌ Logout Error:', error.message);
+    console.error('âŒ Logout Error:', error.message);
     return { success: false, error: error.message };
   }
 };
@@ -565,7 +692,7 @@ const logout = async () => {
 const requestPairingCode = async (phoneNumber) => {
   try {
     let cleanedPhone = phoneNumber.replace(/\D/g, '');
-    if (!cleanedPhone.startsWith('91') && cleanedPhone.length === 10) {
+    if (cleanedPhone.length === 10) {
       cleanedPhone = '91' + cleanedPhone;
     }
     const response = await wahaClient.post(`/${SESSION_NAME}/auth/request-code`, {
@@ -577,9 +704,9 @@ const requestPairingCode = async (phoneNumber) => {
       code: response.data.code
     };
   } catch (error) {
-    console.error('❌ Request Pairing Code Error:', error.message);
+    console.error('âŒ Request Pairing Code Error:', error.message);
     if (error.response?.data) {
-      console.error('📋 Error details:', error.response.data);
+      console.error('ðŸ“‹ Error details:', error.response.data);
     }
     return {
       success: false,
@@ -608,3 +735,8 @@ module.exports = {
   WAHA_API_URL,
   SESSION_NAME
 };
+
+
+
+
+

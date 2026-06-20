@@ -27,6 +27,7 @@ const menuItems = [
   { text: 'Quick Replies', icon: <MessageIcon />, path: '/quick-replies' },
   { text: 'Messages', icon: <MessageIcon />, path: '/messages' },
   { text: 'Workflows', icon: <WorkflowIcon />, path: '/workflows' },
+  { text: 'AI Response Rules', icon: <BotIcon />, path: '/response-rules' },
   { text: 'AI Features', icon: <AutoAwesomeIcon />, path: '/ai-features' },
   { text: 'Analytics', icon: <AnalyticsIcon />, path: '/analytics' },
   { text: 'Settings', icon: <SettingsIcon />, path: '/settings' },

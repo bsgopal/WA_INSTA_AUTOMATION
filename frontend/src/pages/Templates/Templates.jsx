@@ -1,35 +1,48 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Typography, Box, Paper, Button, Grid, Card, CardContent, CardActions,
   IconButton, Dialog, DialogTitle, DialogContent, DialogActions,
   TextField, MenuItem, Chip, Stack, Divider, FormControl, InputLabel,
-  Select
+  Select, CircularProgress, Alert
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import DownloadIcon from '@mui/icons-material/Download';
+import UploadIcon from '@mui/icons-material/Upload';
+import LinkIcon from '@mui/icons-material/Link';
 import CustomSnackbar from '../../components/Snackbar';
 import apiClient from '../../api/client';
 
 export default function Templates() {
   const [templates, setTemplates] = useState([]);
   const [openDialog, setOpenDialog] = useState(false);
-  const [openAIDialog, setOpenAIDialog] = useState(false);
-  const [aiPrompt, setAiPrompt] = useState('');
-  const [aiGenerating, setAiGenerating] = useState(false);
+  const [openLinkDialog, setOpenLinkDialog] = useState(false);
+  const [openCSVDialog, setOpenCSVDialog] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [deleteId, setDeleteId] = useState(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const [openPreviewDialog, setOpenPreviewDialog] = useState(false);
   const [previewContent, setPreviewContent] = useState('');
+  const fileInputRef = useRef(null);
+  const [csvLoading, setCsvLoading] = useState(false);
+  const [linkingTemplateId, setLinkingTemplateId] = useState(null);
+  const [availableMessages, setAvailableMessages] = useState([]);
+  const [selectedMessage, setSelectedMessage] = useState('');
+  const [selectedButtonAction, setSelectedButtonAction] = useState('');
+  const [openCSVPreviewDialog, setOpenCSVPreviewDialog] = useState(false);
+  const [creatingFromCSV, setCreatingFromCSV] = useState(false);
+  const [editingTemplateIdx, setEditingTemplateIdx] = useState(null);
+  const [editingTemplate, setEditingTemplate] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
     type: 'TEXT',
     content: '',
-    category: 'CUSTOM'
+    category: 'CUSTOM',
+    linkedMessageId: null,
+    linkedAction: null,
+    csvTemplates: []
   });
   const [submitting, setSubmitting] = useState(false);
   const [snackbar, setSnackbar] = useState({
@@ -52,9 +65,32 @@ export default function Templates() {
     'CUSTOM'
   ];
 
+  const buttonActionOptions = [
+    { value: 'SEND_MESSAGE', label: 'Send Message' },
+    { value: 'OPEN_LINK', label: 'Open Link' },
+    { value: 'CALL_PHONE', label: 'Call Phone' },
+    { value: 'TRIGGER_WORKFLOW', label: 'Trigger Workflow' },
+    { value: 'QUICK_REPLY', label: 'Quick Reply' }
+  ];
+
   useEffect(() => {
     fetchTemplates();
+    fetchAvailableMessages();
   }, []);
+
+  const fetchAvailableMessages = async () => {
+    try {
+      const quickRepliesRes = await apiClient.get('/quick-replies');
+      const templatesRes = await apiClient.get('/templates');
+      const allMessages = [
+        ...quickRepliesRes.data.map(qr => ({ id: qr._id, name: qr.text, type: 'QUICK_REPLY' })),
+        ...templatesRes.data.map(t => ({ id: t._id, name: t.name, type: 'TEMPLATE' }))
+      ];
+      setAvailableMessages(allMessages);
+    } catch (error) {
+      console.error('Failed to fetch available messages:', error);
+    }
+  };
 
   const fetchTemplates = async () => {
     try {
@@ -70,150 +106,148 @@ export default function Templates() {
     }
   };
 
-  const handleGenerateAI = async () => {
-    try {
-      setAiGenerating(true);
-      const response = await apiClient.post('/templates/ai/generate', {
-        prompt: aiPrompt,
-        type: 'TEXT',
-        tone: 'friendly',
-        language: 'en'
-      });
+  const handleCSVUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-      console.log('AI Generated:', response.data);
-      setFormData(prev => ({
-        ...prev,
-        content: response.data.content
-      }));
-      setOpenAIDialog(false);
-      setAiPrompt('');
-      setOpenDialog(true);
+    const fileName = file.name || '';
+    if (!fileName.toLowerCase().endsWith('.csv')) {
       setSnackbar({
         open: true,
-        message: 'AI response draft generated! Complete fields to save.',
-        severity: 'success'
+        message: 'Please upload a CSV file only.',
+        severity: 'warning'
       });
+      e.target.value = '';
+      return;
+    }
+
+    try {
+      setCsvLoading(true);
+      const text = await file.text();
+
+      const response = await apiClient.post('/templates/ai/generate-from-csv', {
+        csvContent: text
+      });
+
+      if (response.data.success && response.data.templates.length > 0) {
+        setSnackbar({
+          open: true,
+          message: `CSV imported successfully. ${response.data.count} templates ready for review.`,
+          severity: 'success'
+        });
+
+        setFormData(prev => ({
+          ...prev,
+          csvTemplates: response.data.templates
+        }));
+
+        setOpenCSVPreviewDialog(true);
+      } else {
+        setSnackbar({
+          open: true,
+          message: 'No valid templates found in the CSV file.',
+          severity: 'warning'
+        });
+      }
+
+      setOpenCSVDialog(false);
+      fileInputRef.current.value = '';
     } catch (error) {
-      console.error('AI Generation failed:', error);
-      setSnackbar({ open: true, message: 'AI Generation failed. Check API config.', severity: 'error' });
+      console.error('CSV processing error:', error);
+      setSnackbar({
+        open: true,
+        message: error.response?.data?.error || 'Failed to process CSV file',
+        severity: 'error'
+      });
     } finally {
-      setAiGenerating(false);
+      setCsvLoading(false);
     }
   };
 
-  const handleOpenAddDialog = () => {
-    setEditingId(null);
-    setFormData({
-      name: '',
-      type: 'TEXT',
-      content: '',
-      category: 'CUSTOM'
-    });
-    setOpenDialog(true);
+  const handleOpenLinkDialog = (templateId) => {
+    setLinkingTemplateId(templateId);
+    setSelectedMessage('');
+    setSelectedButtonAction('');
+    setOpenLinkDialog(true);
   };
 
-  const handleOpenEditDialog = (template) => {
-    setEditingId(template._id);
-    setFormData({
-      name: template.name,
-      type: template.type,
-      content: template.content,
-      category: template.category || 'CUSTOM'
-    });
-    setOpenDialog(true);
-  };
-
-  const handleSaveTemplate = async () => {
-    if (!formData.name || !formData.content) {
+  const handleSaveLink = async () => {
+    if (!selectedMessage || !selectedButtonAction) {
       setSnackbar({
         open: true,
-        message: 'Please fill in all required fields',
+        message: 'Please select both a message and action',
         severity: 'warning'
       });
       return;
     }
 
     try {
-      setSubmitting(true);
-      if (editingId) {
-        await apiClient.put(`/templates/${editingId}`, formData);
-        setSnackbar({
-          open: true,
-          message: 'Template updated successfully!',
-          severity: 'success'
-        });
-      } else {
-        await apiClient.post('/templates', formData);
-        setSnackbar({
-          open: true,
-          message: 'Template created successfully!',
-          severity: 'success'
-        });
-      }
-      setTimeout(() => {
-        setOpenDialog(false);
-        setEditingId(null);
-        setFormData({
-          name: '',
-          type: 'TEXT',
-          content: '',
-          category: 'CUSTOM'
-        });
-        fetchTemplates();
-      }, 1500);
-    } catch (error) {
-      console.error('Failed to save template:', error);
+      await apiClient.put(`/templates/${linkingTemplateId}`, {
+        linkedMessageId: selectedMessage,
+        linkedAction: selectedButtonAction
+      });
+
       setSnackbar({
         open: true,
-        message: error.response?.data?.message || 'Failed to save template. Please try again.',
+        message: 'Message link created successfully!',
+        severity: 'success'
+      });
+
+      setOpenLinkDialog(false);
+      setLinkingTemplateId(null);
+      fetchTemplates();
+    } catch (error) {
+      console.error('Failed to save link:', error);
+      setSnackbar({
+        open: true,
+        message: 'Failed to create link. Please try again.',
+        severity: 'error'
+      });
+    }
+  };
+
+  const handleCreateFromCSVPreview = async () => {
+    try {
+      setCreatingFromCSV(true);
+      
+      // Get templates from formData
+      const templateToCreate = formData.csvTemplates;
+      
+      if (!templateToCreate || templateToCreate.length === 0) {
+        setSnackbar({
+          open: true,
+          message: 'No templates to create',
+          severity: 'warning'
+        });
+        return;
+      }
+
+      // Call bulk create endpoint
+      const response = await apiClient.post('/templates/bulk-create', {
+        templates: templateToCreate
+      });
+
+      if (response.data.success) {
+        setSnackbar({
+          open: true,
+          message: `✅ Created ${response.data.created} templates! ${response.data.failed > 0 ? `${response.data.failed} failed` : ''}`,
+          severity: response.data.failed > 0 ? 'warning' : 'success'
+        });
+
+        setOpenCSVPreviewDialog(false);
+        setFormData(prev => ({ ...prev, csvTemplates: [] }));
+        fetchTemplates();
+      }
+    } catch (error) {
+      console.error('Failed to create templates:', error);
+      setSnackbar({
+        open: true,
+        message: error.response?.data?.error || 'Failed to create templates',
         severity: 'error'
       });
     } finally {
-      setSubmitting(false);
+      setCreatingFromCSV(false);
     }
-  };
-
-  const confirmDeleteTemplate = (templateId) => {
-    setDeleteId(templateId);
-    setDeleteConfirmOpen(true);
-  };
-
-  const handleDeleteTemplate = async () => {
-    try {
-      await apiClient.delete(`/templates/${deleteId}`);
-      setSnackbar({
-        open: true,
-        message: 'Template deleted successfully!',
-        severity: 'success'
-      });
-      setDeleteConfirmOpen(false);
-      setDeleteId(null);
-      fetchTemplates();
-    } catch (error) {
-      console.error('Failed to delete template:', error);
-      setSnackbar({
-        open: true,
-        message: 'Failed to delete template. Please try again.',
-        severity: 'error'
-      });
-    }
-  };
-
-  const handleCopyToClipboard = (content) => {
-    navigator.clipboard.writeText(content);
-    setSnackbar({ open: true, message: 'Copied to clipboard!', severity: 'success' });
-  };
-
-  const handlePreviewTemplate = (content) => {
-    // Fill basic mock variables for preview
-    let preview = content
-      .replace(/{{firstName}}/g, 'Priya')
-      .replace(/{{lastName}}/g, 'Sharma')
-      .replace(/{{productName}}/g, '24K Gold Kundan Necklace')
-      .replace(/{{price}}/g, '₹85,000')
-      .replace(/{{loyaltyTier}}/g, 'GOLD');
-    setPreviewContent(preview);
-    setOpenPreviewDialog(true);
   };
 
   const getTypeColor = (type) => {
@@ -225,6 +259,98 @@ export default function Templates() {
       INTERACTIVE: 'info'
     };
     return colors[type] || 'default';
+  };
+
+  const handleSnackbarAction = () => {
+    if (snackbar.action === 'confirm_delete') {
+      handleDeleteTemplate();
+    }
+  };
+
+  const handleEditTemplate = (idx) => {
+    const template = formData.csvTemplates[idx];
+    setEditingTemplate({
+      ...template,
+      blocks: template.messageBlocks || []
+    });
+    setEditingTemplateIdx(idx);
+  };
+
+  const handleSaveEditedTemplate = () => {
+    if (editingTemplateIdx !== null && editingTemplate) {
+      const updatedTemplates = [...formData.csvTemplates];
+      updatedTemplates[editingTemplateIdx] = {
+        ...editingTemplate,
+        messageBlocks: editingTemplate.blocks
+      };
+      setFormData(prev => ({
+        ...prev,
+        csvTemplates: updatedTemplates
+      }));
+      setEditingTemplate(null);
+      setEditingTemplateIdx(null);
+      setSnackbar({
+        open: true,
+        message: 'Template updated!',
+        severity: 'success'
+      });
+    }
+  };
+
+  const handleAddButtonToTemplate = () => {
+    if (editingTemplate && editingTemplate.blocks) {
+      const newBlocks = [...editingTemplate.blocks];
+      const buttonBlock = {
+        type: 'BUTTONS',
+        config: {
+          buttons: [
+            {
+              label: 'View More',
+              type: 'QUICK_REPLY',
+              actionValue: 'view_more'
+            }
+          ]
+        }
+      };
+      newBlocks.push(buttonBlock);
+      setEditingTemplate({
+        ...editingTemplate,
+        blocks: newBlocks
+      });
+    }
+  };
+
+  const handleUpdateButton = (blockIdx, btnIdx, field, value) => {
+    if (editingTemplate && editingTemplate.blocks) {
+      const newBlocks = [...editingTemplate.blocks];
+      if (!newBlocks[blockIdx].config.buttons) {
+        newBlocks[blockIdx].config.buttons = [];
+      }
+      newBlocks[blockIdx].config.buttons[btnIdx] = {
+        ...newBlocks[blockIdx].config.buttons[btnIdx],
+        [field]: value
+      };
+      setEditingTemplate({
+        ...editingTemplate,
+        blocks: newBlocks
+      });
+    }
+  };
+
+  const handleDeleteButton = (blockIdx, btnIdx) => {
+    if (editingTemplate && editingTemplate.blocks) {
+      const newBlocks = [...editingTemplate.blocks];
+      if (newBlocks[blockIdx].type === 'BUTTONS') {
+        newBlocks[blockIdx].config.buttons = newBlocks[blockIdx].config.buttons.filter((_, idx) => idx !== btnIdx);
+        if (newBlocks[blockIdx].config.buttons.length === 0) {
+          newBlocks.splice(blockIdx, 1);
+        }
+      }
+      setEditingTemplate({
+        ...editingTemplate,
+        blocks: newBlocks
+      });
+    }
   };
 
   return (
@@ -241,10 +367,19 @@ export default function Templates() {
         <Stack direction="row" spacing={2}>
           <Button
             variant="outlined"
-            startIcon={<AutoAwesomeIcon />}
-            onClick={() => setOpenAIDialog(true)}
+            startIcon={<DownloadIcon />}
+            onClick={downloadCSVTemplate}
+            size="small"
           >
-            AI Generate
+            Download CSV
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<UploadIcon />}
+            onClick={() => setOpenCSVDialog(true)}
+            size="small"
+          >
+            Import CSV
           </Button>
           <Button
             variant="contained"
@@ -257,242 +392,334 @@ export default function Templates() {
         </Stack>
       </Box>
 
-      {/* Templates Grid */}
-      <Grid container spacing={3}>
-        {templates.length === 0 ? (
-          <Grid item xs={12}>
-            <Paper sx={{ p: 6, textAlign: 'center' }}>
-              <Typography variant="body1" color="text.secondary" gutterBottom>
-                No templates yet
-              </Typography>
-              <Typography variant="body2" color="text.secondary" mb={3}>
-                Create your first template to get started
-              </Typography>
-              <Button
-                variant="contained"
-                startIcon={<AddIcon />}
-                onClick={handleOpenAddDialog}
-                disableElevation
-              >
-                Create Template
-              </Button>
-            </Paper>
-          </Grid>
-        ) : (
-          templates.map((template) => (
-            <Grid item xs={12} sm={6} md={4} key={template._id}>
-              <Card elevation={0} sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                <CardContent sx={{ flexGrow: 1 }}>
-                  <Stack direction="row" justifyContent="space-between" alignItems="flex-start" mb={2}>
-                    <Typography variant="h6" gutterBottom>
-                      {template.name}
-                    </Typography>
-                    <Chip
-                      label={template.type}
-                      size="small"
-                      color={getTypeColor(template.type)}
-                    />
-                  </Stack>
+      {/* CSV Upload Dialog */}
+      <Dialog open={openCSVDialog} onClose={() => setOpenCSVDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontWeight: 600 }}>Import CSV Templates</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} mt={1}>
+            <Alert severity="info">
+              Upload a CSV file with name and content columns. TXT and PDF imports are no longer supported.
+            </Alert>
+            <Button
+              variant="contained"
+              component="label"
+              startIcon={<UploadIcon />}
+              disabled={csvLoading}
+              sx={{ alignSelf: 'flex-start' }}
+            >
+              {csvLoading ? 'Processing...' : 'Choose CSV File'}
+              <input
+                ref={fileInputRef}
+                hidden
+                type="file"
+                accept=".csv"
+                onChange={handleCSVUpload}
+              />
+            </Button>
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setOpenCSVDialog(false)} disabled={csvLoading}>Cancel</Button>
+        </DialogActions>
+      </Dialog>
 
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
+      {/* CSV Guidelines & Documentation */}
+      <Paper sx={{ p: 3, mb: 3, bgcolor: '#f0f4f8', border: '1px solid #cbd5e1', borderRadius: 2 }} elevation={0}>
+        <Stack spacing={3}>
+          {/* Format Tabs */}
+          <Box>
+            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2, color: '#1a1a1a' }}>
+              📋 File Format Guidelines
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.6, mb: 2 }}>
+              Learn how to properly format your CSV files before uploading
+            </Typography>
+          </Box>
+
+          {/* CSV FORMAT */}
+          <Paper sx={{ p: 2.5, bgcolor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 2 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 2, color: '#0f172a' }}>
+              📄 CSV Format (Recommended)
+            </Typography>
+            <Stack spacing={1.5} sx={{ bgcolor: '#f9fafb', p: 2, borderRadius: 1, border: '1px solid #e5e7eb' }}>
+              <Typography variant="caption" sx={{ fontFamily: 'monospace', color: '#1f2937', fontWeight: 600 }}>
+                Header (Required): name,keywords,content,category
+              </Typography>
+              <Typography variant="caption" sx={{ fontFamily: 'monospace', color: '#374151', whiteSpace: 'pre-wrap' }}>
+                {`Example:
+"Welcome","hello,hi,greet","Hey! Welcome to our store 👋","GREETING"
+"Product Info","price,cost,rates","We have necklaces from Rs.2000-5000","PRODUCTS"
+"Multi-line","faq,help","Question?\n\nAnswer text\nWith multiple lines","FAQ"`}
+              </Typography>
+            </Stack>
+            <Stack spacing={1} sx={{ mt: 2 }}>
+              <Typography variant="caption" sx={{ color: '#059669', fontWeight: 600 }}>✓ Rules:</Typography>
+              <Typography variant="caption" sx={{ color: '#4b5563' }}>• Always quote text containing commas</Typography>
+              <Typography variant="caption" sx={{ color: '#4b5563' }}>• Use \n for newlines inside quotes: "Line1\nLine2"</Typography>
+              <Typography variant="caption" sx={{ color: '#4b5563' }}>• name and content are required; keywords and category are optional</Typography>
+              <Typography variant="caption" sx={{ color: '#4b5563' }}>• Save as UTF-8 encoding</Typography>
+            </Stack>
+          </Paper>
+        </Stack>
+      </Paper>
+
+      {/* CSV Preview Dialog */}
+      <Dialog open={openCSVPreviewDialog} onClose={() => setOpenCSVPreviewDialog(false)} maxWidth="lg" fullWidth>
+        <DialogTitle sx={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
+          <UploadIcon color="success" />
+          <Typography variant="h6">Preview Imported CSV Templates</Typography>
+        </DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} mt={2}>
+            <Alert severity="success" sx={{ fontSize: '0.9rem' }}>
+              CSV import complete. {formData.csvTemplates?.length || 0} templates are ready for review.
+            </Alert>
+            
+            <Box sx={{ maxHeight: '400px', overflowY: 'auto' }}>
+              {formData.csvTemplates?.map((template, idx) => (
+                <Paper
+                  key={idx}
+                  sx={{
+                    p: 2,
+                    mb: 2,
+                    border: '1px solid #e0e0e0',
+                    borderRadius: 2,
+                    backgroundColor: '#fafafa'
+                  }}
+                >
+                  <Stack direction="row" justifyContent="space-between" alignItems="flex-start" mb={2}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#1976d2', flex: 1 }}>
+                      {idx + 1}. {template.name}
+                    </Typography>
+                    <Stack direction="row" spacing={1}>
+                      <Chip
+                        label={template.category}
+                        size="small"
+                        variant="outlined"
+                      />
+                      <Button
+                        size="small"
+                        startIcon={<EditIcon />}
+                        onClick={() => handleEditTemplate(idx)}
+                      >
+                        Edit
+                      </Button>
+                    </Stack>
+                  </Stack>
+                  
+                  <Box
                     sx={{
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      display: '-webkit-box',
-                      WebkitLineClamp: 3,
-                      WebkitBoxOrient: 'vertical',
-                      mb: 2
+                      p: 1.5,
+                      backgroundColor: '#ffffff',
+                      borderRadius: 1,
+                      fontSize: '0.875rem',
+                      lineHeight: 1.6,
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word',
+                      fontFamily: 'monospace',
+                      maxHeight: '150px',
+                      overflowY: 'auto'
                     }}
                   >
                     {template.content}
-                  </Typography>
-
-                  {template.category && (
-                    <Chip label={template.category} size="small" variant="outlined" />
-                  )}
-                </CardContent>
-
-                <Divider />
-
-                <CardActions>
-                  <IconButton 
-                    size="small" 
-                    color="primary"
-                    onClick={() => handlePreviewTemplate(template.content)}
-                    title="Preview Template"
-                  >
-                    <VisibilityIcon fontSize="small" />
-                  </IconButton>
-                  <IconButton 
-                    size="small"
-                    onClick={() => handleCopyToClipboard(template.content)}
-                    title="Copy Content"
-                  >
-                    <ContentCopyIcon fontSize="small" />
-                  </IconButton>
-                  <IconButton 
-                    size="small"
-                    onClick={() => handleOpenEditDialog(template)}
-                    title="Edit Template"
-                  >
-                    <EditIcon fontSize="small" />
-                  </IconButton>
-                  <IconButton
-                    size="small"
-                    color="error"
-                    onClick={() => confirmDeleteTemplate(template._id)}
-                    title="Delete Template"
-                  >
-                    <DeleteIcon fontSize="small" />
-                  </IconButton>
-                </CardActions>
-              </Card>
-            </Grid>
-          ))
-        )}
-      </Grid>
-
-      {/* Create Template Dialog */}
-      <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="md" fullWidth>
-        <DialogTitle sx={{ fontWeight: 600, fontSize: '1.25rem' }}>Create New Template</DialogTitle>
-        <DialogContent>
-          <Stack spacing={3} mt={1}>
-            <TextField
-              label="Template Name *"
-              fullWidth
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              placeholder="e.g., Welcome Message"
-            />
-            <FormControl fullWidth>
-              <InputLabel>Type</InputLabel>
-              <Select
-                value={formData.type}
-                label="Type"
-                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-              >
-                <MenuItem value="TEXT">Text</MenuItem>
-                <MenuItem value="IMAGE">Image</MenuItem>
-                <MenuItem value="VIDEO">Video</MenuItem>
-                <MenuItem value="DOCUMENT">Document</MenuItem>
-                <MenuItem value="INTERACTIVE">Interactive</MenuItem>
-              </Select>
-            </FormControl>
-            <TextField
-              label="Content *"
-              fullWidth
-              multiline
-              rows={6}
-              value={formData.content}
-              onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-              placeholder="Enter your message template here..."
-            />
-            <FormControl fullWidth>
-              <InputLabel>Category</InputLabel>
-              <Select
-                value={formData.category}
-                label="Category"
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-              >
-                {categoryOptions.map((cat) => (
-                  <MenuItem key={cat} value={cat}>
-                    {cat.replace(/_/g, ' ')}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+                  </Box>
+                </Paper>
+              ))}
+            </Box>
           </Stack>
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setOpenDialog(false)}>Cancel</Button>
-          <Button 
-            variant="contained" 
-            disableElevation
-            onClick={handleSaveTemplate}
-            disabled={submitting}
-          >
-            {submitting ? 'Saving...' : editingId ? 'Update' : 'Create'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Delete Template Confirmation Dialog */}
-      <Dialog open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)}>
-        <DialogTitle sx={{ fontWeight: 600 }}>Delete Template</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" color="text.secondary">
-            Are you sure you want to delete this template? This action cannot be undone.
-          </Typography>
-        </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setDeleteConfirmOpen(false)}>Cancel</Button>
-          <Button variant="contained" color="error" disableElevation onClick={handleDeleteTemplate}>
-            Delete
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Preview Dialog */}
-      <Dialog open={openPreviewDialog} onClose={() => setOpenPreviewDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ fontWeight: 600 }}>Template Live Preview (Mock Customer Priya)</DialogTitle>
-        <DialogContent>
-          <Paper variant="outlined" sx={{ p: 3, bgcolor: '#fafafa', borderRadius: 2, border: '1px solid #e0e0e0', minHeight: 120 }}>
-            <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', fontFamily: 'Inter, sans-serif' }}>
-              {previewContent}
-            </Typography>
-          </Paper>
-        </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setOpenPreviewDialog(false)} variant="contained" disableElevation>
-            Close Preview
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      <CustomSnackbar
-        open={snackbar.open}
-        onClose={() => setSnackbar({ ...snackbar, open: false })}
-        message={snackbar.message}
-        severity={snackbar.severity}
-      />
-
-      {/* AI Generate Dialog */}
-      <Dialog open={openAIDialog} onClose={() => setOpenAIDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ fontWeight: 600 }}>
-          <Stack direction="row" alignItems="center" spacing={1}>
-            <AutoAwesomeIcon color="primary" />
-            <Typography variant="h6">AI Generate Template</Typography>
-          </Stack>
-        </DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" color="text.secondary" mb={3}>
-            Describe what kind of message you want to create, and AI will generate it for you.
-          </Typography>
-          <TextField
-            label="Describe your message"
-            fullWidth
-            multiline
-            rows={4}
-            value={aiPrompt}
-            onChange={(e) => setAiPrompt(e.target.value)}
-            placeholder="e.g., Create a friendly welcome message for new customers with a 10% discount offer"
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenAIDialog(false)}>Cancel</Button>
+          <Button onClick={() => setOpenCSVPreviewDialog(false)}>Cancel</Button>
           <Button
             variant="contained"
-            startIcon={<AutoAwesomeIcon />}
-            onClick={handleGenerateAI}
-            disabled={!aiPrompt || aiGenerating}
+            color="success"
             disableElevation
+            onClick={handleCreateFromCSVPreview}
+            disabled={creatingFromCSV}
+            startIcon={<AddIcon />}
           >
-            {aiGenerating ? 'Generating...' : 'Generate'}
+            {creatingFromCSV ? 'Creating...' : `Create All ${formData.csvTemplates?.length || 0}`}
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Edit Template Dialog */}
+      <Dialog open={editingTemplate !== null} onClose={() => setEditingTemplate(null)} maxWidth="md" fullWidth>
+        <DialogTitle sx={{ fontWeight: 600 }}>
+          Edit Template - {editingTemplate?.name}
+        </DialogTitle>
+        <DialogContent>
+          {editingTemplate && (
+            <Stack spacing={3} mt={2}>
+              <TextField
+                label="Template Name"
+                fullWidth
+                value={editingTemplate.name}
+                onChange={(e) => setEditingTemplate({ ...editingTemplate, name: e.target.value })}
+              />
+
+              <FormControl fullWidth>
+                <InputLabel>Category</InputLabel>
+                <Select
+                  value={editingTemplate.category}
+                  label="Category"
+                  onChange={(e) => setEditingTemplate({ ...editingTemplate, category: e.target.value })}
+                >
+                  {['WELCOME', 'ORDER_CONFIRMATION', 'PRODUCT_RECOMMENDATION', 'DISCOUNT_OFFER', 'FEEDBACK_REQUEST', 'CUSTOM'].map((cat) => (
+                    <MenuItem key={cat} value={cat}>{cat.replace(/_/g, ' ')}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+
+              <Box>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 2 }}>
+                  Message Blocks
+                </Typography>
+                <Stack spacing={2}>
+                  {editingTemplate.blocks?.map((block, blockIdx) => (
+                    <Paper key={blockIdx} sx={{ p: 2, border: '1px solid #e0e0e0' }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
+                        Block {blockIdx + 1}: {block.type}
+                      </Typography>
+
+                      {block.type === 'TEXT' && (
+                        <TextField
+                          fullWidth
+                          multiline
+                          rows={3}
+                          value={block.config?.text || ''}
+                          onChange={(e) => {
+                            const newBlocks = [...editingTemplate.blocks];
+                            newBlocks[blockIdx].config.text = e.target.value;
+                            setEditingTemplate({ ...editingTemplate, blocks: newBlocks });
+                          }}
+                        />
+                      )}
+
+                      {block.type === 'BUTTONS' && (
+                        <Stack spacing={1.5}>
+                          {block.config?.buttons?.map((btn, btnIdx) => (
+                            <Stack key={btnIdx} direction="row" spacing={1} alignItems="flex-start">
+                              <TextField
+                                label="Label"
+                                size="small"
+                                value={btn.label}
+                                onChange={(e) => handleUpdateButton(blockIdx, btnIdx, 'label', e.target.value)}
+                              />
+                              <Select
+                                size="small"
+                                value={btn.type}
+                                onChange={(e) => handleUpdateButton(blockIdx, btnIdx, 'type', e.target.value)}
+                                sx={{ minWidth: 120 }}
+                              >
+                                <MenuItem value="QUICK_REPLY">Quick Reply</MenuItem>
+                                <MenuItem value="URL">Open Link</MenuItem>
+                                <MenuItem value="CALL">Call Phone</MenuItem>
+                              </Select>
+                              <TextField
+                                label="Action Value"
+                                size="small"
+                                value={btn.actionValue}
+                                onChange={(e) => handleUpdateButton(blockIdx, btnIdx, 'actionValue', e.target.value)}
+                              />
+                              <IconButton
+                                size="small"
+                                color="error"
+                                onClick={() => handleDeleteButton(blockIdx, btnIdx)}
+                              >
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </Stack>
+                          ))}
+                          <Button
+                            size="small"
+                            startIcon={<AddIcon />}
+                            onClick={() => {
+                              const newBlocks = [...editingTemplate.blocks];
+                              if (!newBlocks[blockIdx].config.buttons) {
+                                newBlocks[blockIdx].config.buttons = [];
+                              }
+                              newBlocks[blockIdx].config.buttons.push({
+                                label: 'New Button',
+                                type: 'QUICK_REPLY',
+                                actionValue: 'action'
+                              });
+                              setEditingTemplate({ ...editingTemplate, blocks: newBlocks });
+                            }}
+                          >
+                            Add Button
+                          </Button>
+                        </Stack>
+                      )}
+                    </Paper>
+                  ))}
+                </Stack>
+
+                <Button
+                  fullWidth
+                  startIcon={<AddIcon />}
+                  onClick={handleAddButtonToTemplate}
+                  sx={{ mt: 2 }}
+                  variant="outlined"
+                >
+                  Add Button Block
+                </Button>
+              </Box>
+            </Stack>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setEditingTemplate(null)}>Cancel</Button>
+          <Button
+            variant="contained"
+            disableElevation
+            onClick={handleSaveEditedTemplate}
+          >
+            Save Changes
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Confirmation Snackbar with Action */}
+      {snackbar.open && snackbar.action === 'confirm_delete' && (
+        <Box
+          sx={{
+            position: 'fixed',
+            bottom: 20,
+            left: 20,
+            right: 20,
+            backgroundColor: '#fff3cd',
+            borderLeft: '4px solid #ff9800',
+            borderRadius: 1,
+            p: 2,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+            zIndex: 10000
+          }}
+        >
+          <Typography variant="body2" sx={{ flex: 1, color: '#000' }}>
+            {snackbar.message}
+          </Typography>
+          <Stack direction="row" spacing={1}>
+            <Button
+              size="small"
+              onClick={() => setSnackbar({ ...snackbar, open: false })}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="small"
+              variant="contained"
+              color="error"
+              onClick={handleSnackbarAction}
+            >
+              Delete
+            </Button>
+          </Stack>
+        </Box>
+      )}
     </Box>
   );
 }

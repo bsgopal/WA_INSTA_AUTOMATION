@@ -6,6 +6,7 @@ const Customer = require('../models/Customer');
 const Message = require('../models/Message');
 const WhatsAppService = require('../services/WhatsAppService');
 const GeminiService = require('../services/GeminiService');
+const campaignService = require('../services/campaignService');
 const { body, validationResult, query } = require('express-validator');
 
 // ============ GET ALL CAMPAIGNS ============
@@ -217,7 +218,7 @@ router.post('/:id/launch', async (req, res) => {
     await campaign.save();
 
     // Launch campaign asynchronously
-    setImmediate(() => executeCampaign(campaign, customers));
+    setImmediate(() => campaignService.executeCampaign(campaign, customers));
 
     res.json({
       message: 'Campaign launched successfully',
@@ -317,78 +318,6 @@ router.get('/:id/analytics', async (req, res) => {
   }
 });
 
-// ============ HELPER: EXECUTE CAMPAIGN ============
-async function executeCampaign(campaign, customers) {
-  try {
-    const batchSize = campaign.batchSize || 100;
-    const throttleDelay = campaign.throttleDelay || 1000;
-
-    for (let i = 0; i < customers.length; i += batchSize) {
-      // Check if campaign is still running
-      const currentCampaign = await Campaign.findById(campaign._id);
-      if (currentCampaign.status !== 'RUNNING') {
-        console.log('Campaign paused or stopped');
-        break;
-      }
-
-      const batch = customers.slice(i, i + batchSize);
-
-      for (const customer of batch) {
-        try {
-          // Send message based on channel
-          if (campaign.channels.includes('whatsapp')) {
-            const result = await WhatsAppService.sendMessage(
-              customer.whatsappNumber,
-              campaign.messageTemplate.content || 'Test message',
-              {}
-            );
-
-            // Create message record
-            const message = new Message({
-              userId: campaign.userId,
-              campaignId: campaign._id,
-              customerId: customer._id,
-              content: campaign.messageTemplate.content,
-              channel: 'whatsapp',
-              status: result.success ? 'SENT' : 'FAILED',
-              sentAt: result.success ? new Date() : null,
-              failureReason: result.error,
-              externalMessageId: result.externalMessageId
-            });
-
-            await message.save();
-
-            // Update campaign stats
-            if (result.success) {
-              campaign.totalSent++;
-            } else {
-              campaign.totalFailed++;
-            }
-          }
-
-          // Throttle
-          await new Promise(resolve => setTimeout(resolve, throttleDelay));
-        } catch (error) {
-          console.error('Message Send Error:', error);
-          campaign.totalFailed++;
-        }
-      }
-
-      await campaign.save();
-    }
-
-    // Mark campaign as completed
-    campaign.status = 'COMPLETED';
-    campaign.completedAt = new Date();
-    campaign.deliveryRate = campaign.totalSent > 0 ? (campaign.totalDelivered / campaign.totalSent * 100) : 0;
-    await campaign.save();
-
-    console.log(`Campaign ${campaign._id} completed`);
-  } catch (error) {
-    console.error('Execute Campaign Error:', error);
-    campaign.status = 'FAILED';
-    await campaign.save();
-  }
-}
+// Campaign execution moved to campaignService.js
 
 module.exports = router;

@@ -355,11 +355,13 @@ const personalizeMessage = async (template, customer) => {
     const placeholders = {
       '{{firstName}}': customer.firstName || '',
       '{{lastName}}': customer.lastName || '',
-      '{{fullName}}': `${customer.firstName} ${customer.lastName}`,
+      '{{fullName}}': `${customer.firstName} ${customer.lastName}`.trim(),
       '{{loyaltyTier}}': customer.loyaltyTier || 'BRONZE',
       '{{loyaltyPoints}}': customer.loyaltyPoints || 0,
       '{{totalSpent}}': customer.totalSpent || 0,
-      '{{segment}}': customer.rfmSegment || 'NEW'
+      '{{segment}}': customer.rfmSegment || 'NEW',
+      '{{productName}}': customer.customFields?.selectedProduct?.name || customer.customFields?.lastScrapedProducts?.[0]?.name || '',
+      '{{price}}': customer.customFields?.selectedProduct?.price || customer.customFields?.lastScrapedProducts?.[0]?.price || ''
     };
 
     Object.entries(placeholders).forEach(([key, value]) => {

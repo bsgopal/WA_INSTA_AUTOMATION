@@ -316,7 +316,7 @@ router.post('/:id/messages', [
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { content, platform, sender, messageType = 'TEXT', media } = req.body;
+    const { content, platform, sender, messageType = 'TEXT', media, widgetData = null, interactiveReply = null } = req.body;
 
     const conversation = await Conversation.findOne({
       _id: req.params.id,
@@ -333,9 +333,37 @@ router.post('/:id/messages', [
     }
 
     let result = { success: true };
+    let finalContent = content;
+    
+    if (sender === 'TEAM') {
+      try {
+        const aiMessageAnalyzer = require('../services/aiMessageAnalyzer');
+        const detectedLang = aiMessageAnalyzer.detectLanguage(content);
+        const targetLang = customer.language || 'en';
+        
+        if (detectedLang !== targetLang) {
+          const shopConfig = await aiMessageAnalyzer.getShopConfig(req.user.id);
+          const aiConfig = {
+            provider: shopConfig.useAnthropic && shopConfig.anthropicApiKey ? 'anthropic' : 'gemini',
+            apiKey: (shopConfig.useAnthropic && shopConfig.anthropicApiKey) ? shopConfig.anthropicApiKey : (shopConfig.geminiApiKey || process.env.GEMINI_API_KEY),
+            model: (shopConfig.useAnthropic && shopConfig.anthropicApiKey) ? (shopConfig.anthropicModel || 'claude-3-haiku-20240307') : (shopConfig.geminiModel || process.env.GEMINI_MODEL || 'gemini-1.5-flash')
+          };
+          if (aiConfig.apiKey) {
+            console.log(`[Translate Manual Outbound] Translating from "${detectedLang}" to customer language "${targetLang}"`);
+            const translated = await aiMessageAnalyzer.translateText(content, targetLang, aiConfig);
+            if (translated && translated.trim()) {
+              finalContent = translated;
+            }
+          }
+        }
+      } catch (err) {
+        console.error('[Translate Manual Outbound] Outbound translation error:', err.message);
+      }
+    }
+
     if (platform === 'WHATSAPP' && sender === 'TEAM') {
       const WhatsAppService = require('../services/WhatsAppService');
-      result = await WhatsAppService.sendMessage(customer.whatsappNumber, content);
+      result = await WhatsAppService.sendMessage(customer.whatsappNumber, finalContent);
       
       if (!result.success) {
         if (result.failureReason === 422) {
@@ -351,10 +379,11 @@ router.post('/:id/messages', [
       conversationId: req.params.id,
       userId: sender === 'TEAM' ? req.user.id : null,
       customerId: conversation.customerId,
-      content,
+      content: finalContent,
       platform,
       messageType,
       media,
+      widgetData: widgetData || interactiveReply || undefined,
       sender: {
         type: sender,
         userId: sender === 'TEAM' ? req.user.id : null,
@@ -372,7 +401,8 @@ router.post('/:id/messages', [
       await Message.create({
         userId: req.user.id,
         customerId: customer._id,
-        content,
+        content: finalContent,
+        originalContent: content,
         channel: 'whatsapp',
         messageType: 'MANUAL',
         language: customer.language || 'en',
@@ -397,6 +427,24 @@ router.post('/:id/messages', [
         lastActivityAt: new Date()
       }
     );
+
+    // If the message is from CUSTOMER, trigger AI chat handler in the background to respond!
+    if (sender === 'CUSTOMER') {
+      const aiChatHandler = require('../services/aiChatHandler');
+      setTimeout(() => {
+        aiChatHandler.handleCustomerMessage(
+          platform === 'WHATSAPP' ? (customer.whatsappNumber || customer.phone) : customer.instagramHandle,
+          content,
+          platform.toLowerCase(),
+          req.user.id,
+          media || null,
+          {
+            interactiveReply: widgetData?.interactiveReply || interactiveReply || null,
+            rawMessageType: messageType
+          }
+        ).catch(err => console.error('Simulated CUSTOMER message AI response error:', err));
+      }, 500);
+    }
 
     res.status(201).json(message);
   } catch (error) {

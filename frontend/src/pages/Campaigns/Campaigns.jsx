@@ -27,10 +27,11 @@ export default function Campaigns() {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
-    type: 'PROMOTIONAL',
+    type: 'ONE_TIME',
     channels: [],
     targetSegment: 'ALL',
-    message: '',
+    messageTemplate: '',
+    messageType: 'TEXT',
     scheduledAt: ''
   });
   const [submitting, setSubmitting] = useState(false);
@@ -45,10 +46,21 @@ export default function Campaigns() {
     completed: 0,
     draft: 0
   });
+  const [templates, setTemplates] = useState([]);
 
   useEffect(() => {
     fetchCampaigns();
+    fetchTemplates();
   }, []);
+
+  const fetchTemplates = async () => {
+    try {
+      const response = await apiClient.get('/templates');
+      setTemplates(response.data || []);
+    } catch (error) {
+      console.error('Failed to fetch templates:', error);
+    }
+  };
 
   const fetchCampaigns = async () => {
     try {
@@ -111,14 +123,29 @@ export default function Campaigns() {
   };
 
   const handleCreateCampaign = async () => {
-    if (!formData.name || !formData.message || formData.channels.length === 0) {
-      alert('Please fill in all required fields');
+    if (!formData.name || !formData.messageTemplate || formData.channels.length === 0) {
+      alert('Please fill in all required fields (Name, Message Template, and Channels)');
       return;
     }
 
     try {
       setSubmitting(true);
-      await apiClient.post('/campaigns', formData);
+      const payload = {
+        name: formData.name,
+        description: formData.description,
+        type: 'ONE_TIME',
+        channels: formData.channels,
+        messageTemplate: formData.messageTemplate,
+        messageType: formData.messageType || 'TEXT',
+        targetAudience: {
+          segments: formData.targetSegment === 'ALL' ? [] : [formData.targetSegment],
+          languages: [],
+          loyaltyTiers: []
+        },
+        scheduledAt: formData.scheduledAt || undefined
+      };
+
+      await apiClient.post('/campaigns', payload);
       setSnackbar({
         open: true,
         message: 'Campaign created successfully!',
@@ -129,10 +156,11 @@ export default function Campaigns() {
         setFormData({
           name: '',
           description: '',
-          type: 'PROMOTIONAL',
+          type: 'ONE_TIME',
           channels: [],
           targetSegment: 'ALL',
-          message: '',
+          messageTemplate: '',
+          messageType: 'TEXT',
           scheduledAt: ''
         });
         fetchCampaigns();
@@ -442,15 +470,43 @@ export default function Campaigns() {
                 <MenuItem value="NEW">New Customers</MenuItem>
               </Select>
             </FormControl>
-            <TextField
-              label="Message *"
-              fullWidth
-              multiline
-              rows={4}
-              value={formData.message}
-              onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-              placeholder="Enter your campaign message"
-            />
+            <FormControl fullWidth>
+              <InputLabel id="template-select-label">Select Message Template *</InputLabel>
+              <Select
+                labelId="template-select-label"
+                value={formData.messageTemplate}
+                label="Select Message Template *"
+                onChange={(e) => {
+                  const selectedId = e.target.value;
+                  const selectedTpl = templates.find(t => t._id === selectedId);
+                  setFormData({
+                    ...formData,
+                    messageTemplate: selectedId,
+                    messageType: selectedTpl ? (selectedTpl.type || 'TEXT') : 'TEXT'
+                  });
+                }}
+              >
+                {templates.map(tpl => (
+                  <MenuItem key={tpl._id} value={tpl._id}>
+                    {tpl.name} ({tpl.category})
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            
+            {formData.messageTemplate && (
+              <TextField
+                label="Template Content Preview (Read Only)"
+                fullWidth
+                multiline
+                rows={4}
+                value={templates.find(t => t._id === formData.messageTemplate)?.content || ''}
+                InputProps={{
+                  readOnly: true,
+                }}
+                variant="filled"
+              />
+            )}
             <TextField
               label="Schedule (Optional)"
               type="datetime-local"

@@ -19,7 +19,11 @@ class OwnerNotificationService {
 
       // Get owner's WhatsApp number
       const owner = await User.findById(userId);
-      if (!owner || !owner.whatsappNumber) {
+      const ShopConfig = require('../models/ShopConfig');
+      const shopConfig = await ShopConfig.findOne({ userId });
+      const ownerPhone = shopConfig?.contactPhone || (owner ? (owner.whatsappNumber || owner.phone) : null);
+      
+      if (!ownerPhone) {
         console.warn('Owner WhatsApp number not configured');
         return { success: false, reason: 'Owner number not configured' };
       }
@@ -35,7 +39,7 @@ class OwnerNotificationService {
 
       // Send to owner
       const result = await WhatsAppService.sendMessage(
-        owner.whatsappNumber,
+        ownerPhone,
         alertMessage
       );
 
@@ -77,6 +81,8 @@ class OwnerNotificationService {
       : 'New customer';
 
     const suggestedAction = this.getSuggestedAction(analysis.intent, leadScore.score);
+    const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+    const chatLink = `${clientUrl}/conversations?customerId=${customer._id}`;
 
     const alertText = `${emoji} HOT LEAD — ${leadScore.score}/10
 
@@ -94,6 +100,8 @@ Message: "${message.substring(0, 80)}${message.length > 80 ? '...' : ''}"
 ${customerHistoryLine}
 
 Reason: ${leadScore.reason}
+
+🔗 Open Chat: ${chatLink}
 
 💡 Suggested action: ${suggestedAction}`;
 

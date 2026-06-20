@@ -5,6 +5,7 @@ const Message = require('../models/Message');
 const Customer = require('../models/Customer');
 const WhatsAppService = require('../services/WhatsAppService');
 const GeminiService = require('../services/GeminiService');
+const VariableInterpolationService = require('../services/VariableInterpolationService');
 const { body, validationResult, query } = require('express-validator');
 
 // ============ GET ALL MESSAGES ============
@@ -109,19 +110,46 @@ router.post('/send', [
     }
 
     let result;
+    let finalContent = await VariableInterpolationService.interpolateVariables(content, req.user.id, {
+      customer
+    });
+
+    try {
+      const aiMessageAnalyzer = require('../services/aiMessageAnalyzer');
+      const detectedLang = aiMessageAnalyzer.detectLanguage(content);
+      const targetLang = customer.language || 'en';
+      
+      if (detectedLang !== targetLang) {
+        const shopConfig = await aiMessageAnalyzer.getShopConfig(req.user.id);
+        const aiConfig = {
+          provider: shopConfig.useAnthropic && shopConfig.anthropicApiKey ? 'anthropic' : 'gemini',
+          apiKey: (shopConfig.useAnthropic && shopConfig.anthropicApiKey) ? shopConfig.anthropicApiKey : (shopConfig.geminiApiKey || process.env.GEMINI_API_KEY),
+          model: (shopConfig.useAnthropic && shopConfig.anthropicApiKey) ? (shopConfig.anthropicModel || 'claude-3-haiku-20240307') : (shopConfig.geminiModel || process.env.GEMINI_MODEL || 'gemini-1.5-flash')
+        };
+        if (aiConfig.apiKey) {
+          console.log(`[Translate Outbound API] Translating from "${detectedLang}" to customer language "${targetLang}"`);
+          const translated = await aiMessageAnalyzer.translateText(content, targetLang, aiConfig);
+          if (translated && translated.trim()) {
+            finalContent = translated;
+          }
+        }
+      }
+    } catch (err) {
+      console.error('[Translate Outbound API] Outbound translation error:', err.message);
+    }
 
     // Send based on channel
     if (channel === 'whatsapp') {
       result = await WhatsAppService.sendMessage(
         customer.whatsappNumber,
-        content,
+        finalContent,
         { mediaUrl }
       );
     } else if (channel === 'instagram') {
       const InstagramService = require('../services/InstagramService');
       result = await InstagramService.sendDirectMessage(
         customer.instagramHandle || customer.phone,
-        content,
+        finalContent,
         { mediaUrl }
       );
     } else {
@@ -132,7 +160,8 @@ router.post('/send', [
     const message = new Message({
       userId: req.user.id,
       customerId: customer._id,
-      content,
+      content: finalContent,
+      originalContent: content,
       channel,
       status: result.success ? 'SENT' : 'FAILED',
       sentAt: result.success ? new Date() : null,

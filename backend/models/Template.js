@@ -50,7 +50,25 @@ const TemplateSchema = new mongoose.Schema({
     description: 'Default content (usually English)'
   },
   
-  // Variables that can be used in template
+  // Message Blocks for Q&A/Rich Layout
+  messageBlocks: [{
+    type: String,
+    config: mongoose.Schema.Types.Mixed
+  }],
+  
+  // Template Type
+  type: {
+    type: String,
+    enum: ['TEXT', 'IMAGE', 'VIDEO', 'QA_BLOCKS', 'INTERACTIVE'],
+    default: 'TEXT'
+  },
+  
+  // Template Format
+  format: {
+    type: String,
+    enum: ['TEXT', 'QA', 'RICH'],
+    default: 'TEXT'
+  },
   // Example: {{customer_name}}, {{order_id}}, {{discount_percentage}}
   variables: [{
     name: String,

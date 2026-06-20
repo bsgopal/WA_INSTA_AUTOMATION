@@ -20,17 +20,43 @@ if (!config.accessToken || !config.pageId) {
 // Helper: Delay for throttling
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
+const buildWidgetFallbackText = (message, options = {}) => {
+  let fallbackText = message || '';
+
+  if (options.list && Array.isArray(options.list.sections) && options.list.sections.length > 0) {
+    fallbackText += `${fallbackText ? '\n\n' : ''}${options.list.title || 'Options'}\n`;
+    (options.list.sections || []).forEach(section => {
+      if (section.title) {
+        fallbackText += `\n${section.title}\n`;
+      }
+      (section.rows || []).forEach(row => {
+        fallbackText += `- ${row.title}${row.description ? `: ${row.description}` : ''}\n`;
+      });
+    });
+  }
+
+  if (options.buttons && options.buttons.length > 0) {
+    fallbackText += `${fallbackText ? '\n\n' : ''}Options:\n`;
+    options.buttons.forEach((button, index) => {
+      fallbackText += `${index + 1}. ${button.label}${button.value ? ` (${button.value})` : ''}\n`;
+    });
+  }
+
+  return fallbackText.trim();
+};
+
 /**
  * Send Instagram Direct Message
  */
 const sendDirectMessage = async (recipientId, message, options = {}) => {
   try {
     const url = `${baseUrl}/${config.pageId}/messages`;
+    const finalMessage = buildWidgetFallbackText(message, options);
 
     const payload = {
       recipient: { id: recipientId },
       message: {
-        text: message
+        text: finalMessage
       },
       access_token: config.accessToken
     };
@@ -45,6 +71,9 @@ const sendDirectMessage = async (recipientId, message, options = {}) => {
           }
         }
       };
+      if (finalMessage) {
+        payload.message.caption = finalMessage;
+      }
     }
 
     const response = await axios.post(url, payload);
