@@ -176,16 +176,16 @@ export default function QuickReplies() {
       </Paper>
 
       {/* Quick Replies Table */}
-      <TableContainer component={Paper} elevation={0}>
+      <TableContainer component={Paper} elevation={0} border="1px solid #e0e0e0">
         <Table>
           <TableHead>
-            <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-              <TableCell>Title</TableCell>
-              <TableCell>Category</TableCell>
-              <TableCell>Content Preview</TableCell>
-              <TableCell>Shortcut</TableCell>
-              <TableCell align="right">Usage</TableCell>
-              <TableCell align="center">Actions</TableCell>
+            <TableRow sx={{ backgroundColor: '#1976d2' }}>
+              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Title</TableCell>
+              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Category</TableCell>
+              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Content Preview</TableCell>
+              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Shortcut</TableCell>
+              <TableCell align="right" sx={{ color: 'white', fontWeight: 'bold' }}>Usage</TableCell>
+              <TableCell align="center" sx={{ color: 'white', fontWeight: 'bold' }}>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>

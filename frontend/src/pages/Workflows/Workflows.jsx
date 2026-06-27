@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Typography, Box, Paper, Button, Grid, Card, CardContent, CardActions,
   IconButton, Dialog, DialogTitle, DialogContent, DialogActions,
   Stack, Chip, Switch, FormControlLabel, Divider, TextField,
   FormControl, InputLabel, Select, MenuItem, CircularProgress,
-  Tooltip, Alert, Avatar
+  Tooltip, Alert, Avatar, Tabs, Tab
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
@@ -22,6 +23,7 @@ import apiClient from '../../api/client';
 import CustomSnackbar from '../../components/Snackbar';
 
 export default function Workflows() {
+  const navigate = useNavigate();
   const [workflows, setWorkflows] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -32,6 +34,7 @@ export default function Workflows() {
   const [deleteConfirm, setDeleteConfirm] = useState({ open: false, workflowId: null, workflowName: '' });
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
   const [draggedIndex, setDraggedIndex] = useState(null);
+  const [activeTab, setActiveTab] = useState('ALL');
 
   // Category Form State
   const [categoryForm, setCategoryForm] = useState({
@@ -313,9 +316,12 @@ export default function Workflows() {
     return status === 'ACTIVE' ? 'success' : 'default';
   };
 
-  const filteredWorkflows = selectedCategory
-    ? workflows.filter(w => w.category === selectedCategory)
-    : workflows;
+  const filteredWorkflows = workflows.filter(w => {
+    if (selectedCategory && w.category !== selectedCategory) return false;
+    if (activeTab === 'ACTIVE') return w.status === 'ACTIVE';
+    if (activeTab === 'PAUSED') return w.status !== 'ACTIVE';
+    return true;
+  });
 
   return (
     <Box sx={{ width: '100%', flexGrow: 1 }}>
@@ -338,6 +344,14 @@ export default function Workflows() {
           </Button>
           <Button
             variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => navigate('/workflows/create')}
+            disableElevation
+          >
+            Conditional Workflow
+          </Button>
+          <Button
+            variant="outlined"
             startIcon={<AddIcon />}
             onClick={handleOpenCreate}
             disableElevation
@@ -374,6 +388,46 @@ export default function Workflows() {
         </Stack>
       </Paper>
 
+      {/* Status tabs filter */}
+      {!loading && workflows.length > 0 && (
+        <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3.5 }}>
+          <Tabs 
+            value={activeTab} 
+            onChange={(e, val) => setActiveTab(val)} 
+            textColor="primary"
+            indicatorColor="primary"
+          >
+            <Tab 
+              value="ALL" 
+              label={
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>All Workflows</Typography>
+                  <Chip label={workflows.length} size="small" variant="outlined" sx={{ height: 20, fontSize: '0.75rem' }} />
+                </Box>
+              } 
+            />
+            <Tab 
+              value="ACTIVE" 
+              label={
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>Active</Typography>
+                  <Chip label={workflows.filter(w => w.status === 'ACTIVE').length} size="small" color="success" sx={{ height: 20, fontSize: '0.75rem', color: '#fff' }} />
+                </Box>
+              } 
+            />
+            <Tab 
+              value="PAUSED" 
+              label={
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>Paused / Drafts</Typography>
+                  <Chip label={workflows.filter(w => w.status !== 'ACTIVE').length} size="small" sx={{ height: 20, fontSize: '0.75rem' }} />
+                </Box>
+              } 
+            />
+          </Tabs>
+        </Box>
+      )}
+
       {/* Workflows Grid */}
       {loading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
@@ -398,33 +452,73 @@ export default function Workflows() {
           </Button>
         </Paper>
       ) : (
-        <Grid container spacing={3}>
-          {filteredWorkflows.map((workflow) => {
-            const category = categories.find(c => c._id === workflow.category);
-            return (
-              <Grid item xs={12} md={6} lg={4} key={workflow._id}>
-                <Card elevation={0} sx={{ height: '100%', display: 'flex', flexDirection: 'column', border: '1px solid #e8eef7' }}>
-                  <CardContent sx={{ flexGrow: 1 }}>
-                    <Stack direction="row" justifyContent="space-between" alignItems="flex-start" mb={2}>
-                      <Box>
-                        <Typography variant="h6" sx={{ fontWeight: 700, lineHeight: 1.2, mb: 0.5 }}>
-                          {workflow.name}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {workflow.description || 'No description provided.'}
-                        </Typography>
-                      </Box>
-                      <Chip
-                        label={workflow.status}
-                        size="small"
-                        color={getStatusColor(workflow.status)}
-                      />
-                    </Stack>
+        <Box component={Paper} sx={{ mb: 3 }} elevation={0} border="1px solid #e0e0e0">
+          <Box sx={{ overflowX: 'auto' }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', minWidth: 800 }}>
+              {/* Header Row */}
+              <Box sx={{ 
+                display: 'grid', 
+                gridTemplateColumns: '60px 1.5fr 1.2fr 1fr 1fr 120px 120px',
+                gap: 2,
+                p: 2,
+                backgroundColor: '#1976d2',
+                color: 'white',
+                fontWeight: 'bold',
+                width: '100%',
+                boxSizing: 'border-box'
+              }}>
+                <Box sx={{ fontWeight: 'bold', fontSize: '0.9rem' }}>#</Box>
+                <Box sx={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Workflow Name & Description</Box>
+                <Box sx={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Trigger Event</Box>
+                <Box sx={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Category</Box>
+                <Box sx={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Runs</Box>
+                <Box sx={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Status</Box>
+                <Box sx={{ fontWeight: 'bold', fontSize: '0.9rem', textAlign: 'right', pr: 2 }}>Actions</Box>
+              </Box>
 
-                    {category && (
-                      <Box sx={{ mb: 2 }}>
+              {/* Data Rows */}
+              {filteredWorkflows.map((workflow, idx) => {
+                const category = categories.find(c => c._id === workflow.category);
+                return (
+                  <Box key={workflow._id} sx={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: '60px 1.5fr 1.2fr 1fr 1fr 120px 120px',
+                    gap: 2,
+                    p: 2,
+                    borderBottom: '1px solid #e0e0e0',
+                    alignItems: 'center',
+                    backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f9fafb',
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    '&:hover': { backgroundColor: '#f1f5f9' },
+                  }}>
+                    {/* Index */}
+                    <Box sx={{ fontWeight: 'bold', color: '#1976d2' }}>{idx + 1}</Box>
+
+                    {/* Name & Description */}
+                    <Box>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5 }}>
+                        {workflow.name}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: '#666' }}>
+                        {workflow.description || 'No description provided.'}
+                      </Typography>
+                    </Box>
+
+                    {/* Trigger */}
+                    <Box>
+                      <Chip
+                        icon={<Typography sx={{ fontSize: '0.9rem' }}>{getTriggerIcon(workflow.trigger?.type)}</Typography>}
+                        label={workflow.trigger?.type || 'EVENT'}
+                        size="small"
+                        variant="outlined"
+                      />
+                    </Box>
+
+                    {/* Category */}
+                    <Box>
+                      {category ? (
                         <Chip
-                          icon={<FolderIcon fontSize="small" />}
                           label={category.name}
                           size="small"
                           sx={{
@@ -434,70 +528,69 @@ export default function Workflows() {
                             fontWeight: 600
                           }}
                         />
-                      </Box>
-                    )}
+                      ) : (
+                        <Typography variant="caption" color="text.secondary">-</Typography>
+                      )}
+                    </Box>
 
-                    <Divider sx={{ my: 2 }} />
+                    {/* Runs */}
+                    <Box>
+                      <Typography variant="body2" sx={{ fontWeight: 500, color: 'success.main' }}>
+                        {workflow.stats?.successfulExecutions || 0} runs
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {workflow.steps?.length || 0} visual steps
+                      </Typography>
+                    </Box>
 
-                    <Stack spacing={1.5}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Typography variant="caption" color="text.secondary">
-                          Trigger Event:
-                        </Typography>
-                        <Chip
-                          icon={<Typography sx={{ fontSize: '0.9rem' }}>{getTriggerIcon(workflow.trigger?.type)}</Typography>}
-                          label={workflow.trigger?.type || 'EVENT'}
-                          size="small"
-                          variant="outlined"
-                        />
-                      </Box>
+                    {/* Status Switch */}
+                    <Box>
+                      <FormControlLabel
+                        control={
+                          <Switch
+                            size="small"
+                            checked={workflow.status === 'ACTIVE'}
+                            onChange={() => handleToggleStatus(workflow)}
+                          />
+                        }
+                        label={<Typography variant="caption" sx={{ fontWeight: 600 }}>{workflow.status === 'ACTIVE' ? 'Active' : 'Paused'}</Typography>}
+                        sx={{ m: 0 }}
+                      />
+                    </Box>
 
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Typography variant="caption" color="text.secondary">
-                          Execution Path:
-                        </Typography>
-                        <Chip label={`${workflow.steps?.length || 0} visual steps`} size="small" />
-                      </Box>
-
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <TrendingUpIcon sx={{ fontSize: 16, color: 'success.main' }} />
-                        <Typography variant="caption" color="text.secondary">
-                          {workflow.stats?.successfulExecutions || 0} runs executed
-                        </Typography>
-                      </Box>
-                    </Stack>
-                  </CardContent>
-
-                  <Divider />
-
-                  <CardActions sx={{ px: 2, py: 1.5 }}>
-                    <FormControlLabel
-                      control={
-                        <Switch
-                          size="small"
-                          checked={workflow.status === 'ACTIVE'}
-                          onChange={() => handleToggleStatus(workflow)}
-                        />
-                      }
-                      label={<Typography variant="body2" sx={{ fontWeight: 600 }}>{workflow.status === 'ACTIVE' ? 'Active' : 'Paused'}</Typography>}
-                    />
-                    <Box sx={{ flexGrow: 1 }} />
-                    <IconButton size="small" color="primary" onClick={() => handleOpenEdit(workflow)}>
-                      <EditIcon fontSize="small" />
-                    </IconButton>
-                    <IconButton
-                      size="small"
-                      color="error"
-                      onClick={() => handleDeleteClick(workflow._id, workflow.name)}
-                    >
-                      <DeleteIcon fontSize="small" />
-                    </IconButton>
-                  </CardActions>
-                </Card>
-              </Grid>
-            );
-          })}
-        </Grid>
+                    {/* Actions */}
+                    <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end', pr: 1 }}>
+                      <Tooltip title="Edit">
+                        <IconButton 
+                          size="small" 
+                          color="primary"
+                          onClick={() => {
+                            if (workflow.trigger?.type === 'RESPONSE_RULE_SELECTION') {
+                              navigate(`/workflows/${workflow._id}`);
+                            } else {
+                              handleOpenEdit(workflow);
+                            }
+                          }}
+                        >
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Delete">
+                        <IconButton 
+                          size="small" 
+                          color="error"
+                          onClick={() => handleDeleteClick(workflow._id, workflow.name)}
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </Box>
+                  </Box>
+                );
+              })}
+            </Box>
+          </Box>
+        </Box>
       )}
 
       {/* Visual Workflow Canvas Dialog */}

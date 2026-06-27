@@ -6,6 +6,7 @@ import useAuthStore from './store/authStore';
 const DashboardLayout = lazy(() => import('./components/layout/DashboardLayout'));
 const Dashboard = lazy(() => import('./pages/Dashboard/Dashboard'));
 const Login = lazy(() => import('./pages/Auth/Login'));
+const ResetPassword = lazy(() => import('./pages/Auth/ResetPassword'));
 const Customers = lazy(() => import('./pages/Customers/Customers'));
 const Campaigns = lazy(() => import('./pages/Campaigns/Campaigns'));
 const Templates = lazy(() => import('./pages/Templates/Templates'));
@@ -13,6 +14,7 @@ const Messages = lazy(() => import('./pages/Messages/Messages'));
 const Analytics = lazy(() => import('./pages/Analytics/Analytics'));
 const Settings = lazy(() => import('./pages/Settings/Settings'));
 const Workflows = lazy(() => import('./pages/Workflows/Workflows'));
+const ConditionalWorkflowBuilder = lazy(() => import('./pages/Workflows/ConditionalWorkflowBuilder'));
 const AIFeatures = lazy(() => import('./pages/AIFeatures/AIFeatures'));
 const ResponseRules = lazy(() => import('./pages/Rules/ResponseRules'));
 const Conversations = lazy(() => import('./pages/Conversations/Conversations'));
@@ -28,6 +30,7 @@ const ProtectedRoute = ({ children }) => {
 };
 
 function App() {
+  const user = useAuthStore((state) => state.user);
   return (
     <Suspense
       fallback={
@@ -38,6 +41,25 @@ function App() {
     >
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/reset-password/:token" element={<ResetPassword />} />
+        {/* Full-screen protected routes for workflow builder canvas */}
+        <Route
+          path="/workflows/create"
+          element={
+            <ProtectedRoute>
+              <ConditionalWorkflowBuilder />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/workflows/:id"
+          element={
+            <ProtectedRoute>
+              <ConditionalWorkflowBuilder />
+            </ProtectedRoute>
+          }
+        />
+
         <Route
           path="/"
           element={
@@ -57,7 +79,7 @@ function App() {
           <Route path="analytics" element={<Analytics />} />
           <Route path="workflows" element={<Workflows />} />
           <Route path="response-rules" element={<ResponseRules />} />
-          <Route path="ai-features" element={<AIFeatures />} />
+          <Route path="ai-features" element={user?.role === 'ADMIN' ? <AIFeatures /> : <Navigate to="/" replace />} />
           <Route path="settings" element={<Settings />} />
         </Route>
       </Routes>

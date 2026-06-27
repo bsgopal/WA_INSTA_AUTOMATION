@@ -5,7 +5,7 @@ import {
   TableContainer, TableHead, TableRow, Chip, IconButton, TextField,
   InputAdornment, Menu, MenuItem, Dialog, DialogTitle, DialogContent,
   DialogActions, Grid, Stack, Card, CardContent, Avatar, Pagination,
-  FormControl, InputLabel, Select, Alert
+  FormControl, InputLabel, Select, Alert, Checkbox
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import AddIcon from '@mui/icons-material/Add';
@@ -77,6 +77,15 @@ export default function Customers() {
   });
   const [submitting, setSubmitting] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
+  
+  // Bulk message states
+  const [selectedCustomerIds, setSelectedCustomerIds] = useState([]);
+  const [openBulkDialog, setOpenBulkDialog] = useState(false);
+  const [templates, setTemplates] = useState([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState('');
+  const [bulkChannel, setBulkChannel] = useState('whatsapp');
+  const [bulkSending, setBulkSending] = useState(false);
+
   const [stats, setStats] = useState({
     total: 0,
     vip: 0,
@@ -86,7 +95,17 @@ export default function Customers() {
 
   useEffect(() => {
     fetchCustomers();
+    fetchTemplates();
   }, [page, searchTerm, selectedSegment]);
+
+  const fetchTemplates = async () => {
+    try {
+      const res = await apiClient.get('/templates?limit=1000');
+      setTemplates(res.data?.templates || []);
+    } catch (err) {
+      console.error('Failed to load templates:', err);
+    }
+  };
 
   const fetchCustomers = async () => {
     try {
@@ -221,6 +240,60 @@ export default function Customers() {
     }
   };
 
+  const handleBulkSend = async () => {
+    if (!selectedTemplateId || !bulkChannel) {
+      setSnackbar({ open: true, message: 'Please select a template and a channel', severity: 'warning' });
+      return;
+    }
+
+    const template = templates.find(t => t._id === selectedTemplateId);
+    if (!template) return;
+
+    try {
+      setBulkSending(true);
+      const res = await apiClient.post('/messages/bulk-send', {
+        customerIds: selectedCustomerIds,
+        content: template.content,
+        channel: bulkChannel
+      });
+
+      if (res.data?.success) {
+        setSnackbar({
+          open: true,
+          message: `Bulk message job completed successfully! Sent: ${res.data.successCount}, Failed: ${res.data.failCount}`,
+          severity: 'success'
+        });
+        setOpenBulkDialog(false);
+        setSelectedCustomerIds([]);
+      }
+    } catch (err) {
+      console.error('Bulk sending failed:', err);
+      setSnackbar({
+        open: true,
+        message: err.response?.data?.error || 'Bulk sending failed. Please try again.',
+        severity: 'error'
+      });
+    } finally {
+      setBulkSending(false);
+    }
+  };
+
+  const toggleSelectAllCustomers = () => {
+    if (selectedCustomerIds.length === customers.length) {
+      setSelectedCustomerIds([]);
+    } else {
+      setSelectedCustomerIds(customers.map(c => c._id));
+    }
+  };
+
+  const toggleSelectCustomer = (customerId) => {
+    if (selectedCustomerIds.includes(customerId)) {
+      setSelectedCustomerIds(prev => prev.filter(id => id !== customerId));
+    } else {
+      setSelectedCustomerIds(prev => [...prev, customerId]);
+    }
+  };
+
   const handleImportCSV = async () => {
     if (!csvFile) {
       setSnackbar({ open: true, message: 'Please select a file to import', severity: 'warning' });
@@ -291,6 +364,31 @@ export default function Customers() {
           </Typography>
         </Box>
         <Stack direction="row" spacing={2}>
+          {selectedCustomerIds.length > 0 && (
+            <>
+              <Button
+                variant="contained"
+                color="success"
+                startIcon={<MessageIcon />}
+                onClick={() => {
+                  setSelectedTemplateId('');
+                  setBulkChannel('whatsapp');
+                  setOpenBulkDialog(true);
+                }}
+                disableElevation
+                sx={{ fontWeight: 600 }}
+              >
+                Bulk Message ({selectedCustomerIds.length})
+              </Button>
+              <Button
+                variant="text"
+                onClick={() => setSelectedCustomerIds([])}
+                sx={{ textTransform: 'none', fontWeight: 600 }}
+              >
+                Deselect All
+              </Button>
+            </>
+          )}
           <Button
             variant="outlined"
             startIcon={<UploadIcon />}
@@ -438,6 +536,13 @@ export default function Customers() {
         <Table>
           <TableHead>
             <TableRow>
+              <TableCell padding="checkbox">
+                <Checkbox
+                  indeterminate={selectedCustomerIds.length > 0 && selectedCustomerIds.length < customers.length}
+                  checked={customers.length > 0 && selectedCustomerIds.length === customers.length}
+                  onChange={toggleSelectAllCustomers}
+                />
+              </TableCell>
               <TableCell>Customer</TableCell>
               <TableCell>Contact</TableCell>
               <TableCell>Segment</TableCell>
@@ -451,7 +556,7 @@ export default function Customers() {
           <TableBody>
             {customers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} align="center">
+                <TableCell colSpan={9} align="center">
                   <Typography variant="body2" color="text.secondary" py={4}>
                     No customers found. Add your first customer to get started.
                   </Typography>
@@ -459,7 +564,13 @@ export default function Customers() {
               </TableRow>
             ) : (
               customers.map((customer) => (
-                <TableRow key={customer._id} hover>
+                <TableRow key={customer._id} hover selected={selectedCustomerIds.includes(customer._id)}>
+                  <TableCell padding="checkbox">
+                    <Checkbox
+                      checked={selectedCustomerIds.includes(customer._id)}
+                      onChange={() => toggleSelectCustomer(customer._id)}
+                    />
+                  </TableCell>
                   <TableCell>
                     <Stack direction="row" spacing={2} alignItems="center">
                       <Avatar sx={{ bgcolor: 'primary.main' }}>
@@ -683,6 +794,84 @@ export default function Customers() {
           <Button onClick={() => setDeleteConfirmOpen(false)}>Cancel</Button>
           <Button variant="contained" color="error" disableElevation onClick={handleDeleteCustomer}>
             Delete Customer
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Bulk Message Send Dialog */}
+      <Dialog 
+        open={openBulkDialog} 
+        onClose={() => !bulkSending && setOpenBulkDialog(false)} 
+        maxWidth="sm" 
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 3, p: 1 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 700 }}>💬 Send Bulk Template Message</DialogTitle>
+        <DialogContent>
+          <Stack spacing={3} mt={1}>
+            <Alert severity="info" sx={{ borderRadius: 2 }}>
+              You are sending a bulk message to <strong>{selectedCustomerIds.length}</strong> selected customer(s).
+            </Alert>
+
+            <FormControl fullWidth size="small">
+              <InputLabel>Select Message Template</InputLabel>
+              <Select
+                value={selectedTemplateId}
+                label="Select Message Template"
+                onChange={(e) => setSelectedTemplateId(e.target.value)}
+                disabled={bulkSending}
+              >
+                {templates.map((tpl) => (
+                  <MenuItem key={tpl._id} value={tpl._id}>
+                    {tpl.name} ({tpl.type})
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            <FormControl fullWidth size="small">
+              <InputLabel>Channel</InputLabel>
+              <Select
+                value={bulkChannel}
+                label="Channel"
+                onChange={(e) => setBulkChannel(e.target.value)}
+                disabled={bulkSending}
+              >
+                <MenuItem value="whatsapp">WhatsApp</MenuItem>
+                <MenuItem value="instagram">Instagram</MenuItem>
+              </Select>
+            </FormControl>
+
+            {selectedTemplateId && (
+              <Box sx={{ 
+                p: 2, 
+                bgcolor: '#f8fafc', 
+                border: '1px solid #e2e8f0', 
+                borderRadius: 2 
+              }}>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748b', display: 'block', mb: 1 }}>
+                  TEMPLATE CONTENT PREVIEW:
+                </Typography>
+                <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', color: '#1e293b' }}>
+                  {templates.find(t => t._id === selectedTemplateId)?.content || ''}
+                </Typography>
+              </Box>
+            )}
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setOpenBulkDialog(false)} disabled={bulkSending} sx={{ textTransform: 'none', fontWeight: 600 }}>
+            Cancel
+          </Button>
+          <Button 
+            variant="contained" 
+            color="success" 
+            disableElevation
+            disabled={bulkSending || !selectedTemplateId}
+            onClick={handleBulkSend}
+            sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 5, px: 3 }}
+          >
+            {bulkSending ? 'Sending...' : 'Send Messages'}
           </Button>
         </DialogActions>
       </Dialog>

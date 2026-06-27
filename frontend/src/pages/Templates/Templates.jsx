@@ -3,7 +3,7 @@ import {
   Typography, Box, Paper, Button, Grid, Card, CardContent, CardActions,
   IconButton, Dialog, DialogTitle, DialogContent, DialogActions,
   TextField, MenuItem, Chip, Stack, Divider, FormControl, InputLabel,
-  Select, CircularProgress, Alert
+  Select, CircularProgress, Alert, Tooltip
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
@@ -13,12 +13,14 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import DownloadIcon from '@mui/icons-material/Download';
 import UploadIcon from '@mui/icons-material/Upload';
 import LinkIcon from '@mui/icons-material/Link';
+import CloseIcon from '@mui/icons-material/Close';
 import CustomSnackbar from '../../components/Snackbar';
 import apiClient from '../../api/client';
 
 export default function Templates() {
   const [templates, setTemplates] = useState([]);
   const [openDialog, setOpenDialog] = useState(false);
+  const [openHelpDialog, setOpenHelpDialog] = useState(false);
   const [openLinkDialog, setOpenLinkDialog] = useState(false);
   const [openCSVDialog, setOpenCSVDialog] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -267,6 +269,66 @@ export default function Templates() {
     }
   };
 
+  const downloadCSVTemplate = () => {
+    const csvHeader = 'name,keywords,content,category\n';
+    const exampleRow = '"Welcome Message","hello,hi,greet","Hey! Welcome to our store 👋","GREETING"\n';
+    const csvContent = csvHeader + exampleRow;
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'template_example.csv');
+    link.style.visibility = 'hidden';
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    setSnackbar({
+      open: true,
+      message: 'CSV template downloaded successfully!',
+      severity: 'success'
+    });
+  };
+
+  const handleOpenAddDialog = () => {
+    setEditingId(null);
+    setFormData({
+      name: '',
+      type: 'TEXT',
+      content: '',
+      category: 'CUSTOM',
+      linkedMessageId: null,
+      linkedAction: null,
+      csvTemplates: []
+    });
+    setOpenDialog(true);
+  };
+
+  const handleDeleteTemplate = async () => {
+    if (!deleteConfirmId) return;
+
+    try {
+      await apiClient.delete(`/templates/${deleteConfirmId}`);
+      setSnackbar({
+        open: true,
+        message: 'Template deleted successfully!',
+        severity: 'success'
+      });
+      setDeleteConfirmId(null);
+      fetchTemplates();
+    } catch (error) {
+      console.error('Failed to delete template:', error);
+      setSnackbar({
+        open: true,
+        message: 'Failed to delete template',
+        severity: 'error'
+      });
+    }
+  };
+
   const handleEditTemplate = (idx) => {
     const template = formData.csvTemplates[idx];
     setEditingTemplate({
@@ -364,7 +426,15 @@ export default function Templates() {
             Create and manage reusable message templates
           </Typography>
         </Box>
-        <Stack direction="row" spacing={2}>
+        <Stack direction="row" spacing={1.5}>
+          <Button
+            variant="outlined"
+            color="info"
+            onClick={() => setOpenHelpDialog(true)}
+            size="small"
+          >
+            Help / Guidelines
+          </Button>
           <Button
             variant="outlined"
             startIcon={<DownloadIcon />}
@@ -391,6 +461,150 @@ export default function Templates() {
           </Button>
         </Stack>
       </Box>
+
+      {/* Main Template Creation/Edit Dialog */}
+      <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontWeight: 600 }}>
+          {editingId ? 'Edit Template' : 'Create New Template'}
+        </DialogTitle>
+        <DialogContent>
+          <Stack spacing={2.5} mt={2}>
+            {/* 1. Template Name */}
+            <TextField
+              fullWidth
+              label="1. Template Name"
+              placeholder="e.g., Welcome Message, Price Quote"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              helperText="Short name for this template"
+              size="small"
+            />
+
+            {/* 2. Template Type */}
+            <FormControl fullWidth size="small">
+              <InputLabel>2. Template Type</InputLabel>
+              <Select
+                value={formData.type}
+                label="2. Template Type"
+                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+              >
+                <MenuItem value="TEXT">📝 Text Only</MenuItem>
+                <MenuItem value="IMAGE">🖼️ With Image</MenuItem>
+                <MenuItem value="INTERACTIVE">🔘 With Buttons</MenuItem>
+              </Select>
+            </FormControl>
+
+            {/* 3. Category */}
+            <FormControl fullWidth size="small">
+              <InputLabel>3. Category</InputLabel>
+              <Select
+                value={formData.category}
+                label="3. Category"
+                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+              >
+                {categoryOptions.map((cat) => (
+                  <MenuItem key={cat} value={cat}>
+                    {cat.replace(/_/g, ' ')}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            {/* 4. Template Content */}
+            <TextField
+              fullWidth
+              label="4. Template Content"
+              placeholder="Type your message here... You can use {{customer_name}}, {{gold_rate_22k}}, etc."
+              value={formData.content}
+              onChange={(e) => setFormData({ ...formData, content: e.target.value })}
+              multiline
+              rows={4}
+              helperText="Supports dynamic variables with {{variable_name}} format"
+              size="small"
+            />
+
+            {/* 5. Keywords (Optional) */}
+            <TextField
+              fullWidth
+              label="5. Keywords (Optional)"
+              placeholder="e.g., rates, price, quote (comma-separated)"
+              value={formData.keywords || ''}
+              onChange={(e) => setFormData({ ...formData, keywords: e.target.value })}
+              helperText="Keywords to trigger this template"
+              size="small"
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setOpenDialog(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={async () => {
+              if (!formData.name.trim() || !formData.content.trim()) {
+                setSnackbar({
+                  open: true,
+                  message: 'Please fill in template name and content',
+                  severity: 'warning'
+                });
+                return;
+              }
+
+              try {
+                setSubmitting(true);
+                const payload = {
+                  name: formData.name,
+                  type: formData.type,
+                  content: formData.content,
+                  category: formData.category,
+                  keywords: formData.keywords || ''
+                };
+
+                if (editingId) {
+                  await apiClient.put(`/templates/${editingId}`, payload);
+                  setSnackbar({
+                    open: true,
+                    message: 'Template updated successfully!',
+                    severity: 'success'
+                  });
+                } else {
+                  await apiClient.post('/templates', payload);
+                  setSnackbar({
+                    open: true,
+                    message: 'Template created successfully!',
+                    severity: 'success'
+                  });
+                }
+
+                setOpenDialog(false);
+                setFormData({
+                  name: '',
+                  type: 'TEXT',
+                  content: '',
+                  category: 'CUSTOM',
+                  linkedMessageId: null,
+                  linkedAction: null,
+                  csvTemplates: []
+                });
+                setEditingId(null);
+                fetchTemplates();
+              } catch (error) {
+                console.error('Failed to save template:', error);
+                setSnackbar({
+                  open: true,
+                  message: error.response?.data?.error || 'Failed to save template',
+                  severity: 'error'
+                });
+              } finally {
+                setSubmitting(false);
+              }
+            }}
+            disabled={submitting}
+            disableElevation
+          >
+            {submitting ? 'Saving...' : editingId ? 'Update Template' : 'Create Template'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* CSV Upload Dialog */}
       <Dialog open={openCSVDialog} onClose={() => setOpenCSVDialog(false)} maxWidth="sm" fullWidth>
@@ -423,45 +637,193 @@ export default function Templates() {
         </DialogActions>
       </Dialog>
 
-      {/* CSV Guidelines & Documentation */}
-      <Paper sx={{ p: 3, mb: 3, bgcolor: '#f0f4f8', border: '1px solid #cbd5e1', borderRadius: 2 }} elevation={0}>
-        <Stack spacing={3}>
-          {/* Format Tabs */}
-          <Box>
-            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2, color: '#1a1a1a' }}>
-              📋 File Format Guidelines
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.6, mb: 2 }}>
-              Learn how to properly format your CSV files before uploading
-            </Typography>
-          </Box>
+      {/* Link Template Dialog */}
+      <Dialog open={openLinkDialog} onClose={() => setOpenLinkDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontWeight: 600 }}>Link Template to Action/Message</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Select Message/Quick Reply</InputLabel>
+              <Select
+                value={selectedMessage}
+                label="Select Message/Quick Reply"
+                onChange={(e) => setSelectedMessage(e.target.value)}
+              >
+                {availableMessages.map((msg) => (
+                  <MenuItem key={`${msg.type}-${msg.id}`} value={msg.id}>
+                    [{msg.type}] {msg.name?.substring(0, 50)}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
 
-          {/* CSV FORMAT */}
-          <Paper sx={{ p: 2.5, bgcolor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 2 }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 2, color: '#0f172a' }}>
-              📄 CSV Format (Recommended)
+            <FormControl fullWidth size="small">
+              <InputLabel>Select Button Action</InputLabel>
+              <Select
+                value={selectedButtonAction}
+                label="Select Button Action"
+                onChange={(e) => setSelectedButtonAction(e.target.value)}
+              >
+                <MenuItem value="QUICK_REPLY">💬 Quick Reply</MenuItem>
+                <MenuItem value="OPEN_URL">🔗 Open Website URL</MenuItem>
+                <MenuItem value="CALL_PHONE">📞 Call Phone Number</MenuItem>
+              </Select>
+            </FormControl>
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setOpenLinkDialog(false)}>Cancel</Button>
+          <Button variant="contained" onClick={handleSaveLink}>Save Link</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Templates List - Grid Table Layout */}
+      <Box sx={{ mb: 3 }}>
+        <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
+          📋 Your Templates ({templates.length})
+        </Typography>
+        
+        {templates.length === 0 ? (
+          <Paper sx={{ p: 4, textAlign: 'center', backgroundColor: '#f9fafb', border: '1px dashed #cbd5e1', borderRadius: 2 }}>
+            <Typography variant="body2" color="text.secondary" mb={2}>
+              No templates created yet. Start by creating your first template!
             </Typography>
-            <Stack spacing={1.5} sx={{ bgcolor: '#f9fafb', p: 2, borderRadius: 1, border: '1px solid #e5e7eb' }}>
-              <Typography variant="caption" sx={{ fontFamily: 'monospace', color: '#1f2937', fontWeight: 600 }}>
-                Header (Required): name,keywords,content,category
-              </Typography>
-              <Typography variant="caption" sx={{ fontFamily: 'monospace', color: '#374151', whiteSpace: 'pre-wrap' }}>
-                {`Example:
-"Welcome","hello,hi,greet","Hey! Welcome to our store 👋","GREETING"
-"Product Info","price,cost,rates","We have necklaces from Rs.2000-5000","PRODUCTS"
-"Multi-line","faq,help","Question?\n\nAnswer text\nWith multiple lines","FAQ"`}
-              </Typography>
-            </Stack>
-            <Stack spacing={1} sx={{ mt: 2 }}>
-              <Typography variant="caption" sx={{ color: '#059669', fontWeight: 600 }}>✓ Rules:</Typography>
-              <Typography variant="caption" sx={{ color: '#4b5563' }}>• Always quote text containing commas</Typography>
-              <Typography variant="caption" sx={{ color: '#4b5563' }}>• Use \n for newlines inside quotes: "Line1\nLine2"</Typography>
-              <Typography variant="caption" sx={{ color: '#4b5563' }}>• name and content are required; keywords and category are optional</Typography>
-              <Typography variant="caption" sx={{ color: '#4b5563' }}>• Save as UTF-8 encoding</Typography>
-            </Stack>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={handleOpenAddDialog}
+              disableElevation
+            >
+              Create First Template
+            </Button>
           </Paper>
-        </Stack>
-      </Paper>
+        ) : (
+          <Box component={Paper} sx={{ mb: 3 }} elevation={0} border="1px solid #e0e0e0">
+            <Box sx={{ overflowX: 'auto' }}>
+              <Box sx={{ display: 'flex', flexDirection: 'column', minWidth: 800 }}>
+                {/* Header Row */}
+                <Box sx={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: '60px 1fr 120px 150px 150px',
+                  gap: 2,
+                  p: 2,
+                  backgroundColor: '#1976d2',
+                  color: 'white',
+                  fontWeight: 'bold',
+                  width: '100%',
+                  boxSizing: 'border-box'
+                }}>
+                  <Box sx={{ fontWeight: 'bold', fontSize: '0.9rem' }}>#</Box>
+                  <Box sx={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Template Name & Content</Box>
+                  <Box sx={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Type</Box>
+                  <Box sx={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Category</Box>
+                  <Box sx={{ fontWeight: 'bold', fontSize: '0.9rem', textAlign: 'right', pr: 2 }}>Actions</Box>
+                </Box>
+
+                {/* Data Rows */}
+                {templates.map((template, idx) => (
+                  <Box key={template._id} sx={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: '60px 1fr 120px 150px 150px',
+                    gap: 2,
+                    p: 2,
+                    borderBottom: '1px solid #e0e0e0',
+                    alignItems: 'center',
+                    backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f9fafb',
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    '&:hover': { backgroundColor: '#f1f5f9' },
+                  }}>
+                    {/* Index */}
+                    <Box sx={{ fontWeight: 'bold', color: '#1976d2' }}>{idx + 1}</Box>
+
+                    {/* Name + Preview */}
+                    <Box>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5 }}>
+                        {template.name}
+                      </Typography>
+                      <Typography variant="caption" sx={{ 
+                        color: '#666',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        display: '-webkit-box',
+                        WebkitLineClamp: 1,
+                        WebkitBoxOrient: 'vertical'
+                      }}>
+                        {template.content?.substring(0, 80)}...
+                      </Typography>
+                    </Box>
+
+                    {/* Type */}
+                    <Box>
+                      <Chip 
+                        label={template.type || 'TEXT'} 
+                        size="small" 
+                        color={getTypeColor(template.type || 'TEXT')}
+                        variant="outlined"
+                      />
+                    </Box>
+
+                    {/* Category */}
+                    <Box>
+                      <Chip 
+                        label={template.category || 'CUSTOM'} 
+                        size="small"
+                        variant="filled"
+                        sx={{ backgroundColor: '#e3f2fd', color: '#1565c0' }}
+                      />
+                    </Box>
+
+                    {/* Actions */}
+                    <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end', pr: 1 }}>
+                      <Tooltip title="Edit">
+                        <IconButton 
+                          size="small" 
+                          color="primary"
+                          onClick={() => {
+                            setEditingId(template._id);
+                            setFormData({
+                              name: template.name,
+                              type: template.type,
+                              content: template.content,
+                              category: template.category,
+                              keywords: template.keywords || '',
+                              linkedMessageId: null,
+                              linkedAction: null,
+                              csvTemplates: []
+                            });
+                            setOpenDialog(true);
+                          }}
+                        >
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Link Template">
+                        <IconButton 
+                          size="small" 
+                          color="info"
+                          onClick={() => handleOpenLinkDialog(template._id)}
+                        >
+                          <LinkIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Delete">
+                        <IconButton 
+                          size="small" 
+                          color="error"
+                          onClick={() => setDeleteConfirmId(template._id)}
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </Box>
+                  </Box>
+                ))}
+              </Box>
+            </Box>
+          </Box>
+        )}
+      </Box>
 
       {/* CSV Preview Dialog */}
       <Dialog open={openCSVPreviewDialog} onClose={() => setOpenCSVPreviewDialog(false)} maxWidth="lg" fullWidth>
@@ -720,6 +1082,48 @@ export default function Templates() {
           </Stack>
         </Box>
       )}
+
+      {/* Help / Guidelines Dialog */}
+      <Dialog open={openHelpDialog} onClose={() => setOpenHelpDialog(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 2, bgcolor: '#fff' } }}>
+        <DialogTitle sx={{ fontWeight: 700, color: '#1a1a1a', pb: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>📋 File Format Guidelines</span>
+          <IconButton onClick={() => setOpenHelpDialog(false)} size="small"><CloseIcon /></IconButton>
+        </DialogTitle>
+        <DialogContent>
+          <Stack spacing={2.5} sx={{ mt: 1 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.6 }}>
+              Learn how to properly format your CSV files before uploading:
+            </Typography>
+
+            <Paper sx={{ p: 2.5, bgcolor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 2 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, color: '#0f172a' }}>
+                📄 CSV Format (Recommended)
+              </Typography>
+              <Stack spacing={1.5} sx={{ bgcolor: '#ffffff', p: 2, borderRadius: 1, border: '1px solid #e5e7eb' }}>
+                <Typography variant="caption" sx={{ fontFamily: 'monospace', color: '#1f2937', fontWeight: 600 }}>
+                  Header (Required): name,keywords,content,category
+                </Typography>
+                <Typography variant="caption" sx={{ fontFamily: 'monospace', color: '#374151', whiteSpace: 'pre-wrap' }}>
+                  {`Example:
+"Welcome","hello,hi,greet","Hey! Welcome to our store 👋","GREETING"
+"Product Info","price,cost,rates","We have necklaces from Rs.2000-5000","PRODUCTS"
+"Multi-line","faq,help","Question?\\n\\nAnswer text\\nWith multiple lines","FAQ"`}
+                </Typography>
+              </Stack>
+              <Stack spacing={1} sx={{ mt: 2 }}>
+                <Typography variant="caption" sx={{ color: '#059669', fontWeight: 600 }}>✓ Rules:</Typography>
+                <Typography variant="caption" sx={{ color: '#4b5563' }}>• Always quote text containing commas</Typography>
+                <Typography variant="caption" sx={{ color: '#4b5563' }}>• Use \\n for newlines inside quotes: "Line1\\nLine2"</Typography>
+                <Typography variant="caption" sx={{ color: '#4b5563' }}>• name and content are required; keywords and category are optional</Typography>
+                <Typography variant="caption" sx={{ color: '#4b5563' }}>• Save as UTF-8 encoding</Typography>
+              </Stack>
+            </Paper>
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setOpenHelpDialog(false)} variant="contained" color="primary" disableElevation>Got it</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

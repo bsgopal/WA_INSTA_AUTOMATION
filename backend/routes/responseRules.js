@@ -349,6 +349,7 @@ Return ONLY the raw JSON object. Do not wrap it in markdown backticks, code bloc
 router.get('/', async (req, res) => {
   try {
     const rules = await ResponseRule.find({ userId: req.user.id })
+      .populate('userId', 'firstName lastName')
       .sort({ createdAt: -1 });
     
     console.log(`📋 GET /response-rules: Fetching ${rules.length} rules for user ${req.user.id}`);
@@ -664,6 +665,74 @@ router.post('/bulk-create-from-templates', async (req, res) => {
   } catch (error) {
     console.error('Bulk Create Rules Error:', error);
     res.status(500).json({ error: 'Failed to create rules', details: error.message });
+  }
+});
+
+// ============ GET LIST ITEMS ============
+router.get('/:id/list-items', async (req, res) => {
+  try {
+    const rule = await ResponseRule.findOne({
+      _id: req.params.id,
+      userId: req.user.id
+    });
+
+    if (!rule) {
+      return res.status(404).json({ error: 'Response rule not found' });
+    }
+
+    const rows = [];
+
+    // 1. Gather from LIST blocks
+    const listBlocks = rule.messageBlocks?.filter(b => b.type === 'LIST') || [];
+    for (const listBlock of listBlocks) {
+      for (const sec of (listBlock.config?.sections || [])) {
+        for (const row of (sec.rows || [])) {
+          rows.push({
+            id: row.rowId || row.id || row.value || row.title,
+            title: row.title || row.label || '',
+            description: `${listBlock.config?.title || 'List'}: ${row.description || 'List Option'}`
+          });
+        }
+      }
+    }
+
+    // 2. Gather from BUTTONS blocks
+    const buttonsBlocks = rule.messageBlocks?.filter(b => b.type === 'BUTTONS') || [];
+    for (const bBlock of buttonsBlocks) {
+      for (const btn of (bBlock.config?.buttons || [])) {
+        rows.push({
+          id: btn.value || btn.id || btn.label,
+          title: btn.label || '',
+          description: `Button: ${btn.value || ''}`
+        });
+      }
+    }
+
+    // 3. Gather from CARD blocks
+    const cardBlocks = rule.messageBlocks?.filter(b => b.type === 'CARD') || [];
+    for (const cBlock of cardBlocks) {
+      for (const btn of (cBlock.config?.buttons || [])) {
+        rows.push({
+          id: btn.value || btn.id || btn.label,
+          title: btn.label || '',
+          description: `Card Button: ${btn.value || ''}`
+        });
+      }
+    }
+
+    const sections = [{
+      title: 'Available Options',
+      rows
+    }];
+
+    res.json({
+      title: rule.name || 'Options',
+      buttonText: 'Select',
+      sections
+    });
+  } catch (error) {
+    console.error('Get List Items Error:', error);
+    res.status(500).json({ error: 'Failed to fetch list items' });
   }
 });
 

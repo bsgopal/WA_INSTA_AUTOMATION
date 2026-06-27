@@ -1,4 +1,5 @@
-﻿import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Typography, Box, Paper, Grid, TextField, Button, Switch,
   FormControlLabel, Divider, Stack, Card, CardContent, IconButton,
@@ -9,6 +10,7 @@ import {
 import SaveIcon from '@mui/icons-material/Save';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
+import EditIcon from '@mui/icons-material/Edit';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
@@ -23,6 +25,7 @@ import SmartToyIcon from '@mui/icons-material/SmartToy';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import LinkIcon from '@mui/icons-material/Link';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 
 import apiClient from '../../api/client';
 import CustomSnackbar from '../../components/Snackbar';
@@ -57,14 +60,20 @@ export default function ResponseRules() {
   const fileInputRef = useRef(null);
 
   const [draftReview, setDraftReview] = useState(null);
+  const [openPreviewDialog, setOpenPreviewDialog] = useState(false);
+  const [previewContent, setPreviewContent] = useState(null);
   const [openReviewModal, setOpenReviewModal] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
   const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', type: '', ruleId: null });
+  const [activeTab, setActiveTab] = useState('ALL');
+  const [openHelpDialog, setOpenHelpDialog] = useState(false);
 
   const ROW_ACTION_OPTIONS = [
     { value: 'CUSTOM', label: 'Custom Trigger' },
     { value: 'QUICK_REPLY', label: 'Quick Reply' },
     { value: 'TEMPLATE', label: 'Message Template' },
+    { value: 'RESPONSE_RULE', label: 'Trigger Response Rule' },
+    { value: 'WORKFLOW', label: 'Trigger Workflow' },
     { value: 'URL', label: 'Open URL' },
     { value: 'CATALOG', label: 'Catalog Link' }
   ];
@@ -74,9 +83,106 @@ export default function ResponseRules() {
     return n ? n.replace(/_/g, ' ') : fb;
   };
 
-  const inputSx = { '& .MuiOutlinedInput-root': { '& fieldset': { borderColor: '#e0e0e0' } } };
-  const labelSx = { style: { color: '#666666' } };
-  const inputPropsSx = { style: { color: '#1a1a1a' } };
+  // Enhanced modern input styling with comprehensive Material-UI design
+  const inputSx = {
+    '& .MuiOutlinedInput-root': {
+      backgroundColor: '#f9fafb',
+      transition: 'all 0.2s ease-in-out',
+      borderRadius: '8px',
+      '& fieldset': {
+        borderColor: '#d0d8e0',
+        transition: 'all 0.2s ease-in-out',
+        borderWidth: '1px'
+      },
+      '&:hover fieldset': {
+        borderColor: '#b8c3d1'
+      },
+      '&.Mui-focused fieldset': {
+        borderColor: '#0084ff',
+        borderWidth: '2px'
+      },
+      '&.Mui-focused': {
+        backgroundColor: '#ffffff',
+        boxShadow: '0 0 0 3px rgba(0, 132, 255, 0.1)'
+      },
+      '&.Mui-error fieldset': {
+        borderColor: '#d32f2f',
+        boxShadow: '0 0 0 3px rgba(211, 47, 47, 0.1)'
+      },
+      '&.Mui-disabled': {
+        backgroundColor: '#f5f5f5'
+      }
+    },
+    '& .MuiOutlinedInput-input': {
+      padding: '12px 14px',
+      fontSize: '0.95rem',
+      color: '#1a1a1a',
+      fontWeight: 400,
+      lineHeight: 1.5,
+      '&::placeholder': {
+        color: '#999999',
+        opacity: 0.7
+      }
+    },
+    '& .MuiOutlinedInput-input.Mui-disabled': {
+      color: '#999999',
+      WebkitTextFillColor: '#999999'
+    },
+    '& .MuiOutlinedInput-notchedOutline': {
+      borderWidth: '1px'
+    },
+    '& .MuiFormHelperText-root': {
+      marginTop: '6px',
+      fontSize: '0.8rem',
+      color: '#666666',
+      fontWeight: 400
+    },
+    '& .MuiFormHelperText-root.Mui-error': {
+      color: '#d32f2f',
+      fontWeight: 500
+    }
+  };
+
+  const labelSx = {
+    style: {
+      color: '#555555',
+      fontWeight: 500,
+      fontSize: '0.9rem',
+      transform: 'translate(14px, -6px) scale(0.75)',
+      transformOrigin: 'top left',
+      letterSpacing: '-0.3px'
+    },
+    // For focus state styling
+    required: false
+  };
+
+  const inputPropsSx = {
+    style: {
+      color: '#1a1a1a',
+      fontSize: '0.95rem',
+      fontWeight: 400
+    }
+  };
+
+  // FormControl styling for Select components
+  const formControlSx = {
+    '& .MuiOutlinedInput-root': inputSx['& .MuiOutlinedInput-root'],
+    '& .MuiFormLabel-root': {
+      color: '#555555',
+      fontWeight: 500
+    },
+    '& .MuiFormLabel-root.Mui-focused': {
+      color: '#0084ff'
+    },
+    '& .MuiFormLabel-root.Mui-error': {
+      color: '#d32f2f'
+    },
+    '& .MuiFormHelperText-root': {
+      marginTop: '6px',
+      fontSize: '0.8rem',
+      color: '#666666'
+    }
+  };
 
   // ── helpers ──────────────────────────────────────────────────────────────────
   const showSnackbar = (message, severity = 'info') => setSnackbar({ open: true, message, severity });
@@ -154,7 +260,14 @@ export default function ResponseRules() {
         const rt = String(row?.title || '').trim();
         if (!rt) continue;
         const rd = String(row?.description || '').trim();
-        lines.push(rd ? `${rt} - ${rd}` : rt);
+        let itemText = rd ? `${rt} - ${rd}` : rt;
+        if (row.actionUrl) {
+          itemText += `\n   🔗 ${row.actionUrl}`;
+        }
+        if (row.image) {
+          itemText += `\n   🖼️ Image: ${row.image}`;
+        }
+        lines.push(itemText);
       }
     }
     return lines;
@@ -332,20 +445,50 @@ export default function ResponseRules() {
   };
 
   const handleAIDraftRule = async () => {
+    if (!aiPrompt.trim() && !uploadedFile) {
+      showSnackbar('Please enter a description or upload a CSV file.', 'warning');
+      return;
+    }
+
     try {
       setAiGenerating(true);
-      if (!uploadedFile) { showSnackbar('Please upload a CSV file.', 'warning'); return; }
-      if (!uploadedFile.name.toLowerCase().endsWith('.csv')) { showSnackbar('CSV files only.', 'warning'); return; }
-      const tpls = detectAndParseTemplateCSV(await uploadedFile.text());
-      if (tpls?.length) {
-        setDraftReview({ mode: 'BULK_TEMPLATES', templates: tpls, count: tpls.length });
-        setOpenReviewModal(true);
-        showSnackbar(`Found ${tpls.length} templates!`, 'success');
+      
+      if (uploadedFile) {
+        if (!uploadedFile.name.toLowerCase().endsWith('.csv')) { 
+          showSnackbar('CSV files only.', 'warning'); 
+          return; 
+        }
+        const tpls = detectAndParseTemplateCSV(await uploadedFile.text());
+        if (tpls?.length) {
+          setDraftReview({ mode: 'BULK_TEMPLATES', templates: tpls, count: tpls.length });
+          setOpenReviewModal(true);
+          showSnackbar(`Found ${tpls.length} templates!`, 'success');
+        } else {
+          showSnackbar('CSV must have question/name and answer/content columns.', 'error');
+        }
       } else {
-        showSnackbar('CSV must have question/name and answer/content columns.', 'error');
+        // Generate single rule from prompt description
+        const response = await apiClient.post('/response-rules/ai/draft', { prompt: aiPrompt });
+        const drafted = response.data;
+        if (drafted && drafted.name) {
+          setDraftReview({
+            mode: 'SINGLE_DRAFT',
+            name: drafted.name,
+            triggerType: drafted.triggerType || 'KEYWORD',
+            triggerValue: drafted.triggerValue || '',
+            messageBlocks: drafted.messageBlocks || []
+          });
+          setOpenReviewModal(true);
+          showSnackbar('AI generated a draft rule!', 'success');
+        } else {
+          showSnackbar('Failed to generate draft with AI.', 'error');
+        }
       }
-    } catch (e) { showSnackbar(e?.message || 'CSV parsing failed', 'error'); }
-    finally { setAiGenerating(false); }
+    } catch (e) { 
+      showSnackbar(e.response?.data?.error || e?.message || 'AI generation failed', 'error'); 
+    } finally { 
+      setAiGenerating(false); 
+    }
   };
 
   const applyAIDraft = async () => {
@@ -393,15 +536,17 @@ export default function ResponseRules() {
                   InputLabelProps={labelSx} inputProps={inputPropsSx} sx={inputSx} />
               </Grid>
               <Grid item xs={12} sm={6}>
-                <FormControl fullWidth size="small" sx={inputSx}>
+                <FormControl fullWidth size="small" sx={formControlSx}>
                   <InputLabel sx={labelSx.style}>Action Type</InputLabel>
                   <Select value={btn.actionType || 'CUSTOM'} label="Action Type"
-                    onChange={(e) => updateBtn(btnIdx, { actionType: e.target.value, actionValue: '', templateId: '', quickReplyId: '' })}
+                    onChange={(e) => updateBtn(btnIdx, { actionType: e.target.value, actionValue: '', templateId: '', quickReplyId: '', ruleId: '', workflowId: '' })}
                     sx={{ color: '#1a1a1a' }}>
                     <MenuItem value="URL">🔗 Open URL/Link</MenuItem>
                     <MenuItem value="QUICK_REPLY">💬 Quick Reply</MenuItem>
                     <MenuItem value="TEMPLATE">📋 Message Template</MenuItem>
                     <MenuItem value="CALL">📞 Call Phone</MenuItem>
+                    <MenuItem value="RESPONSE_RULE">🤖 Trigger Response Rule</MenuItem>
+                    <MenuItem value="WORKFLOW">🔀 Trigger Workflow</MenuItem>
                     <MenuItem value="CUSTOM">⚡ Custom Trigger</MenuItem>
                   </Select>
                 </FormControl>
@@ -415,7 +560,7 @@ export default function ResponseRules() {
               )}
               {btn.actionType === 'QUICK_REPLY' && (
                 <Grid item xs={12}>
-                  <FormControl fullWidth size="small" sx={inputSx}>
+                  <FormControl fullWidth size="small" sx={formControlSx}>
                     <InputLabel sx={labelSx.style}>Select Quick Reply</InputLabel>
                     <Select value={btn.quickReplyId || ''} label="Select Quick Reply"
                       onChange={(e) => { const s = quickReplies.find(q => q._id === e.target.value); updateBtn(btnIdx, { quickReplyId: e.target.value, actionValue: s?.title || '' }); }}
@@ -428,13 +573,45 @@ export default function ResponseRules() {
               )}
               {btn.actionType === 'TEMPLATE' && (
                 <Grid item xs={12}>
-                  <FormControl fullWidth size="small" sx={inputSx}>
+                  <FormControl fullWidth size="small" sx={formControlSx}>
                     <InputLabel sx={labelSx.style}>Select Template</InputLabel>
                     <Select value={btn.templateId || ''} label="Select Template"
                       onChange={(e) => { const s = templates.find(t => t._id === e.target.value); updateBtn(btnIdx, { templateId: e.target.value, actionValue: s?.name || '' }); }}
                       sx={{ color: '#1a1a1a' }}>
                       {templates.length === 0 ? <MenuItem disabled>No templates</MenuItem>
                         : templates.map(t => <MenuItem key={t._id} value={t._id}>{t.name}</MenuItem>)}
+                    </Select>
+                  </FormControl>
+                </Grid>
+              )}
+              {btn.actionType === 'RESPONSE_RULE' && (
+                <Grid item xs={12}>
+                  <FormControl fullWidth size="small" sx={formControlSx}>
+                    <InputLabel sx={labelSx.style}>Select Response Rule</InputLabel>
+                    <Select value={btn.ruleId || ''} label="Select Response Rule"
+                      onChange={(e) => {
+                        const s = rules.find(r => r._id === e.target.value);
+                        updateBtn(btnIdx, { ruleId: e.target.value, actionValue: s?.name || '', id: s?.name || btn.value || `rule_${Date.now()}` });
+                      }}
+                      sx={{ color: '#1a1a1a' }}>
+                      {rules.length === 0 ? <MenuItem disabled>No rules available</MenuItem>
+                        : rules.map(r => <MenuItem key={r._id} value={r._id}>{r.name}</MenuItem>)}
+                    </Select>
+                  </FormControl>
+                </Grid>
+              )}
+              {btn.actionType === 'WORKFLOW' && (
+                <Grid item xs={12}>
+                  <FormControl fullWidth size="small" sx={formControlSx}>
+                    <InputLabel sx={labelSx.style}>Select Workflow</InputLabel>
+                    <Select value={btn.workflowId || ''} label="Select Workflow"
+                      onChange={(e) => {
+                        const w = workflows.find(wf => wf._id === e.target.value);
+                        updateBtn(btnIdx, { workflowId: e.target.value, actionValue: w?.name || '', id: w?.name || btn.value || `wf_${Date.now()}` });
+                      }}
+                      sx={{ color: '#1a1a1a' }}>
+                      {workflows.length === 0 ? <MenuItem disabled>No workflows available</MenuItem>
+                        : workflows.map(wf => <MenuItem key={wf._id} value={wf._id}>{wf.name}</MenuItem>)}
                     </Select>
                   </FormControl>
                 </Grid>
@@ -502,12 +679,12 @@ export default function ResponseRules() {
 
               {/* Action Type + Input Type + Delete */}
               <Grid item xs={12} sm={5}>
-                <FormControl fullWidth size="small" sx={inputSx}>
+                <FormControl fullWidth size="small" sx={formControlSx}>
                   <InputLabel sx={labelSx.style}>Action Type</InputLabel>
                   <Select value={row.actionType || 'CUSTOM'} label="Action Type"
                     onChange={(e) => {
                       const t = e.target.value;
-                      const patch = { actionType: t, actionValue: '', quickReplyId: '', templateId: '' };
+                      const patch = { actionType: t, actionValue: '', quickReplyId: '', templateId: '', ruleId: '', workflowId: '' };
                       if (t === 'CUSTOM') patch.rowId = row.rowId || `row_${Date.now()}`;
                       updateRow(rowIdx, patch);
                     }}
@@ -517,7 +694,7 @@ export default function ResponseRules() {
                 </FormControl>
               </Grid>
               <Grid item xs={10} sm={5}>
-                <FormControl fullWidth size="small" sx={inputSx}>
+                <FormControl fullWidth size="small" sx={formControlSx}>
                   <InputLabel sx={labelSx.style}>Input Type</InputLabel>
                   <Select value={row.inputType || 'TEXT'} label="Input Type"
                     onChange={(e) => updateRow(rowIdx, { inputType: e.target.value })}
@@ -537,6 +714,13 @@ export default function ResponseRules() {
                 }}>
                   <DeleteIcon fontSize="small" />
                 </IconButton>
+              </Grid>
+
+              {/* Image URL field */}
+              <Grid item xs={12}>
+                <TextField label="Row Image URL" size="small" fullWidth value={row.image || ''}
+                  onChange={(e) => updateRow(rowIdx, { image: e.target.value })}
+                  placeholder="https://example.com/image.jpg (optional)" InputLabelProps={labelSx} inputProps={inputPropsSx} sx={inputSx} />
               </Grid>
 
               {/* Conditional fields — always full width */}
@@ -563,7 +747,7 @@ export default function ResponseRules() {
               )}
               {row.actionType === 'QUICK_REPLY' && (
                 <Grid item xs={12}>
-                  <FormControl fullWidth size="small" sx={inputSx}>
+                  <FormControl fullWidth size="small" sx={formControlSx}>
                     <InputLabel sx={labelSx.style}>Quick Reply</InputLabel>
                     <Select value={row.quickReplyId || ''} label="Quick Reply"
                       onChange={(e) => {
@@ -579,7 +763,7 @@ export default function ResponseRules() {
               )}
               {row.actionType === 'TEMPLATE' && (
                 <Grid item xs={12}>
-                  <FormControl fullWidth size="small" sx={inputSx}>
+                  <FormControl fullWidth size="small" sx={formControlSx}>
                     <InputLabel sx={labelSx.style}>Template</InputLabel>
                     <Select value={row.templateId || ''} label="Template"
                       onChange={(e) => {
@@ -593,6 +777,46 @@ export default function ResponseRules() {
                   </FormControl>
                 </Grid>
               )}
+              {row.actionType === 'RESPONSE_RULE' && (
+                <Grid item xs={12}>
+                  <FormControl fullWidth size="small" sx={formControlSx}>
+                    <InputLabel sx={labelSx.style}>Response Rule</InputLabel>
+                    <Select value={row.ruleId || ''} label="Response Rule"
+                      onChange={(e) => {
+                        const s = rules.find(r => r._id === e.target.value);
+                        updateRow(rowIdx, { ruleId: e.target.value, actionValue: s?.name || '', rowId: s?.name || row.rowId || `rule_${Date.now()}` });
+                      }}
+                      sx={{ color: '#1a1a1a' }}>
+                      {rules.length === 0 ? <MenuItem disabled>No rules available</MenuItem>
+                        : rules.map(r => <MenuItem key={r._id} value={r._id}>{r.name}</MenuItem>)}
+                    </Select>
+                  </FormControl>
+                </Grid>
+              )}
+              {row.actionType === 'WORKFLOW' && (
+                <Grid item xs={12}>
+                  <FormControl fullWidth size="small" sx={formControlSx}>
+                    <InputLabel sx={labelSx.style}>Workflow</InputLabel>
+                    <Select value={row.workflowId || ''} label="Workflow"
+                      onChange={(e) => {
+                        const w = workflows.find(wf => wf._id === e.target.value);
+                        updateRow(rowIdx, { workflowId: e.target.value, actionValue: w?.name || '', rowId: w?.name || row.rowId || `wf_${Date.now()}` });
+                      }}
+                      sx={{ color: '#1a1a1a' }}>
+                      {workflows.length === 0 ? <MenuItem disabled>No workflows available</MenuItem>
+                        : workflows.map(wf => <MenuItem key={wf._id} value={wf._id}>{wf.name}</MenuItem>)}
+                    </Select>
+                  </FormControl>
+                </Grid>
+              )}
+
+              {/* URL Display / Link field (optional, for link indicator) */}
+              <Grid item xs={12}>
+                <TextField label="Link Display URL (Optional - Shows link indicator)" size="small" fullWidth value={row.actionUrl || ''}
+                  onChange={(e) => updateRow(rowIdx, { actionUrl: e.target.value })}
+                  placeholder="https://example.com (optional - for link preview)" InputLabelProps={labelSx} inputProps={inputPropsSx} sx={inputSx}
+                  helperText="URL shown as a link indicator in the preview" />
+              </Grid>
             </Grid>
           </Box>
         ))}
@@ -621,7 +845,10 @@ export default function ResponseRules() {
             Configure dynamic rules and design interactive layout templates using visual drag-and-drop
           </Typography>
         </Box>
-        <Stack direction="row" spacing={2}>
+        <Stack direction="row" spacing={1.5}>
+          <Button variant="outlined" color="info" onClick={() => setOpenHelpDialog(true)}>
+            Help / Guidelines
+          </Button>
           <Button variant="outlined" startIcon={<AutoAwesomeIcon />}
             onClick={() => { setOpenAICopilot(true); if (!openDrawer) handleOpenAddDrawer(); }}>
             AI Assistant
@@ -632,73 +859,662 @@ export default function ResponseRules() {
         </Stack>
       </Box>
 
-      {/* CSV Guidelines */}
-      <Paper sx={{ p: 3, mb: 3, bgcolor: '#f0f4f8', border: '1px solid #cbd5e1', borderRadius: 2 }} elevation={0}>
-        <Stack spacing={2}>
-          <Box>
-            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, color: '#1a1a1a' }}>
-              📋 CSV Template Format Guidelines
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.6 }}>
-              When uploading templates via the AI Assistant, use this CSV format so each row becomes one rule:
+      {/* Status tabs filter */}
+      {!loading && rules.length > 0 && (
+        <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3.5 }}>
+          <Tabs 
+            value={activeTab} 
+            onChange={(e, val) => setActiveTab(val)} 
+            textColor="primary"
+            indicatorColor="primary"
+          >
+            <Tab 
+              value="ALL" 
+              label={
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>All Rules</Typography>
+                  <Chip label={rules.length} size="small" variant="outlined" sx={{ height: 20, fontSize: '0.75rem' }} />
+                </Box>
+              } 
+            />
+            <Tab 
+              value="ACTIVE" 
+              label={
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>Active</Typography>
+                  <Chip label={rules.filter(r => r.isActive).length} size="small" color="success" sx={{ height: 20, fontSize: '0.75rem', color: '#fff' }} />
+                </Box>
+              } 
+            />
+            <Tab 
+              value="INACTIVE" 
+              label={
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>Draft / Inactive</Typography>
+                  <Chip label={rules.filter(r => !r.isActive).length} size="small" sx={{ height: 20, fontSize: '0.75rem' }} />
+                </Box>
+              } 
+            />
+          </Tabs>
+        </Box>
+      )}
+
+      {/* Rules Grid - Card Layout */}
+      {loading ? (
+        <Paper sx={{ p: 6, textAlign: 'center', bgcolor: 'transparent' }} elevation={0}>
+          <CircularProgress size={30} />
+          <Typography variant="body2" color="text.secondary" mt={2}>Loading configurations...</Typography>
+        </Paper>
+      ) : rules.length === 0 ? (
+        <Paper sx={{ p: 6, textAlign: 'center', border: '1px dashed #cbd5e1', borderRadius: 3 }} elevation={0}>
+          <Typography variant="subtitle1" color="text.secondary" gutterBottom sx={{ fontWeight: 600 }}>No active response rules yet</Typography>
+          <Typography variant="body2" color="text.secondary" mb={3}>Create your first trigger layout or use the AI Assistant.</Typography>
+          <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpenAddDrawer} disableElevation>Add Rule</Button>
+        </Paper>
+      ) : (
+        <Box sx={{ flex: 1, overflowY: 'auto', pr: 1, pb: 4 }}>
+          {rules.filter(rule => {
+            if (activeTab === 'ACTIVE') return rule.isActive;
+            if (activeTab === 'INACTIVE') return !rule.isActive;
+            return true;
+          }).length === 0 ? (
+            <Paper sx={{ p: 6, textAlign: 'center', border: '1px dashed #cbd5e1', borderRadius: 3 }} elevation={0}>
+              <Typography variant="subtitle1" color="text.secondary" sx={{ fontWeight: 600 }}>No rules match this status filter</Typography>
+            </Paper>
+          ) : (
+            <Box component={Paper} sx={{ mb: 3 }} elevation={0} border="1px solid #e0e0e0">
+              <Box sx={{ overflowX: 'auto' }}>
+                <Box sx={{ display: 'flex', flexDirection: 'column', minWidth: 800 }}>
+                  {/* Header Row */}
+                  <Box sx={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: '60px 1.5fr 1fr 1fr 120px 180px',
+                    gap: 2,
+                    p: 2,
+                    backgroundColor: '#1976d2',
+                    color: 'white',
+                    fontWeight: 'bold',
+                    width: '100%',
+                    boxSizing: 'border-box'
+                  }}>
+                    <Box sx={{ fontWeight: 'bold', fontSize: '0.9rem' }}>#</Box>
+                    <Box sx={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Rule Name & Creator</Box>
+                    <Box sx={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Trigger</Box>
+                    <Box sx={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Blocks</Box>
+                    <Box sx={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Status</Box>
+                    <Box sx={{ fontWeight: 'bold', fontSize: '0.9rem', textAlign: 'right', pr: 2 }}>Actions</Box>
+                  </Box>
+
+                  {/* Data Rows */}
+                  {rules.filter(rule => {
+                    if (activeTab === 'ACTIVE') return rule.isActive;
+                    if (activeTab === 'INACTIVE') return !rule.isActive;
+                    return true;
+                  }).map((rule, idx) => (
+                    <Box key={rule._id} sx={{ 
+                      display: 'grid', 
+                      gridTemplateColumns: '60px 1.5fr 1fr 1fr 120px 180px',
+                      gap: 2,
+                      p: 2,
+                      borderBottom: '1px solid #e0e0e0',
+                      alignItems: 'center',
+                      backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f9fafb',
+                      width: '100%',
+                      boxSizing: 'border-box',
+                      '&:hover': { backgroundColor: '#f1f5f9' },
+                    }}>
+                      {/* Index */}
+                      <Box sx={{ fontWeight: 'bold', color: '#1976d2' }}>{idx + 1}</Box>
+
+                      {/* Name & Creator */}
+                      <Box>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5 }}>
+                          {rule.name}
+                        </Typography>
+                        {rule.userId && (
+                          <Typography variant="caption" color="text.secondary" display="block" sx={{ fontStyle: 'italic' }}>
+                            Created by: {rule.userId.firstName || ''} {rule.userId.lastName || ''}
+                          </Typography>
+                        )}
+                      </Box>
+
+                      {/* Trigger */}
+                      <Box>
+                        <Chip label={rule.triggerType} size="small" variant="outlined" color="primary" sx={{ fontWeight: 600, mb: 0.5 }} />
+                        <Typography variant="body2" sx={{ color: '#1a1a1a', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          "{rule.triggerValue}"
+                        </Typography>
+                      </Box>
+
+                      {/* Blocks */}
+                      <Box>
+                        <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap', gap: 0.5 }}>
+                          {rule.messageBlocks?.slice(0, 2).map((b, i) => (
+                            <Chip key={i} label={b.type} size="small" variant="outlined" sx={{ fontSize: '0.7rem' }} />
+                          ))}
+                          {rule.messageBlocks?.length > 2 && (
+                            <Chip label={`+${rule.messageBlocks.length - 2}`} size="small" sx={{ fontSize: '0.7rem' }} />
+                          )}
+                        </Stack>
+                      </Box>
+
+                      {/* Status */}
+                      <Box>
+                        <FormControlLabel 
+                          control={<Switch size="small" checked={rule.isActive} onChange={() => handleToggleActiveRule(rule._id, rule.isActive)} />} 
+                          label={rule.isActive ? 'Active' : 'Inactive'}
+                          sx={{ m: 0 }}
+                          labelPlacement="end"
+                        />
+                      </Box>
+
+                      {/* Actions */}
+                      <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end', pr: 1 }}>
+                        <Tooltip title="Preview">
+                          <IconButton 
+                            size="small" 
+                            color="info"
+                            onClick={() => {
+                              setOpenPreviewDialog(true);
+                              setPreviewContent(rule);
+                            }}
+                          >
+                            <VisibilityIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Edit">
+                          <IconButton 
+                            size="small" 
+                            color="primary"
+                            onClick={() => handleOpenEditDrawer(rule)}
+                          >
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Delete">
+                          <IconButton 
+                            size="small" 
+                            color="error"
+                            onClick={() => confirmDeleteRule(rule._id)}
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
+                    </Box>
+                  ))}
+                </Box>
+              </Box>
+            </Box>
+          )}
+        </Box>
+      )}
+
+      {/* Preview Dialog - Enhanced Phone Mockup */}
+      <Dialog 
+        open={openPreviewDialog} 
+        onClose={() => setOpenPreviewDialog(false)} 
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            backgroundColor: '#ffffff',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.15), 0 2px 8px rgba(0, 0, 0, 0.1)',
+            border: '1px solid #e8e8e8'
+          }
+        }}
+      >
+        <DialogTitle sx={{ 
+          fontWeight: 700, 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+          background: 'linear-gradient(135deg, #f8f9fa 0%, #f0f2f5 100%)',
+          px: 3,
+          py: 2.5,
+          borderBottom: '2px solid #0084ff',
+          gap: 1.5
+        }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <PhoneAndroidIcon sx={{ 
+              color: '#0084ff',
+              fontSize: '28px',
+              fontWeight: 700
+            }} />
+            <Typography variant="h6" sx={{ 
+              fontWeight: 700, 
+              color: '#1a1a1a',
+              fontSize: '1.1rem',
+              letterSpacing: '0.3px'
+            }}>
+              Live WhatsApp Preview
             </Typography>
           </Box>
-          <Stack spacing={1} sx={{ bgcolor: 'white', p: 2, borderRadius: 1, border: '1px solid #e2e8f0' }}>
-            <Typography variant="caption" sx={{ fontFamily: 'monospace', color: '#2c5aa0', fontWeight: 600 }}>Header: question,keywords,answer,category</Typography>
-            <Typography variant="caption" sx={{ fontFamily: 'monospace', color: '#2c5aa0' }}>✅ Content with newlines must be quoted: "Line 1\nLine 2"</Typography>
-            <Typography variant="caption" sx={{ fontFamily: 'monospace', color: '#2c5aa0' }}>keywords becomes the trigger key for the rule</Typography>
-          </Stack>
-          <Alert severity="info" sx={{ '& .MuiAlert-message': { fontSize: '0.85rem' } }}>
-            <strong>Pro Tip:</strong> Upload your templates CSV in the AI Assistant. For 20 questions, you create 20 rules with one click.
-          </Alert>
-        </Stack>
-      </Paper>
+          <IconButton 
+            onClick={() => setOpenPreviewDialog(false)} 
+            size="small"
+            sx={{
+              color: '#666',
+              '&:hover': {
+                backgroundColor: 'rgba(0, 132, 255, 0.08)',
+                color: '#0084ff',
+                transition: 'all 0.3s ease'
+              }
+            }}
+          >
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent sx={{ p: 3, overflow: 'hidden', backgroundColor: '#f8f9fa' }}>
+          {previewContent && previewContent.messageBlocks && (
+            <Box sx={{ 
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              minHeight: '520px'
+            }}>
+              {/* Phone Frame Container */}
+              <Box sx={{
+                width: '100%',
+                maxWidth: '360px',
+                backgroundColor: '#000',
+                borderRadius: '40px',
+                padding: '12px',
+                boxShadow: '0 20px 60px rgba(0, 0, 0, 0.35), 0 0 1px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.1)',
+                position: 'relative',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                '&:hover': {
+                  boxShadow: '0 24px 72px rgba(0, 0, 0, 0.4), 0 0 1px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.1)'
+                },
+                '&::before': {
+                  content: '""',
+                  position: 'absolute',
+                  top: '0px',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  width: '150px',
+                  height: '24px',
+                  backgroundColor: '#000',
+                  borderRadius: '0 0 30px 30px',
+                  zIndex: 10
+                }
+              }}>
+                {/* Phone Screen */}
+                <Box sx={{
+                  backgroundColor: '#fff',
+                  borderRadius: '36px',
+                  overflow: 'hidden',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  height: '100%',
+                  minHeight: '680px',
+                  position: 'relative',
+                  boxShadow: 'inset 0 1px 2px rgba(0, 0, 0, 0.05)'
+                }}>
+                  {/* Status Bar */}
+                  <Box sx={{
+                    backgroundColor: '#075e54',
+                    color: '#fff',
+                    px: 2.5,
+                    pt: 2,
+                    pb: 1,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    fontSize: '0.7rem',
+                    fontWeight: 600,
+                    borderRadius: '36px 36px 0 0'
+                  }}>
+                    <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
+                      📡 📶 🔋
+                    </Box>
+                    <Box>9:41</Box>
+                  </Box>
 
-      {/* Rules grid */}
-      <Grid container spacing={3}>
-        {loading ? (
-          <Grid item xs={12}>
-            <Paper sx={{ p: 6, textAlign: 'center', bgcolor: 'transparent' }} elevation={0}>
-              <CircularProgress size={30} />
-              <Typography variant="body2" color="text.secondary" mt={2}>Loading configurations...</Typography>
-            </Paper>
-          </Grid>
-        ) : rules.length === 0 ? (
-          <Grid item xs={12}>
-            <Paper sx={{ p: 6, textAlign: 'center', border: '1px dashed #cbd5e1', borderRadius: 3 }} elevation={0}>
-              <Typography variant="subtitle1" color="text.secondary" gutterBottom sx={{ fontWeight: 600 }}>No active response rules yet</Typography>
-              <Typography variant="body2" color="text.secondary" mb={3}>Create your first trigger layout or use the AI Assistant.</Typography>
-              <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpenAddDrawer} disableElevation>Add Rule</Button>
-            </Paper>
-          </Grid>
-        ) : rules.map(rule => (
-          <Grid item xs={12} md={6} lg={4} key={rule._id}>
-            <Card elevation={0} sx={{ height: '100%', display: 'flex', flexDirection: 'column', border: '1px solid #e2e8f0', borderRadius: 3 }}>
-              <CardContent sx={{ flexGrow: 1, p: 3 }}>
-                <Stack direction="row" justifyContent="space-between" alignItems="flex-start" mb={2}>
-                  <Typography variant="h6" sx={{ fontWeight: 700, fontSize: '1.1rem' }}>{rule.name}</Typography>
-                  <FormControlLabel control={<Switch size="small" checked={rule.isActive} onChange={() => handleToggleActiveRule(rule._id, rule.isActive)} />} label="" sx={{ m: 0 }} />
-                </Stack>
-                <Stack direction="row" spacing={1} mb={2}>
-                  <Chip label={rule.triggerType} size="small" variant="outlined" color="primary" sx={{ fontWeight: 600 }} />
-                  <Chip label={`"${rule.triggerValue}"`} size="small" sx={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis' }} />
-                </Stack>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                  Blocks count: <strong>{rule.messageBlocks?.length || 0}</strong> widgets
-                </Typography>
-                <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap', gap: 0.5 }}>
-                  {rule.messageBlocks?.map((b, idx) => <Chip key={idx} label={b.type} size="small" variant="outlined" sx={{ fontSize: '0.75rem' }} />)}
-                </Stack>
-              </CardContent>
-              <Divider />
-              <Box sx={{ p: 2, display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
-                <Button size="small" onClick={() => handleOpenEditDrawer(rule)}>Edit</Button>
-                <Button size="small" color="error" onClick={() => confirmDeleteRule(rule._id)}>Delete</Button>
+                  {/* WhatsApp Header */}
+                  <Box sx={{
+                    backgroundColor: '#075e54',
+                    color: '#fff',
+                    px: 2,
+                    py: 1.5,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    borderBottom: '1px solid #e0e0e0'
+                  }}>
+                    <Box>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.25 }}>
+                        {previewContent.name || 'Bot'}
+                      </Typography>
+                      <Typography variant="caption" sx={{ fontSize: '0.65rem', opacity: 0.9 }}>
+                        {previewContent.triggerType}: "{previewContent.triggerValue}"
+                      </Typography>
+                    </Box>
+                    <Typography variant="caption" sx={{ fontSize: '0.65rem' }}>🟢</Typography>
+                  </Box>
+
+                  {/* Messages Container */}
+                  <Box sx={{ 
+                    flex: 1,
+                    overflowY: 'auto',
+                    px: 1.5,
+                    py: 2,
+                    backgroundColor: '#ecf0f1',
+                    backgroundImage: 'radial-gradient(#d8dfe6 8%, transparent 8%)',
+                    backgroundSize: '14px 14px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 1.5,
+                    transition: 'background-color 0.2s ease'
+                  }}>
+                    {/* Messages Preview */}
+                    {previewContent.messageBlocks.map((block, index) => {
+                      if (block.type === 'TEXT') return (
+                        <Box key={index} sx={{ 
+                          alignSelf: 'flex-start', 
+                          maxWidth: '80%',
+                          backgroundColor: '#dfe5e9',
+                          color: '#000',
+                          p: 1.5,
+                          borderRadius: '18px 18px 18px 4px',
+                          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.08)',
+                          wordWrap: 'break-word',
+                          transition: 'all 0.2s ease',
+                          '&:hover': {
+                            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.15), 0 2px 3px rgba(0, 0, 0, 0.1)'
+                          }
+                        }}>
+                          <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.4, fontSize: '0.95rem', color: '#1a1a1a' }}>
+                            {block.config?.text}
+                          </Typography>
+                        </Box>
+                      );
+
+                      if (block.type === 'CARD') return (
+                        <Box key={index} sx={{
+                          alignSelf: 'flex-start',
+                          maxWidth: '85%',
+                          backgroundColor: '#dfe5e9',
+                          borderRadius: '18px 18px 18px 4px',
+                          overflow: 'hidden',
+                          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.08)',
+                          transition: 'all 0.2s ease',
+                          '&:hover': {
+                            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.15), 0 2px 3px rgba(0, 0, 0, 0.1)'
+                          }
+                        }}>
+                          {block.config?.imageUrl && (
+                            <Box 
+                              component="img" 
+                              src={block.config.imageUrl} 
+                              sx={{ 
+                                width: '100%',
+                                height: '140px',
+                                objectFit: 'cover',
+                                backgroundColor: '#ddd'
+                              }} 
+                              onError={(e) => e.target.style.display = 'none'}
+                            />
+                          )}
+                          <Box sx={{ p: 1.5 }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5, color: '#000', fontSize: '0.95rem' }}>
+                              {block.config?.title}
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: '#555', display: 'block', fontSize: '0.85rem', lineHeight: 1.3 }}>
+                              {block.config?.description}
+                            </Typography>
+                            {block.config?.buttons?.length > 0 && (
+                              <Stack spacing={0.8} sx={{ mt: 1 }}>
+                                {block.config.buttons.map((b, bi) => (
+                                  <Button 
+                                    key={bi} 
+                                    size="small"
+                                    onClick={() => handlePreviewRowClick(b)}
+                                    sx={{
+                                      textTransform: 'none',
+                                      color: '#0084ff',
+                                      fontSize: '0.8rem',
+                                      fontWeight: 600,
+                                      p: 0.75,
+                                      border: '1px solid #0084ff',
+                                      borderRadius: '8px',
+                                      transition: 'all 0.2s ease',
+                                      '&:hover': { 
+                                        backgroundColor: 'rgba(0, 132, 255, 0.12)',
+                                        borderColor: '#0073e6'
+                                      }
+                                    }}
+                                  >
+                                    {b.label}
+                                  </Button>
+                                ))}
+                              </Stack>
+                            )}
+                          </Box>
+                        </Box>
+                      );
+
+                      if (block.type === 'BUTTONS') return (
+                        <Stack key={index} spacing={0.8} sx={{ alignSelf: 'flex-start', width: '85%' }}>
+                          {(block.config?.buttons || []).map((b, bi) => (
+                            <Button 
+                              key={bi}
+                              onClick={() => handlePreviewRowClick(b)}
+                              fullWidth
+                              sx={{
+                                textTransform: 'none',
+                                backgroundColor: '#0084ff',
+                                color: '#fff',
+                                borderRadius: '24px',
+                                fontWeight: 700,
+                                py: 1,
+                                fontSize: '0.9rem',
+                                transition: 'all 0.2s ease',
+                                boxShadow: '0 2px 4px rgba(0, 132, 255, 0.3)',
+                                '&:hover': { 
+                                  backgroundColor: '#0073e6',
+                                  boxShadow: '0 4px 8px rgba(0, 132, 255, 0.4)'
+                                }
+                              }}
+                            >
+                              {b.label}
+                            </Button>
+                          ))}
+                        </Stack>
+                      );
+
+                      if (block.type === 'LIST') {
+                        return (
+                          <Box key={index} sx={{
+                            alignSelf: 'flex-start',
+                            width: '85%',
+                            backgroundColor: '#dfe5e9',
+                            borderRadius: '18px 18px 18px 4px',
+                            overflow: 'hidden',
+                            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.08)',
+                            transition: 'all 0.2s ease',
+                            '&:hover': {
+                              boxShadow: '0 2px 4px rgba(0, 0, 0, 0.15), 0 2px 3px rgba(0, 0, 0, 0.1)'
+                            }
+                          }}>
+                            <Box sx={{ p: 1.5, borderBottom: '1px solid #c0c7cc' }}>
+                              <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#000', fontSize: '0.95rem' }}>
+                                {block.config?.title}
+                              </Typography>
+                            </Box>
+                            <Stack spacing={0.5} sx={{ p: 1 }}>
+                              {(block.config?.sections || []).map((sec, si) => (
+                                <Box key={si}>
+                                  {sec.title && (
+                                    <Typography 
+                                      variant="caption" 
+                                      sx={{ 
+                                        textTransform: 'uppercase',
+                                        fontWeight: 700,
+                                        fontSize: '0.65rem',
+                                        color: '#64748b',
+                                        display: 'block',
+                                        px: 1,
+                                        py: 0.5
+                                      }}
+                                    >
+                                      {sec.title}
+                                    </Typography>
+                                  )}
+                                  <Stack spacing={0.5}>
+                                    {(sec.rows || []).map((row, ri) => (
+                                      <Box 
+                                        key={ri}
+                                        onClick={() => handlePreviewRowClick(row)}
+                                        sx={{
+                                          p: 1,
+                                          backgroundColor: '#fff',
+                                          cursor: 'pointer',
+                                          border: 'none',
+                                          borderBottomColor: '#e8e8e8',
+                                          borderBottom: ri < (sec.rows || []).length - 1 ? '1px solid #e8e8e8' : 'none',
+                                          transition: 'all 0.2s ease',
+                                          '&:hover': {
+                                            backgroundColor: '#f8f9fa'
+                                          }
+                                        }}
+                                      >
+                                        {/* Row Image if provided */}
+                                        {row.image && (
+                                          <Box sx={{ mb: 0.8, borderRadius: '8px', overflow: 'hidden', maxHeight: '120px' }}>
+                                            <img 
+                                              src={row.image} 
+                                              alt="row item"
+                                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                              onError={(e) => { e.target.style.display = 'none'; }}
+                                            />
+                                          </Box>
+                                        )}
+                                        
+                                        <Stack direction="row" spacing={1} alignItems="flex-start" justifyContent="space-between">
+                                          <Box sx={{ flex: 1 }}>
+                                            {/* Numbered title with bold styling */}
+                                            <Typography 
+                                              variant="body2" 
+                                              sx={{ 
+                                                fontWeight: 700, 
+                                                color: '#000', 
+                                                fontSize: '0.9rem',
+                                                lineHeight: 1.3
+                                              }}
+                                            >
+                                              {ri + 1}. {row.title}
+                                            </Typography>
+                                            
+                                            {/* Description on separate line if present */}
+                                            {row.description && (
+                                              <Typography 
+                                                variant="caption" 
+                                                sx={{ 
+                                                  color: '#666', 
+                                                  display: 'block', 
+                                                  fontSize: '0.75rem',
+                                                  mt: 0.4
+                                                }}
+                                              >
+                                                {row.description}
+                                              </Typography>
+                                            )}
+                                            
+                                            {/* URL/Link indicator if action URL exists */}
+                                            {(row.actionUrl || (row.actionType === 'URL' && row.actionValue)) && (
+                                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.4 }}>
+                                                <LinkIcon sx={{ fontSize: '0.65rem', color: '#0084ff' }} />
+                                                <Typography 
+                                                  variant="caption" 
+                                                  sx={{ 
+                                                    color: '#0084ff', 
+                                                    fontSize: '0.7rem',
+                                                    fontWeight: 500
+                                                  }}
+                                                >
+                                                  {row.actionUrl || row.actionValue}
+                                                </Typography>
+                                              </Box>
+                                            )}
+                                          </Box>
+                                          
+                                          <Typography variant="caption" sx={{ color: '#999', fontSize: '1.2rem', mt: 0.2 }}>
+                                            ›
+                                          </Typography>
+                                        </Stack>
+                                      </Box>
+                                    ))}
+                                  </Stack>
+                                </Box>
+                              ))}
+                            </Stack>
+                          </Box>
+                        );
+                      }
+
+                      if (block.type === 'RELATED_QUESTIONS') return (
+                        <Stack key={index} spacing={0.8} sx={{ alignSelf: 'flex-start', width: '85%' }}>
+                          {(block.config?.questions || []).map((q, qi) => (
+                            <Button 
+                              key={qi}
+                              onClick={() => handlePreviewRowClick({ title: q })}
+                              fullWidth
+                              sx={{
+                                textTransform: 'none',
+                                backgroundColor: '#e8eef5',
+                                color: '#1a1a1a',
+                                border: '1px solid #d0d8e0',
+                                borderRadius: '18px',
+                                fontWeight: 500,
+                                py: 0.8,
+                                fontSize: '0.85rem',
+                                justifyContent: 'flex-start',
+                                pl: 1.5,
+                                transition: 'all 0.2s ease',
+                                '&:hover': { 
+                                  backgroundColor: '#dce3ed',
+                                  borderColor: '#0084ff',
+                                  color: '#0084ff'
+                                }
+                              }}
+                            >
+                              {q}
+                            </Button>
+                          ))}
+                        </Stack>
+                      );
+
+                      return null;
+                    })}
+                  </Box>
+
+                  {/* Input Bar */}
+                  <Box sx={{
+                    backgroundColor: '#fff',
+                    borderTop: '1px solid #e8e8e8',
+                    p: 1.5,
+                    display: 'flex',
+                    gap: 1,
+                    alignItems: 'center',
+                    borderRadius: '0 0 36px 36px',
+                    transition: 'all 0.2s ease'
+                  }}>
+                    <Typography sx={{ flex: 1, color: '#999', fontSize: '0.85rem', fontWeight: 500 }}>
+                      Type a message...
+                    </Typography>
+                    <Typography sx={{ color: '#0084ff', fontSize: '1.2rem', fontWeight: 700 }}>
+                      ↑
+                    </Typography>
+                  </Box>
+                </Box>
               </Box>
-            </Card>
-          </Grid>
-        ))}
-      </Grid>
+            </Box>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* ── Visual Builder Drawer ── */}
       <Drawer anchor="right" open={openDrawer} onClose={handleCloseDrawerWithCheck}
@@ -769,81 +1585,148 @@ export default function ResponseRules() {
                 <Tooltip title="Redo"><span><IconButton size="small" onClick={handleRedo} disabled={!historyStack.future.length} sx={{ color: '#666' }}><RedoIcon /></IconButton></span></Tooltip>
                 <Button variant="outlined" startIcon={<ContentCopyIcon />} onClick={handleCopyLayout} size="small">Copy JSON</Button>
                 <Button variant="outlined" startIcon={<ContentPasteIcon />} onClick={handlePasteLayout} size="small">Paste JSON</Button>
+                <Divider orientation="vertical" flexItem sx={{ my: 1 }} />
+                <Tooltip title="Preview layout">
+                  <Button variant="contained" startIcon={<PhoneAndroidIcon />} onClick={() => {
+                    setPreviewContent({
+                      name: ruleName || 'Response Rule',
+                      triggerType: triggerType,
+                      triggerValue: triggerValue,
+                      messageBlocks: blocks
+                    });
+                    setOpenPreviewDialog(true);
+                  }} size="small" sx={{ bgcolor: '#1976d2' }}>
+                    Preview
+                  </Button>
+                </Tooltip>
               </Stack>
             </Box>
 
             {/* Canvas scroll area */}
             <Box sx={{ flex: 1, p: 3, overflowY: 'auto' }}>
               <Grid container spacing={3}>
-                {/* Config form */}
+                {/* Config form - Numbered fields */}
                 <Grid item xs={12}>
-                  <Paper sx={{ p: 3, borderRadius: 3, border: '1px solid #e0e0e0 !important', background: '#fff !important' }} elevation={1}>
-                    <Grid container spacing={2} alignItems="center">
-                      <Grid item xs={12} md={4}>
-                        <TextField label="Rule Name *" fullWidth value={ruleName} onChange={(e) => setRuleName(e.target.value)}
-                          placeholder="e.g. Price Check Kundan Ring" InputLabelProps={labelSx} inputProps={inputPropsSx} sx={inputSx} />
-                      </Grid>
-                      <Grid item xs={12} md={2.5}>
-                        <FormControl fullWidth sx={inputSx}>
-                          <InputLabel sx={labelSx.style}>Trigger Type</InputLabel>
-                          <Select value={triggerType} label="Trigger Type" onChange={(e) => setTriggerType(e.target.value)} sx={{ color: '#1a1a1a' }}>
-                            <MenuItem value="EXACT_MATCH">Exact Match</MenuItem>
-                            <MenuItem value="KEYWORD">Keyword Includes</MenuItem>
-                            <MenuItem value="INTENT">AI Intent Category</MenuItem>
-                          </Select>
-                        </FormControl>
-                      </Grid>
-                      <Grid item xs={12} md={3.5}>
-                        <TextField
-                          label={triggerType === 'INTENT' ? 'Intent (e.g. general_inquiry)' : triggerType === 'KEYWORD' ? 'Keywords (comma-separated)' : 'Exact Trigger Text'}
-                          fullWidth value={triggerValue} onChange={(e) => setTriggerValue(e.target.value)}
-                          placeholder={triggerType === 'INTENT' ? 'general_inquiry' : 'price, cost, rate'}
-                          InputLabelProps={labelSx} inputProps={inputPropsSx} sx={inputSx} />
-                      </Grid>
-                      <Grid item xs={12} md={2}>
-                        <FormControlLabel control={<Switch checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />} label="Active" sx={{ color: '#666' }} />
-                      </Grid>
-                      <Grid item xs={12} md={6}>
-                        <FormControl fullWidth sx={inputSx}>
-                          <InputLabel sx={labelSx.style}>Rule Action</InputLabel>
-                          <Select value={actionType} label="Rule Action" onChange={(e) => setActionType(e.target.value)} sx={{ color: '#1a1a1a' }}>
-                            <MenuItem value="SEND_TEXT">Send Visual Layout</MenuItem>
-                            <MenuItem value="SEND_TEMPLATE">Send Template Broadcast</MenuItem>
-                            <MenuItem value="TRIGGER_WORKFLOW">Trigger Workflow</MenuItem>
-                            <MenuItem value="HUMAN_HANDOVER">Escalate to Human</MenuItem>
-                          </Select>
-                        </FormControl>
-                      </Grid>
+                  <Paper sx={{
+                    p: 4,
+                    borderRadius: 2.5,
+                    background: '#ffffff',
+                    backgroundImage: 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)',
+                    border: 'none',
+                    boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08), 0 4px 24px rgba(0, 0, 0, 0.04)',
+                    borderTop: '4px solid #1976d2',
+                    transition: 'all 0.3s ease-in-out',
+                    '&:hover': {
+                      boxShadow: '0 4px 16px rgba(0, 0, 0, 0.12), 0 6px 32px rgba(0, 0, 0, 0.06)'
+                    }
+                  }} elevation={0}>
+                    <Stack spacing={2.5} mt={0}>
+                      {/* 1. Rule Name */}
+                      <TextField
+                        fullWidth
+                        label="1. Rule Name"
+                        placeholder="e.g., Price Check Kundan Ring"
+                        value={ruleName}
+                        onChange={(e) => setRuleName(e.target.value)}
+                        helperText="Short name for this response rule"
+                        size="small"
+                        InputLabelProps={labelSx}
+                        inputProps={inputPropsSx}
+                        sx={inputSx}
+                      />
+
+                      {/* 2. Trigger Type */}
+                      <FormControl fullWidth size="small" sx={formControlSx}>
+                        <InputLabel sx={labelSx.style}>2. Trigger Type</InputLabel>
+                        <Select
+                          value={triggerType}
+                          label="2. Trigger Type"
+                          onChange={(e) => setTriggerType(e.target.value)}
+                          sx={{ color: '#1a1a1a' }}
+                        >
+                          <MenuItem value="EXACT_MATCH">Exact Match</MenuItem>
+                          <MenuItem value="KEYWORD">Keyword Includes</MenuItem>
+                          <MenuItem value="INTENT">AI Intent Category</MenuItem>
+                        </Select>
+                      </FormControl>
+
+                      {/* 3. Trigger Value */}
+                      <TextField
+                        fullWidth
+                        label="3. Trigger Value"
+                        placeholder={triggerType === 'INTENT' ? 'general_inquiry' : triggerType === 'KEYWORD' ? 'price, cost, rate' : 'exact text to match'}
+                        value={triggerValue}
+                        onChange={(e) => setTriggerValue(e.target.value)}
+                        helperText={
+                          triggerType === 'INTENT'
+                            ? 'Intent category to match (e.g., general_inquiry)'
+                            : triggerType === 'KEYWORD'
+                            ? 'Keywords to match (comma-separated)'
+                            : 'Exact text that will trigger this rule'
+                        }
+                        size="small"
+                        InputLabelProps={labelSx}
+                        inputProps={inputPropsSx}
+                        sx={inputSx}
+                      />
+
+                      {/* 4. Rule Action */}
+                      <FormControl fullWidth size="small" sx={formControlSx}>
+                        <InputLabel sx={labelSx.style}>4. Rule Action</InputLabel>
+                        <Select
+                          value={actionType}
+                          label="4. Rule Action"
+                          onChange={(e) => setActionType(e.target.value)}
+                          sx={{ color: '#1a1a1a' }}
+                        >
+                          <MenuItem value="SEND_TEXT">Send Visual Layout</MenuItem>
+                          <MenuItem value="SEND_TEMPLATE">Send Template Broadcast</MenuItem>
+                          <MenuItem value="TRIGGER_WORKFLOW">Trigger Workflow</MenuItem>
+                          <MenuItem value="HUMAN_HANDOVER">Escalate to Human</MenuItem>
+                        </Select>
+                      </FormControl>
+
+                      {/* 5. Template/Workflow Selection - Conditional */}
                       {actionType === 'SEND_TEMPLATE' && (
-                        <Grid item xs={12} md={6}>
-                          <Box onDragOver={(e) => e.preventDefault()} onDrop={handleDropLinkTemplate}
-                            sx={{ p: 2, border: '2px dashed #1976d2', borderRadius: 3, textAlign: 'center', bgcolor: templateId ? '#e0e0e0' : 'transparent' }}>
-                            <Stack direction="row" spacing={1} justifyContent="center" alignItems="center">
-                              <LinkIcon color="primary" />
-                              {templateId
-                                ? <Typography variant="body2" sx={{ fontWeight: 600 }}>Linked: {templates.find(t => t._id === templateId)?.name || 'Template'}</Typography>
-                                : <Typography variant="body2" color="#666">Drag/drop template here or select below</Typography>}
-                            </Stack>
-                            <FormControl fullWidth size="small" sx={{ mt: 1, ...inputSx }}>
-                              <Select value={templateId} onChange={(e) => setTemplateId(e.target.value)} displayEmpty>
-                                <MenuItem value="" disabled>Choose template...</MenuItem>
-                                {templates.map(t => <MenuItem key={t._id} value={t._id}>{t.name}</MenuItem>)}
-                              </Select>
-                            </FormControl>
-                          </Box>
-                        </Grid>
-                      )}
-                      {actionType === 'TRIGGER_WORKFLOW' && (
-                        <Grid item xs={12} md={6}>
-                          <FormControl fullWidth sx={inputSx}>
-                            <InputLabel sx={labelSx.style}>Select Workflow</InputLabel>
-                            <Select value={workflowId} label="Select Workflow" onChange={(e) => setWorkflowId(e.target.value)} sx={{ color: '#1a1a1a' }}>
-                              {workflows.map(w => <MenuItem key={w._id} value={w._id}>{w.name}</MenuItem>)}
+                        <Box onDragOver={(e) => e.preventDefault()} onDrop={handleDropLinkTemplate}
+                          sx={{ p: 2, border: '2px dashed #1976d2', borderRadius: 3, textAlign: 'center', bgcolor: templateId ? '#e0e0e0' : 'transparent' }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600, mb: 1.5, color: '#1a1a1a' }}>5. Template Selection</Typography>
+                          <Stack direction="row" spacing={1} justifyContent="center" alignItems="center" sx={{ mb: 1.5 }}>
+                            <LinkIcon color="primary" />
+                            {templateId
+                              ? <Typography variant="body2" sx={{ fontWeight: 600 }}>Linked: {templates.find(t => t._id === templateId)?.name || 'Template'}</Typography>
+                              : <Typography variant="body2" color="#666">Drag/drop template here or select below</Typography>}
+                          </Stack>
+                          <FormControl fullWidth size="small" sx={formControlSx}>
+                            <InputLabel sx={labelSx.style}>Choose template...</InputLabel>
+                            <Select value={templateId} label="Choose template..." onChange={(e) => setTemplateId(e.target.value)} sx={{ color: '#1a1a1a' }}>
+                              <MenuItem value="" disabled>Choose template...</MenuItem>
+                              {templates.map(t => <MenuItem key={t._id} value={t._id}>{t.name}</MenuItem>)}
                             </Select>
                           </FormControl>
-                        </Grid>
+                        </Box>
                       )}
-                    </Grid>
+
+                      {actionType === 'TRIGGER_WORKFLOW' && (
+                        <FormControl fullWidth size="small" sx={formControlSx}>
+                          <InputLabel sx={labelSx.style}>5. Workflow Selection</InputLabel>
+                          <Select value={workflowId} label="5. Workflow Selection" onChange={(e) => setWorkflowId(e.target.value)} sx={{ color: '#1a1a1a' }}>
+                            {workflows.length === 0 ? (
+                              <MenuItem disabled>No workflows available</MenuItem>
+                            ) : (
+                              workflows.map(w => <MenuItem key={w._id} value={w._id}>{w.name}</MenuItem>)
+                            )}
+                          </Select>
+                        </FormControl>
+                      )}
+
+                      {/* 6. Active Status */}
+                      <FormControlLabel
+                        control={<Switch checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />}
+                        label="6. Active Status"
+                        sx={{ color: '#666', fontWeight: 500 }}
+                      />
+                    </Stack>
                   </Paper>
                 </Grid>
 
@@ -1005,112 +1888,6 @@ export default function ResponseRules() {
               <Button variant="contained" startIcon={<SaveIcon />} onClick={handleSaveRule} disableElevation>Save Response Rule</Button>
             </Box>
           </Box>
-
-          {/* Right: WhatsApp Preview */}
-          <Box sx={{ width: '380px', height: '100%', display: 'flex', flexDirection: 'column', background: '#fff !important', borderLeft: '1px solid #e0e0e0' }}>
-            <Box sx={{ p: 2.5, borderBottom: '1px solid #e0e0e0', display: 'flex', alignItems: 'center', gap: 1 }}>
-              <PhoneAndroidIcon />
-              <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Live WhatsApp Preview</Typography>
-            </Box>
-            <Box sx={{ flex: 1, p: 2.5, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2, backgroundImage: 'radial-gradient(#e0e0e0 10%, transparent 10%)', backgroundSize: '16px 16px', bgcolor: '#0a0f1d' }}>
-              {blocks.map((block, index) => {
-                if (block.type === 'TEXT') return (
-                  <Box key={index} sx={{ alignSelf: 'flex-start', maxWidth: '85%', bgcolor: '#e0e0e0', p: 2, borderRadius: '0px 16px 16px 16px', border: '1px solid #b0b0b0' }}>
-                    <Typography variant="body2" color="#1a1a1a" sx={{ whiteSpace: 'pre-wrap' }}>{block.config?.text}</Typography>
-                  </Box>
-                );
-                if (block.type === 'CARD') return (
-                  <Card key={index} sx={{ alignSelf: 'flex-start', maxWidth: '85%', background: '#e0e0e0 !important', border: '1px solid #b0b0b0 !important', borderRadius: 4, overflow: 'hidden' }}>
-                    {block.config?.imageUrl && <Box component="img" src={block.config.imageUrl} sx={{ width: '100%', maxHeight: 180, objectFit: 'cover' }} />}
-                    <CardContent sx={{ p: 2, pb: '12px !important' }}>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5, color: '#1a1a1a' }}>{block.config?.title}</Typography>
-                      <Typography variant="caption" color="#555" display="block">{block.config?.description}</Typography>
-                    </CardContent>
-                    {block.config?.buttons?.length > 0 && (
-                      <Stack spacing={1} sx={{ p: 1.5, pt: 0 }}>
-                        {block.config.buttons.map((b, bi) => (
-                          <Button key={bi} variant="outlined" size="small" fullWidth
-                            onClick={() => { const t = String(b.actionType || b.type || '').toUpperCase(); const v = b.actionValue || ''; if (t === 'URL' && v) window.open(v, '_blank'); else showSnackbar(`${fmtAction(t, 'Action')}: ${b.label}`, 'info'); }}
-                            sx={{ textTransform: 'none', color: '#1976d2', borderColor: '#1976d2', borderRadius: 2, fontSize: '0.75rem' }}>
-                            {b.label}
-                            <Chip size="small" label={fmtAction(b.actionType || b.type, 'Reply')} sx={{ ml: 1, height: 18, fontSize: '0.6rem', fontWeight: 700, bgcolor: '#eef6ff', color: '#1565c0' }} />
-                          </Button>
-                        ))}
-                      </Stack>
-                    )}
-                  </Card>
-                );
-                if (block.type === 'BUTTONS') return (
-                  <Stack key={index} spacing={1} sx={{ alignSelf: 'flex-start', width: '85%' }}>
-                    {(block.config?.buttons || []).map((b, bi) => (
-                      <Button key={bi} variant="contained" fullWidth
-                        onClick={() => handlePreviewRowClick({ title: b.label, actionType: b.actionType || b.type, actionValue: b.actionValue || b.label })}
-                        sx={{ textTransform: 'none', bgcolor: '#1976d2', color: '#fff', borderRadius: 3, fontWeight: 600, py: 1 }}>
-                        {b.label}
-                        <Chip size="small" label={fmtAction(b.actionType || b.type, 'Reply')} sx={{ ml: 1, height: 18, fontSize: '0.6rem', bgcolor: 'rgba(255,255,255,0.18)', color: '#fff' }} />
-                      </Button>
-                    ))}
-                  </Stack>
-                );
-                if (block.type === 'LIST') {
-                  const lines = getListPreviewLines(block);
-                  return (
-                    <Stack key={index} spacing={1.25} sx={{ alignSelf: 'flex-start', width: '85%' }}>
-                      {lines.length > 0 && (
-                        <Box sx={{ bgcolor: '#fff', borderRadius: '0px 16px 16px 16px', border: '1px solid #d9dee7', p: 1.6 }}>
-                          <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.55, color: '#1a1a1a' }}>{lines.join('\n')}</Typography>
-                        </Box>
-                      )}
-                      <Card sx={{ background: '#e0e0e0 !important', border: '1px solid #b0b0b0 !important', borderRadius: 4 }}>
-                        <CardContent sx={{ p: 2 }}>
-                          <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5, color: '#1a1a1a' }}>📋 {block.config?.title}</Typography>
-                          <Divider sx={{ borderColor: '#b0b0b0', mb: 1.5 }} />
-                          <Stack spacing={1.5}>
-                            {(block.config?.sections || []).map((sec, si) => (
-                              <Box key={si}>
-                                {sec.title && <Typography variant="caption" color="#64748b" display="block" sx={{ textTransform: 'uppercase', fontWeight: 700, fontSize: '0.65rem', mb: 0.5 }}>{sec.title}</Typography>}
-                                <Stack spacing={1}>
-                                  {(sec.rows || []).map((row, ri) => (
-                                    <Box key={ri} onClick={() => handlePreviewRowClick(row)}
-                                      sx={{ p: 1, bgcolor: '#fff', borderRadius: 2, cursor: 'pointer', border: '1px solid #e0e0e0', '&:hover': { borderColor: '#1976d2' } }}>
-                                      <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
-                                        <Typography variant="body2" sx={{ fontWeight: 600, color: '#1a1a1a' }}>{row.title}</Typography>
-                                        <Chip size="small" label={fmtAction(row.actionType, 'Custom')}
-                                          sx={{ height: 20, fontSize: '0.62rem', fontWeight: 700, bgcolor: row.actionType === 'URL' ? '#e3f2fd' : row.actionType === 'CATALOG' ? '#e8f5e9' : '#f3e5f5', color: row.actionType === 'URL' ? '#1565c0' : row.actionType === 'CATALOG' ? '#2e7d32' : '#6a1b9a' }} />
-                                      </Stack>
-                                      {row.description && <Typography variant="caption" color="#666" display="block" sx={{ fontSize: '0.7rem' }}>{row.description}</Typography>}
-                                      {(row.actionType === 'URL' || row.actionType === 'CATALOG') && row.actionValue && (
-                                        <Typography variant="caption" color="#64748b" display="block" sx={{ fontSize: '0.68rem', mt: 0.25 }}>
-                                          {row.actionType === 'URL' ? '🔗' : '🛍️'} {row.actionValue}
-                                        </Typography>
-                                      )}
-                                    </Box>
-                                  ))}
-                                </Stack>
-                              </Box>
-                            ))}
-                          </Stack>
-                        </CardContent>
-                      </Card>
-                    </Stack>
-                  );
-                }
-                if (block.type === 'RELATED_QUESTIONS') return (
-                  <Box key={index} sx={{ alignSelf: 'flex-start', width: '90%', display: 'flex', flexDirection: 'column', gap: 1 }}>
-                    <Typography variant="caption" color="#64748b" sx={{ fontWeight: 600 }}>Suggested Questions:</Typography>
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.8 }}>
-                      {(block.config?.questions || []).map((q, qi) => (
-                        <Box key={qi} sx={{ bgcolor: '#b0b0b0', color: '#1a1a1a', px: 1.8, py: 0.8, borderRadius: '16px', border: '1px solid #888', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 500 }}>
-                          👉 {q}
-                        </Box>
-                      ))}
-                    </Box>
-                  </Box>
-                );
-                return null;
-              })}
-            </Box>
-          </Box>
         </Box>
       </Drawer>
 
@@ -1125,7 +1902,11 @@ export default function ResponseRules() {
             </Stack>
             <IconButton onClick={() => setOpenAICopilot(false)}><CloseIcon /></IconButton>
           </Box>
-          <Typography variant="body2" color="text.secondary" mb={2}>Upload a CSV template file to create one rule per row.</Typography>
+          <Typography variant="body2" color="text.secondary" mb={2}>
+            {uploadedFile 
+              ? 'Ready to process your CSV file to create rules in bulk.' 
+              : 'Describe what the rule should do to generate it instantly, or upload a CSV template to bulk import multiple rules.'}
+          </Typography>
           <AIProviderStatus compact sx={{ mb: 3 }} />
           <Stack spacing={2.5}>
             <TextField label="Describe rule behavior" fullWidth multiline rows={4} value={aiPrompt}
@@ -1138,14 +1919,14 @@ export default function ResponseRules() {
               <CloudUploadIcon color="primary" sx={{ fontSize: 32, mb: 1 }} />
               {uploadedFile
                 ? <Typography variant="body2" sx={{ fontWeight: 600 }}>Selected: {uploadedFile.name}</Typography>
-                : <Typography variant="body2" color="#666">Upload CSV template (.csv)</Typography>}
+                : <Typography variant="body2" color="#666">Upload CSV template (.csv) [Optional]</Typography>}
             </Box>
           </Stack>
         </Box>
         <Box sx={{ pt: 3, borderTop: '1px solid #e0e0e0', display: 'flex', justifyContent: 'flex-end', gap: 1.5 }}>
           <Button onClick={() => setOpenAICopilot(false)} sx={{ color: '#666' }}>Cancel</Button>
           <Button variant="contained" startIcon={<AutoAwesomeIcon />} onClick={handleAIDraftRule} disabled={aiGenerating} disableElevation>
-            {aiGenerating ? 'Processing...' : 'Process CSV'}
+            {aiGenerating ? (uploadedFile ? 'Processing...' : 'Generating...') : (uploadedFile ? 'Process CSV' : 'Generate Rule')}
           </Button>
         </Box>
       </Drawer>
@@ -1181,18 +1962,65 @@ export default function ResponseRules() {
                 </>
               ) : (
                 <>
-                  <Paper sx={{ p: 2, background: '#f5f5f5 !important' }}>
+                  <Paper sx={{ p: 2, background: '#f5f5f5 !important', mb: 1 }}>
                     <Typography variant="subtitle2" color="text.secondary" gutterBottom>Rule Name</Typography>
                     <Typography variant="body1" sx={{ fontWeight: 600 }}>{draftReview.name}</Typography>
+                    <Typography variant="subtitle2" color="text.secondary" sx={{ mt: 1.5 }} gutterBottom>Triggers</Typography>
+                    <Chip label={`${draftReview.triggerType}: "${draftReview.triggerValue}"`} size="small" color="primary" />
                   </Paper>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Generated Layout Blocks:</Typography>
                   {draftReview.messageBlocks?.map((b, i) => (
                     <Card key={i} sx={{ background: '#f9f9f9 !important', border: '1px solid #e0e0e0 !important' }}>
                       <Box sx={{ bgcolor: '#e0e0e0', px: 2, py: 0.8 }}>
                         <Typography variant="caption" sx={{ fontWeight: 700 }}>Block #{i + 1}: {b.type}</Typography>
                       </Box>
                       <CardContent sx={{ p: 2 }}>
-                        {b.type === 'TEXT' && <Typography variant="body2">{b.config?.text}</Typography>}
-                        {b.type === 'BUTTONS' && <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap' }}>{b.config?.buttons?.map((btn, bi) => <Chip key={bi} label={btn.label} size="small" />)}</Stack>}
+                        {b.type === 'TEXT' && <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>{b.config?.text || b.config?.message || ''}</Typography>}
+                        {b.type === 'CARD' && (
+                          <Box>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{b.config?.title}</Typography>
+                            {b.config?.description && <Typography variant="body2" color="text.secondary">{b.config.description}</Typography>}
+                            {b.config?.imageUrl && <Typography variant="caption" display="block" sx={{ mt: 0.5, color: '#1976d2' }}>Image: {b.config.imageUrl}</Typography>}
+                            {b.config?.buttons?.length > 0 && (
+                              <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap', mt: 1.5 }}>
+                                {b.config.buttons.map((btn, bi) => <Chip key={bi} label={btn.label} size="small" />)}
+                              </Stack>
+                            )}
+                          </Box>
+                        )}
+                        {b.type === 'BUTTONS' && (
+                          <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap' }}>
+                            {b.config?.buttons?.map((btn, bi) => <Chip key={bi} label={btn.label} size="small" />)}
+                          </Stack>
+                        )}
+                        {b.type === 'LIST' && (
+                          <Box>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{b.config?.title || 'Menu List'}</Typography>
+                            {b.config?.buttonText && <Typography variant="caption" display="block" color="text.secondary">Menu Button: {b.config.buttonText}</Typography>}
+                            <Stack spacing={1} sx={{ mt: 1.5 }}>
+                              {b.config?.sections?.map((sec, si) => (
+                                <Box key={si} sx={{ pl: 1, borderLeft: '2px solid #1976d2' }}>
+                                  <Typography variant="caption" sx={{ fontWeight: 700, color: '#1976d2' }}>{sec.title || 'Section'}</Typography>
+                                  {sec.rows?.map((row, ri) => (
+                                    <Typography key={ri} variant="body2" sx={{ pl: 1, mt: 0.5 }}>
+                                      • {row.title} {row.description ? `— ${row.description}` : ''}
+                                    </Typography>
+                                  ))}
+                                </Box>
+                              ))}
+                            </Stack>
+                          </Box>
+                        )}
+                        {b.type === 'RELATED_QUESTIONS' && (
+                          <Box>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Related FAQs</Typography>
+                            <Stack spacing={0.5} sx={{ mt: 1 }}>
+                              {b.config?.questions?.map((q, qi) => (
+                                <Typography key={qi} variant="body2">• {q}</Typography>
+                              ))}
+                            </Stack>
+                          </Box>
+                        )}
                       </CardContent>
                     </Card>
                   ))}
@@ -1219,6 +2047,48 @@ export default function ResponseRules() {
           <Button onClick={handleConfirmAction} variant="contained" color={confirmDialog.type === 'delete' ? 'error' : 'warning'} disableElevation>
             {confirmDialog.type === 'delete' ? 'Delete' : 'Discard'}
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Help / Guidelines Dialog */}
+      <Dialog open={openHelpDialog} onClose={() => setOpenHelpDialog(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 2, bgcolor: '#fff' } }}>
+        <DialogTitle sx={{ fontWeight: 700, color: '#1a1a1a', pb: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>📋 CSV Template Format Guidelines</span>
+          <IconButton onClick={() => setOpenHelpDialog(false)} size="small"><CloseIcon /></IconButton>
+        </DialogTitle>
+        <DialogContent>
+          <Stack spacing={2.5} sx={{ mt: 1 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.6 }}>
+              When uploading templates via the AI Assistant, use a CSV file format so each row automatically becomes one response rule:
+            </Typography>
+            
+            <Box sx={{ p: 2, bgcolor: '#f8fafc', borderRadius: 1.5, border: '1px solid #e2e8f0' }}>
+              <Typography variant="caption" sx={{ fontFamily: 'monospace', color: '#2c5aa0', fontWeight: 700, display: 'block', mb: 1 }}>
+                Required Headers:
+              </Typography>
+              <Typography variant="caption" sx={{ fontFamily: 'monospace', color: '#2c5aa0', display: 'block', mb: 0.5 }}>
+                • <strong>question</strong> / <strong>name</strong>: The title or name of the rule.
+              </Typography>
+              <Typography variant="caption" sx={{ fontFamily: 'monospace', color: '#2c5aa0', display: 'block', mb: 0.5 }}>
+                • <strong>keywords</strong>: Comma-separated trigger words (e.g. <i>price,cost,discount</i>).
+              </Typography>
+              <Typography variant="caption" sx={{ fontFamily: 'monospace', color: '#2c5aa0', display: 'block' }}>
+                • <strong>answer</strong> / <strong>content</strong>: The reply message sent to customers.
+              </Typography>
+            </Box>
+
+            <Alert severity="success">
+              ✅ Multi-line answers (with newlines) must be enclosed in double quotes: <br/>
+              <code>"Line 1\nLine 2"</code>
+            </Alert>
+
+            <Alert severity="info" sx={{ '& .MuiAlert-message': { fontSize: '0.85rem' } }}>
+              <strong>Pro Tip:</strong> You can upload a single CSV file with up to 100+ items to generate rules in bulk with just one click.
+            </Alert>
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setOpenHelpDialog(false)} variant="contained" disableElevation>Got it</Button>
         </DialogActions>
       </Dialog>
     </Box>

@@ -21,7 +21,7 @@ const WorkflowSchema = new mongoose.Schema({
   trigger: {
     type: {
       type: String,
-      enum: ['MANUAL', 'SCHEDULED', 'EVENT', 'WEBHOOK', 'CUSTOMER_ACTION'],
+      enum: ['MANUAL', 'SCHEDULED', 'EVENT', 'WEBHOOK', 'CUSTOMER_ACTION', 'RESPONSE_RULE_SELECTION'],
       required: true
     },
     event: String, // 'customer_created', 'message_received', 'purchase_made', etc.
@@ -32,6 +32,8 @@ const WorkflowSchema = new mongoose.Schema({
       dayOfMonth: Number, // 1-31
       timezone: String
     },
+    responseRuleId: String,
+    responseRuleName: String,
     conditions: [{
       field: String,
       operator: String, // 'equals', 'contains', 'greater_than', etc.
@@ -44,7 +46,7 @@ const WorkflowSchema = new mongoose.Schema({
     id: String,
     type: {
       type: String,
-      enum: ['SEND_MESSAGE', 'WAIT', 'CONDITION', 'UPDATE_CUSTOMER', 'TAG', 'WEBHOOK', 'AI_ACTION'],
+      enum: ['SEND_MESSAGE', 'WAIT', 'CONDITION', 'UPDATE_CUSTOMER', 'TAG', 'WEBHOOK', 'AI_ACTION', 'RESPONSE_RULE', 'SEND_TEMPLATE', 'QUICK_REPLY'],
       required: true
     },
     name: String,
@@ -94,6 +96,11 @@ const WorkflowSchema = new mongoose.Schema({
     }
   },
   
+  // Visual Builder Canvas State
+  conditions: mongoose.Schema.Types.Mixed,
+  responseCards: mongoose.Schema.Types.Mixed,
+  defaultCard: mongoose.Schema.Types.Mixed,
+
   createdAt: {
     type: Date,
     default: Date.now
@@ -105,6 +112,7 @@ const WorkflowSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 // Indexes
+WorkflowSchema.index({ userId: 1, createdAt: -1 });
 WorkflowSchema.index({ userId: 1, status: 1 });
 WorkflowSchema.index({ 'trigger.type': 1, status: 1 });
 

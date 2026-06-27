@@ -11,6 +11,9 @@ const CampaignSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  topic: {
+    type: String
+  },
   description: String,
   objective: {
     type: String,

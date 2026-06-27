@@ -165,48 +165,94 @@ export default function AIFeatures() {
         <AIProviderStatus compact />
       </Box>
 
-      <Grid container spacing={3}>
-        {features.map((feature) => (
-          <Grid item xs={12} sm={6} md={4} key={feature.id}>
-            <Card
-              elevation={0}
-              sx={{
-                height: '100%',
-                cursor: 'pointer',
-                transition: 'all 0.3s ease',
-                '&:hover': {
-                  boxShadow: 3,
-                  transform: 'translateY(-4px)'
-                }
-              }}
-              onClick={() => handleFeatureClick(feature)}
-            >
-              <CardContent>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-                  <Box sx={{ color: `${feature.color}.main` }}>
-                    {feature.icon}
-                  </Box>
-                  <AutoAwesomeIcon sx={{ color: 'warning.main', fontSize: 20 }} />
+      <Box component={Paper} sx={{ mb: 3 }} elevation={0} border="1px solid #e0e0e0">
+        <Box sx={{ overflowX: 'auto' }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', minWidth: 800 }}>
+            {/* Header Row */}
+            <Box sx={{ 
+              display: 'grid', 
+              gridTemplateColumns: '60px 1fr 150px 150px 150px',
+              gap: 2,
+              p: 2,
+              backgroundColor: '#1976d2',
+              color: 'white',
+              fontWeight: 'bold',
+              width: '100%',
+              boxSizing: 'border-box'
+            }}>
+              <Box sx={{ fontWeight: 'bold', fontSize: '0.9rem' }}>#</Box>
+              <Box sx={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Feature Name & Description</Box>
+              <Box sx={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Action Type</Box>
+              <Box sx={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Platform Status</Box>
+              <Box sx={{ fontWeight: 'bold', fontSize: '0.9rem', textAlign: 'right', pr: 2 }}>Actions</Box>
+            </Box>
+
+            {/* Data Rows */}
+            {features.map((feature, idx) => (
+              <Box key={feature.id} sx={{ 
+                display: 'grid', 
+                gridTemplateColumns: '60px 1fr 150px 150px 150px',
+                gap: 2,
+                p: 2,
+                borderBottom: '1px solid #e0e0e0',
+                alignItems: 'center',
+                backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f9fafb',
+                width: '100%',
+                boxSizing: 'border-box',
+                '&:hover': { backgroundColor: '#f1f5f9' },
+              }}>
+                {/* Index */}
+                <Box sx={{ fontWeight: 'bold', color: '#1976d2', display: 'flex', alignItems: 'center', gap: 1 }}>
+                  {idx + 1}
                 </Box>
 
-                <Typography variant="h6" gutterBottom>
-                  {feature.title}
-                </Typography>
-                <Typography variant="body2" color="text.secondary" gutterBottom>
-                  {feature.description}
-                </Typography>
+                {/* Name & Description */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <Box sx={{ color: `${feature.color}.main`, display: 'flex', alignItems: 'center' }}>
+                    {feature.icon}
+                  </Box>
+                  <Box>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5 }}>
+                      {feature.title}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {feature.description}
+                    </Typography>
+                  </Box>
+                </Box>
 
-                <Chip
-                  label={feature.action}
-                  size="small"
-                  color={feature.color}
-                  sx={{ mt: 2 }}
-                />
-              </CardContent>
-            </Card>
-          </Grid>
-        ))}
-      </Grid>
+                {/* Action Type */}
+                <Box>
+                  <Chip 
+                    label={feature.action} 
+                    size="small" 
+                    color={feature.color}
+                  />
+                </Box>
+
+                {/* Platform Status */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <AutoAwesomeIcon sx={{ color: 'warning.main', fontSize: 16 }} />
+                  <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.secondary' }}>Gemini Active</Typography>
+                </Box>
+
+                {/* Actions */}
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end', pr: 1 }}>
+                  <Button
+                    variant="contained"
+                    size="small"
+                    color="primary"
+                    onClick={() => handleFeatureClick(feature)}
+                    disableElevation
+                  >
+                    Run Tool
+                  </Button>
+                </Box>
+              </Box>
+            ))}
+          </Box>
+        </Box>
+      </Box>
 
       <Dialog open={openDialog} onClose={handleClose} maxWidth="sm" fullWidth>
         <DialogTitle>

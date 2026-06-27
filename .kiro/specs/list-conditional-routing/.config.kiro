@@ -1,0 +1,12 @@
+{
+  "specType": "feature",
+  "workflowType": "requirements-first",
+  "featureName": "list-conditional-routing",
+  "featureTitle": "LIST-Based Conditional Workflow Routing",
+  "description": "Enable users to create conditional workflows that route to different responses based on which LIST item a user selects. Build decision trees/flowcharts where each LIST option triggers different actions.",
+  "status": "planning",
+  "createdAt": "2026-06-27",
+  "phase": "requirements",
+  "completedPhases": [],
+  "nextPhase": "design"
+}

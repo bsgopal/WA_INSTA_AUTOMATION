@@ -4,7 +4,7 @@ import {
   TableContainer, TableHead, TableRow, Chip, IconButton, Dialog,
   DialogTitle, DialogContent, DialogActions, TextField, MenuItem,
   Grid, LinearProgress, Tooltip, Menu, Stack, Card, CardContent,
-  FormControl, InputLabel, Select
+  FormControl, InputLabel, Select, Tabs, Tab, Alert
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
@@ -22,10 +22,12 @@ export default function Campaigns() {
   const [campaigns, setCampaigns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [openDialog, setOpenDialog] = useState(false);
+  const [openDetailsDialog, setOpenDetailsDialog] = useState(false);
   const [selectedCampaign, setSelectedCampaign] = useState(null);
   const [anchorEl, setAnchorEl] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
+    topic: '',
     description: '',
     type: 'ONE_TIME',
     channels: [],
@@ -47,6 +49,22 @@ export default function Campaigns() {
     draft: 0
   });
   const [templates, setTemplates] = useState([]);
+  
+  // View & Edit dialog states
+  const [detailsTab, setDetailsTab] = useState(0);
+  const [campaignTargets, setCampaignTargets] = useState([]);
+  const [loadingTargets, setLoadingTargets] = useState(false);
+  const [editFormData, setEditFormData] = useState({
+    name: '',
+    topic: '',
+    description: '',
+    type: 'ONE_TIME',
+    channels: [],
+    targetSegment: 'ALL',
+    messageTemplate: '',
+    messageType: 'TEXT',
+    scheduledAt: ''
+  });
 
   useEffect(() => {
     fetchCampaigns();
@@ -59,6 +77,18 @@ export default function Campaigns() {
       setTemplates(response.data || []);
     } catch (error) {
       console.error('Failed to fetch templates:', error);
+    }
+  };
+
+  const fetchCampaignTargets = async (campaignId) => {
+    try {
+      setLoadingTargets(true);
+      const res = await apiClient.get(`/campaigns/${campaignId}/targets`);
+      setCampaignTargets(res.data || []);
+    } catch (err) {
+      console.error('Failed to fetch campaign targets:', err);
+    } finally {
+      setLoadingTargets(false);
     }
   };
 
@@ -123,8 +153,8 @@ export default function Campaigns() {
   };
 
   const handleCreateCampaign = async () => {
-    if (!formData.name || !formData.messageTemplate || formData.channels.length === 0) {
-      alert('Please fill in all required fields (Name, Message Template, and Channels)');
+    if (!formData.name || !formData.topic || !formData.messageTemplate || formData.channels.length === 0) {
+      alert('Please fill in all required fields (Name, Topic, Message Template, and Channels)');
       return;
     }
 
@@ -132,6 +162,7 @@ export default function Campaigns() {
       setSubmitting(true);
       const payload = {
         name: formData.name,
+        topic: formData.topic,
         description: formData.description,
         type: 'ONE_TIME',
         channels: formData.channels,
@@ -155,6 +186,7 @@ export default function Campaigns() {
         setOpenDialog(false);
         setFormData({
           name: '',
+          topic: '',
           description: '',
           type: 'ONE_TIME',
           channels: [],
@@ -171,6 +203,55 @@ export default function Campaigns() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleUpdateCampaign = async () => {
+    if (!editFormData.name || !editFormData.topic || !editFormData.messageTemplate || editFormData.channels.length === 0) {
+      alert('Please fill in all required fields (Name, Topic, Message Template, and Channels)');
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      const payload = {
+        name: editFormData.name,
+        topic: editFormData.topic,
+        description: editFormData.description,
+        type: 'ONE_TIME',
+        channels: editFormData.channels,
+        messageTemplate: editFormData.messageTemplate,
+        messageType: editFormData.messageType || 'TEXT',
+        targetAudience: {
+          segments: editFormData.targetSegment === 'ALL' ? [] : [editFormData.targetSegment],
+          languages: [],
+          loyaltyTiers: []
+        },
+        scheduledAt: editFormData.scheduledAt || undefined
+      };
+
+      await apiClient.put(`/campaigns/${selectedCampaign._id}`, payload);
+      setSnackbar({
+        open: true,
+        message: 'Campaign updated successfully!',
+        severity: 'success'
+      });
+      setOpenDetailsDialog(false);
+      fetchCampaigns();
+    } catch (error) {
+      console.error('Failed to update campaign:', error);
+      alert(error.response?.data?.error || 'Failed to update campaign. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleToggleEditChannel = (channel) => {
+    setEditFormData(prev => ({
+      ...prev,
+      channels: prev.channels.includes(channel)
+        ? prev.channels.filter(c => c !== channel)
+        : [...prev.channels, channel]
+    }));
   };
 
   const handleToggleChannel = (channel) => {
@@ -325,14 +406,34 @@ export default function Campaigns() {
               </TableRow>
             ) : (
               campaigns.map((campaign) => (
-                <TableRow key={campaign._id} hover>
+                <TableRow 
+                  key={campaign._id} 
+                  hover
+                  onClick={() => {
+                    setSelectedCampaign(campaign);
+                    setDetailsTab(0);
+                    setEditFormData({
+                      name: campaign.name,
+                      topic: campaign.topic || '',
+                      description: campaign.description || '',
+                      type: campaign.type || 'ONE_TIME',
+                      channels: campaign.channels || [],
+                      targetSegment: campaign.targetAudience?.segments?.[0] || 'ALL',
+                      messageTemplate: campaign.messageTemplate?._id || campaign.messageTemplate || '',
+                      messageType: campaign.messageType || 'TEXT',
+                      scheduledAt: campaign.scheduledAt ? new Date(campaign.scheduledAt).toISOString().slice(0, 16) : ''
+                    });
+                    setOpenDetailsDialog(true);
+                  }}
+                  sx={{ cursor: 'pointer' }}
+                >
                   <TableCell>
-                    <Typography variant="body2" fontWeight={500}>
+                    <Typography variant="body2" fontWeight={600} color="primary.main">
                       {campaign.name}
                     </Typography>
-                    {campaign.description && (
-                      <Typography variant="caption" color="text.secondary">
-                        {campaign.description}
+                    {campaign.topic && (
+                      <Typography variant="caption" sx={{ display: 'block', fontWeight: 600, color: 'text.primary' }}>
+                        Topic: {campaign.topic}
                       </Typography>
                     )}
                   </TableCell>
@@ -367,7 +468,10 @@ export default function Campaigns() {
                           <IconButton
                             size="small"
                             color="success"
-                            onClick={() => handleLaunchCampaign(campaign._id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleLaunchCampaign(campaign._id);
+                            }}
                           >
                             <PlayArrowIcon fontSize="small" />
                           </IconButton>
@@ -378,14 +482,36 @@ export default function Campaigns() {
                           <IconButton
                             size="small"
                             color="warning"
-                            onClick={() => handlePauseCampaign(campaign._id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handlePauseCampaign(campaign._id);
+                            }}
                           >
                             <PauseIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
                       )}
                       <Tooltip title="View Details">
-                        <IconButton size="small">
+                        <IconButton 
+                          size="small"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedCampaign(campaign);
+                            setDetailsTab(0);
+                            setEditFormData({
+                              name: campaign.name,
+                              topic: campaign.topic || '',
+                              description: campaign.description || '',
+                              type: campaign.type || 'ONE_TIME',
+                              channels: campaign.channels || [],
+                              targetSegment: campaign.targetAudience?.segments?.[0] || 'ALL',
+                              messageTemplate: campaign.messageTemplate?._id || campaign.messageTemplate || '',
+                              messageType: campaign.messageType || 'TEXT',
+                              scheduledAt: campaign.scheduledAt ? new Date(campaign.scheduledAt).toISOString().slice(0, 16) : ''
+                            });
+                            setOpenDetailsDialog(true);
+                          }}
+                        >
                           <VisibilityIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
@@ -393,7 +519,10 @@ export default function Campaigns() {
                         <IconButton
                           size="small"
                           color="error"
-                          onClick={() => handleDeleteCampaign(campaign._id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteCampaign(campaign._id);
+                          }}
                         >
                           <DeleteIcon fontSize="small" />
                         </IconButton>
@@ -418,6 +547,13 @@ export default function Campaigns() {
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               placeholder="e.g., Summer Sale 2024"
+            />
+            <TextField
+              label="Campaign Topic *"
+              fullWidth
+              value={formData.topic}
+              onChange={(e) => setFormData({ ...formData, topic: e.target.value })}
+              placeholder="e.g., Seasonal Discount, Product Launch, Customer Support"
             />
             <TextField
               label="Description"
@@ -528,6 +664,385 @@ export default function Campaigns() {
             {submitting ? 'Creating...' : 'Create Campaign'}
           </Button>
         </DialogActions>
+      </Dialog>
+
+      {/* Campaign Details Dialog */}
+      <Dialog 
+        open={openDetailsDialog} 
+        onClose={() => setOpenDetailsDialog(false)} 
+        maxWidth="sm" 
+        fullWidth
+        PaperProps={{
+          sx: { 
+            borderRadius: 4, 
+            overflow: 'hidden',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.15)'
+          }
+        }}
+      >
+        {selectedCampaign && (
+          <>
+            {/* Header Banner - Google/Microsoft style */}
+            <Box sx={{
+              background: 'linear-gradient(90deg, #1e88e5 0%, #1565c0 100%)',
+              color: '#ffffff',
+              p: 3,
+              boxSizing: 'border-box'
+            }}>
+              <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+                <Box>
+                  <Typography variant="h5" sx={{ fontWeight: 700, color: '#ffffff', mb: 0.5 }}>
+                    {selectedCampaign.name}
+                  </Typography>
+                  {selectedCampaign.topic && (
+                    <Typography variant="subtitle2" sx={{ color: 'rgba(255,255,255,0.9)', fontWeight: 600 }}>
+                      Topic: {selectedCampaign.topic}
+                    </Typography>
+                  )}
+                </Box>
+                <Chip 
+                  label={selectedCampaign.status} 
+                  size="small"
+                  sx={{ fontWeight: 600, px: 1, bgcolor: '#ffffff', color: '#1565c0' }}
+                />
+              </Stack>
+            </Box>
+
+            {/* View & Edit Tabs */}
+            <Box sx={{ borderBottom: 1, borderColor: 'divider', bgcolor: '#f8fafc' }}>
+              <Tabs 
+                value={detailsTab} 
+                onChange={(e, newValue) => setDetailsTab(newValue)} 
+                variant="fullWidth"
+              >
+                <Tab label="View Details" sx={{ textTransform: 'none', fontWeight: 600 }} />
+                <Tab label="Edit Settings" sx={{ textTransform: 'none', fontWeight: 600 }} />
+              </Tabs>
+            </Box>
+
+            {detailsTab === 0 && (
+              <DialogContent sx={{ p: 3 }}>
+                <Stack spacing={3}>
+                  {/* Description */}
+                  {selectedCampaign.description && (
+                    <Box>
+                      <Typography variant="caption" sx={{ fontWeight: 700, color: '#5f6368', letterSpacing: '0.8px', display: 'block', mb: 0.5 }}>
+                        DESCRIPTION
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {selectedCampaign.description}
+                      </Typography>
+                    </Box>
+                  )}
+
+                  {/* Campaign Settings Grid */}
+                  <Grid container spacing={2}>
+                    <Grid item xs={6}>
+                      <Typography variant="caption" sx={{ fontWeight: 700, color: '#5f6368', letterSpacing: '0.8px', display: 'block', mb: 0.5 }}>
+                        CAMPAIGN TYPE
+                      </Typography>
+                      <Chip label={selectedCampaign.type} size="small" variant="outlined" />
+                    </Grid>
+                    <Grid item xs={6}>
+                      <Typography variant="caption" sx={{ fontWeight: 700, color: '#5f6368', letterSpacing: '0.8px', display: 'block', mb: 0.5 }}>
+                        CHANNELS
+                      </Typography>
+                      <Stack direction="row" spacing={0.5}>
+                        {selectedCampaign.channels.map(ch => (
+                          <Chip key={ch} label={ch} size="small" />
+                        ))}
+                      </Stack>
+                    </Grid>
+                    <Grid item xs={6}>
+                      <Typography variant="caption" sx={{ fontWeight: 700, color: '#5f6368', letterSpacing: '0.8px', display: 'block', mb: 0.5 }}>
+                        TARGET AUDIENCE
+                      </Typography>
+                      <Typography variant="body2" color="text.primary">
+                        {selectedCampaign.targetAudience?.segments?.length > 0
+                          ? `Segments: ${selectedCampaign.targetAudience.segments.join(', ')}`
+                          : 'All opted-in customers'}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={6}>
+                      <Typography variant="caption" sx={{ fontWeight: 700, color: '#5f6368', letterSpacing: '0.8px', display: 'block', mb: 0.5 }}>
+                        CREATED AT
+                      </Typography>
+                      <Typography variant="body2" color="text.primary">
+                        {formatDate(selectedCampaign.createdAt)}
+                      </Typography>
+                    </Grid>
+                  </Grid>
+
+                  {/* Delivery Stats & Progress bar */}
+                  <Box sx={{ borderTop: '1px solid #e2e8f0', pt: 2.5 }}>
+                    <Typography variant="caption" sx={{ fontWeight: 700, color: '#5f6368', letterSpacing: '0.8px', display: 'block', mb: 1.5 }}>
+                      DELIVERY PROGRESS
+                    </Typography>
+                    
+                    <Grid container spacing={2} sx={{ mb: 2 }}>
+                      <Grid item xs={3}>
+                        <Typography variant="h6" sx={{ fontWeight: 700, color: '#202124' }}>
+                          {selectedCampaign.totalTargets || 0}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">Targets</Typography>
+                      </Grid>
+                      <Grid item xs={3}>
+                        <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e88e5' }}>
+                          {selectedCampaign.totalSent || 0}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">Sent</Typography>
+                      </Grid>
+                      <Grid item xs={3}>
+                        <Typography variant="h6" sx={{ fontWeight: 700, color: '#4caf50' }}>
+                          {selectedCampaign.totalDelivered || 0}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">Delivered</Typography>
+                      </Grid>
+                      <Grid item xs={3}>
+                        <Typography variant="h6" sx={{ fontWeight: 700, color: '#f44336' }}>
+                          {selectedCampaign.totalFailed || 0}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">Failed</Typography>
+                      </Grid>
+                    </Grid>
+
+                    {/* Progress Bar */}
+                    {selectedCampaign.totalTargets > 0 && (
+                      <Box sx={{ mt: 1 }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                          <Typography variant="caption" color="text.secondary">
+                            Execution Progress
+                          </Typography>
+                          <Typography variant="caption" sx={{ fontWeight: 600 }}>
+                            {(((selectedCampaign.totalSent + selectedCampaign.totalFailed) / selectedCampaign.totalTargets) * 100).toFixed(0)}%
+                          </Typography>
+                        </Box>
+                        <LinearProgress 
+                          variant="determinate" 
+                          value={Math.min(100, (((selectedCampaign.totalSent + selectedCampaign.totalFailed) / selectedCampaign.totalTargets) * 100))}
+                          sx={{ height: 6, borderRadius: 3 }}
+                        />
+                      </Box>
+                    )}
+                  </Box>
+
+                  {/* Message Template details */}
+                  <Box sx={{ borderTop: '1px solid #e2e8f0', pt: 2.5 }}>
+                    <Typography variant="caption" sx={{ fontWeight: 700, color: '#5f6368', letterSpacing: '0.8px', display: 'block', mb: 1 }}>
+                      MESSAGE TEMPLATE CONTENT
+                    </Typography>
+                    <Box sx={{ 
+                      p: 2, 
+                      bgcolor: '#f8fafc', 
+                      border: '1px solid #e2e8f0', 
+                      borderRadius: 2 
+                    }}>
+                      <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', color: '#1e293b' }}>
+                        {selectedCampaign.messageTemplate?.content || 'No template content loaded'}
+                      </Typography>
+                    </Box>
+                  </Box>
+                </Stack>
+              </DialogContent>
+            )}
+
+            {detailsTab === 1 && (
+              <DialogContent sx={{ p: 3 }}>
+                <Stack spacing={2.5}>
+                  {selectedCampaign.status === 'RUNNING' && (
+                    <Alert severity="warning" sx={{ borderRadius: 2 }}>
+                      Cannot edit a running campaign. Please pause it first.
+                    </Alert>
+                  )}
+
+                  <TextField
+                    label="Campaign Name *"
+                    fullWidth
+                    value={editFormData.name}
+                    onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                    disabled={selectedCampaign.status === 'RUNNING' || submitting}
+                    InputProps={{ sx: { borderRadius: 1.5 } }}
+                  />
+
+                  <TextField
+                    label="Campaign Topic *"
+                    fullWidth
+                    value={editFormData.topic}
+                    onChange={(e) => setEditFormData({ ...editFormData, topic: e.target.value })}
+                    disabled={selectedCampaign.status === 'RUNNING' || submitting}
+                    InputProps={{ sx: { borderRadius: 1.5 } }}
+                  />
+
+                  <TextField
+                    label="Description"
+                    fullWidth
+                    multiline
+                    rows={2}
+                    value={editFormData.description}
+                    onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
+                    disabled={selectedCampaign.status === 'RUNNING' || submitting}
+                    InputProps={{ sx: { borderRadius: 1.5 } }}
+                  />
+
+                  <Box>
+                    <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 600, color: '#5f6368' }}>
+                      Channels *
+                    </Typography>
+                    <Stack direction="row" spacing={1}>
+                      {['whatsapp', 'instagram'].map(channel => (
+                        <Chip
+                          key={channel}
+                          label={channel.charAt(0).toUpperCase() + channel.slice(1)}
+                          onClick={() => selectedCampaign.status !== 'RUNNING' && handleToggleEditChannel(channel)}
+                          color={editFormData.channels.includes(channel) ? 'primary' : 'default'}
+                          variant={editFormData.channels.includes(channel) ? 'filled' : 'outlined'}
+                          disabled={selectedCampaign.status === 'RUNNING' || submitting}
+                        />
+                      ))}
+                    </Stack>
+                  </Box>
+
+                  <FormControl fullWidth>
+                    <InputLabel>Target Segment</InputLabel>
+                    <Select
+                      value={editFormData.targetSegment}
+                      label="Target Segment"
+                      onChange={(e) => setEditFormData({ ...editFormData, targetSegment: e.target.value })}
+                      disabled={selectedCampaign.status === 'RUNNING' || submitting}
+                      sx={{ borderRadius: 1.5 }}
+                    >
+                      <MenuItem value="ALL">All Customers</MenuItem>
+                      <MenuItem value="VIP">VIP Customers</MenuItem>
+                      <MenuItem value="LOYAL">Loyal Customers</MenuItem>
+                      <MenuItem value="NEW">New Customers</MenuItem>
+                    </Select>
+                  </FormControl>
+
+                  <FormControl fullWidth>
+                    <InputLabel id="edit-template-select-label">Select Message Template *</InputLabel>
+                    <Select
+                      labelId="edit-template-select-label"
+                      value={editFormData.messageTemplate}
+                      label="Select Message Template *"
+                      onChange={(e) => {
+                        const selectedId = e.target.value;
+                        const selectedTpl = templates.find(t => t._id === selectedId);
+                        setEditFormData({
+                          ...editFormData,
+                          messageTemplate: selectedId,
+                          messageType: selectedTpl ? (selectedTpl.type || 'TEXT') : 'TEXT'
+                        });
+                      }}
+                      disabled={selectedCampaign.status === 'RUNNING' || submitting}
+                      sx={{ borderRadius: 1.5 }}
+                    >
+                      {templates.map(tpl => (
+                        <MenuItem key={tpl._id} value={tpl._id}>
+                          {tpl.name} ({tpl.category})
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+
+                  {editFormData.messageTemplate && (
+                    <Box sx={{ 
+                      p: 2, 
+                      bgcolor: '#f8fafc', 
+                      border: '1px solid #e2e8f0', 
+                      borderRadius: 2 
+                    }}>
+                      <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748b', display: 'block', mb: 1 }}>
+                        TEMPLATE CONTENT PREVIEW:
+                      </Typography>
+                      <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', color: '#1e293b' }}>
+                        {templates.find(t => t._id === editFormData.messageTemplate)?.content || ''}
+                      </Typography>
+                    </Box>
+                  )}
+
+                  <TextField
+                    label="Schedule (Optional)"
+                    type="datetime-local"
+                    fullWidth
+                    value={editFormData.scheduledAt}
+                    onChange={(e) => setEditFormData({ ...editFormData, scheduledAt: e.target.value })}
+                    disabled={selectedCampaign.status === 'RUNNING' || submitting}
+                    InputLabelProps={{ shrink: true }}
+                    InputProps={{ sx: { borderRadius: 1.5 } }}
+                  />
+                </Stack>
+              </DialogContent>
+            )}
+
+            <DialogActions sx={{ px: 3, pb: 3, pt: 1, display: 'flex', gap: 2, justifyContent: 'space-between' }}>
+              <Button 
+                onClick={() => setOpenDetailsDialog(false)}
+                variant="outlined"
+                sx={{ 
+                  borderColor: '#dadce0',
+                  color: '#202124',
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  borderRadius: 2,
+                  px: 3,
+                  py: 0.8,
+                  '&:hover': {
+                    borderColor: '#dadce0',
+                    backgroundColor: '#f8fafc'
+                  }
+                }}
+              >
+                {detailsTab === 0 ? 'Close' : 'Cancel'}
+              </Button>
+
+              {detailsTab === 0 ? (
+                /* View mode action buttons */
+                <Stack direction="row" spacing={1.5}>
+                  {selectedCampaign.status === 'DRAFT' && (
+                    <Button
+                      variant="contained"
+                      color="success"
+                      disableElevation
+                      onClick={() => {
+                        handleLaunchCampaign(selectedCampaign._id);
+                        setOpenDetailsDialog(false);
+                      }}
+                      sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 2, px: 3 }}
+                    >
+                      Launch Campaign
+                    </Button>
+                  )}
+                  {selectedCampaign.status === 'RUNNING' && (
+                    <Button
+                      variant="contained"
+                      color="warning"
+                      disableElevation
+                      onClick={() => {
+                        handlePauseCampaign(selectedCampaign._id);
+                        setOpenDetailsDialog(false);
+                      }}
+                      sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 2, px: 3 }}
+                    >
+                      Pause Campaign
+                    </Button>
+                  )}
+                </Stack>
+              ) : (
+                /* Edit mode action buttons */
+                <Button
+                  variant="contained"
+                  color="primary"
+                  disableElevation
+                  disabled={selectedCampaign.status === 'RUNNING' || submitting}
+                  onClick={handleUpdateCampaign}
+                  sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 2, px: 3 }}
+                >
+                  {submitting ? 'Saving...' : 'Save Changes'}
+                </Button>
+              )}
+            </DialogActions>
+          </>
+        )}
       </Dialog>
 
       <CustomSnackbar

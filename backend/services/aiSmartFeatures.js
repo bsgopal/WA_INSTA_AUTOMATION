@@ -347,7 +347,7 @@ const getChurnRecommendations = (riskLevel) => {
 /**
  * Personalize message content dynamically
  */
-const personalizeMessage = async (template, customer) => {
+const personalizeMessage = async (template, customer, context = {}) => {
   try {
     let personalized = template;
 
@@ -356,6 +356,12 @@ const personalizeMessage = async (template, customer) => {
       '{{firstName}}': customer.firstName || '',
       '{{lastName}}': customer.lastName || '',
       '{{fullName}}': `${customer.firstName} ${customer.lastName}`.trim(),
+      '{{customer_name}}': `${customer.firstName} ${customer.lastName}`.trim() || customer.firstName || '',
+      '{{customer_phone}}': customer.whatsappNumber || customer.phone || '',
+      '{{selected_item}}': context.selectedItemTitle || customer.customFields?.selectedItemTitle || '',
+      '{{selected_description}}': context.selectedItemDescription || customer.customFields?.selectedItemDescription || '',
+      '{{shop_name}}': process.env.SHOP_NAME || 'Kanalli',
+      '{{current_date}}': new Date().toLocaleDateString(),
       '{{loyaltyTier}}': customer.loyaltyTier || 'BRONZE',
       '{{loyaltyPoints}}': customer.loyaltyPoints || 0,
       '{{totalSpent}}': customer.totalSpent || 0,
@@ -365,7 +371,9 @@ const personalizeMessage = async (template, customer) => {
     };
 
     Object.entries(placeholders).forEach(([key, value]) => {
-      personalized = personalized.replace(new RegExp(key, 'g'), value);
+      // Escape regex special chars
+      const escapedKey = key.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+      personalized = personalized.replace(new RegExp(escapedKey, 'g'), value);
     });
 
     // AI-powered personalization for dynamic content

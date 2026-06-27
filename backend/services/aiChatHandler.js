@@ -65,7 +65,12 @@ class AIChatHandler {
               buttons.push({
                 label,
                 value,
-                type: button?.type || button?.actionType || 'QUICK_REPLY'
+                type: button?.type || button?.actionType || 'QUICK_REPLY',
+                actionType: button?.actionType || 'QUICK_REPLY',
+                quickReplyId: button?.quickReplyId || '',
+                templateId: button?.templateId || '',
+                ruleId: button?.ruleId || '',
+                workflowId: button?.workflowId || ''
               });
             }
           }
@@ -83,7 +88,12 @@ class AIChatHandler {
               buttons.push({
                 label,
                 value,
-                type: button?.type || button?.actionType || 'QUICK_REPLY'
+                type: button?.type || button?.actionType || 'QUICK_REPLY',
+                actionType: button?.actionType || 'QUICK_REPLY',
+                quickReplyId: button?.quickReplyId || '',
+                templateId: button?.templateId || '',
+                ruleId: button?.ruleId || '',
+                workflowId: button?.workflowId || ''
               });
             }
           }
@@ -117,8 +127,12 @@ class AIChatHandler {
               description: rowDescription,
               actionType: rowActionType,
               actionValue: rowActionValue,
+              actionUrl: row?.actionUrl || '',
+              image: row?.image || row?.imageUrl || '',
               quickReplyId: row?.quickReplyId || '',
-              templateId: row?.templateId || ''
+              templateId: row?.templateId || '',
+              ruleId: row?.ruleId || '',
+              workflowId: row?.workflowId || ''
             });
           }
 
@@ -176,6 +190,212 @@ class AIChatHandler {
           }
         : null
     };
+  }
+
+  /**
+   * Find action for interactive button selection or list row selection
+   */
+  async findActionForInteractiveSelection(selectedId, messageText, userId, customer) {
+    try {
+      const Message = require('../models/Message');
+      const QuickReply = require('../models/QuickReply');
+      const Template = require('../models/Template');
+      const ResponseRule = require('../models/ResponseRule');
+      const workflowEngine = require('./workflowEngine');
+
+      // Find last outbound message containing list/buttons for this customer
+      const lastOutbound = await Message.findOne({
+        customerId: customer._id,
+        userId,
+        $or: [
+          { 'widgetData.list': { $ne: null } },
+          { 'widgetData.buttons': { $ne: null } }
+        ]
+      }).sort({ createdAt: -1 });
+
+      if (!lastOutbound || !lastOutbound.widgetData) {
+        return null;
+      }
+
+      const widget = lastOutbound.widgetData;
+      let matchedItem = null;
+
+      if (selectedId) {
+        // Match by ID
+        if (widget.list && widget.list.sections) {
+          for (const section of widget.list.sections) {
+            const foundRow = section.rows?.find(r => r.id === selectedId || r.rowId === selectedId);
+            if (foundRow) {
+              matchedItem = foundRow;
+              break;
+            }
+          }
+        }
+        if (!matchedItem && widget.buttons) {
+          matchedItem = widget.buttons.find(b => b.value === selectedId || b.id === selectedId);
+        }
+      }
+
+      if (!matchedItem && messageText) {
+        const cleanMsg = messageText.trim().toLowerCase();
+        
+        // 1. Check if it's a number match (e.g. "1")
+        const matchNum = parseInt(cleanMsg, 10);
+        if (!isNaN(matchNum) && matchNum > 0) {
+          if (widget.list && widget.list.sections) {
+            const allRows = widget.list.sections.flatMap(s => s.rows || []);
+            if (matchNum <= allRows.length) {
+              matchedItem = allRows[matchNum - 1];
+            }
+          }
+          if (!matchedItem && widget.buttons) {
+            if (matchNum <= widget.buttons.length) {
+              matchedItem = widget.buttons[matchNum - 1];
+            }
+          }
+        }
+
+        // 2. Check if it's a text match
+        if (!matchedItem) {
+          if (widget.list && widget.list.sections) {
+            for (const section of widget.list.sections) {
+              const foundRow = section.rows?.find(r => r.title?.toLowerCase().trim() === cleanMsg);
+              if (foundRow) {
+                matchedItem = foundRow;
+                break;
+              }
+            }
+          }
+          if (!matchedItem && widget.buttons) {
+            matchedItem = widget.buttons.find(b => b.label?.toLowerCase().trim() === cleanMsg);
+          }
+        }
+      }
+
+      if (!matchedItem) {
+        return null;
+      }
+
+      console.log(`🎯 Matched list/button item:`, matchedItem);
+
+      // Trigger RESPONSE_RULE_SELECTION workflows if there is a ruleId stored in widgetData
+      const sourceRuleId = widget.ruleId;
+      if (sourceRuleId) {
+        const itemId = matchedItem.id || matchedItem.rowId || matchedItem.value;
+        const itemTitle = matchedItem.title || matchedItem.label;
+        const itemDesc = matchedItem.description || '';
+        
+        // Check if there is an active workflow for this response rule trigger
+        const Workflow = require('../models/Workflow');
+        const activeWorkflowsCount = await Workflow.countDocuments({
+          status: 'ACTIVE',
+          'trigger.type': 'RESPONSE_RULE_SELECTION',
+          'trigger.responseRuleId': sourceRuleId
+        });
+
+        if (activeWorkflowsCount > 0) {
+          console.log(`⚡ Triggering active RESPONSE_RULE_SELECTION workflows for rule: ${sourceRuleId}, item: ${itemId}`);
+          
+          await workflowEngine.triggerResponseRuleWorkflows(sourceRuleId, {
+            customerId: customer._id,
+            selectedItemId: itemId,
+            selectedItemTitle: itemTitle,
+            selectedItemDescription: itemDesc,
+            responseRuleId: sourceRuleId
+          });
+
+          return {
+            success: true,
+            bypassResponse: true,
+            ruleName: 'Workflow Triggered'
+          };
+        }
+      }
+
+      const actionType = String(matchedItem.actionType || '').toUpperCase();
+
+      if (actionType === 'QUICK_REPLY' && (matchedItem.quickReplyId || matchedItem.linkedQuickReplyId)) {
+        const qrId = matchedItem.quickReplyId || matchedItem.linkedQuickReplyId;
+        const qr = await QuickReply.findById(qrId);
+        if (qr && qr.content) {
+          return {
+            success: true,
+            source: 'INTERACTIVE_ACTION',
+            responseText: qr.content,
+            actionType: 'QUICK_REPLY'
+          };
+        }
+      }
+
+      if (actionType === 'TEMPLATE' && matchedItem.templateId) {
+        const tpl = await Template.findById(matchedItem.templateId);
+        if (tpl && tpl.content) {
+          return {
+            success: true,
+            source: 'INTERACTIVE_ACTION',
+            responseText: tpl.content,
+            actionType: 'TEMPLATE'
+          };
+        }
+      }
+
+      if (actionType === 'RESPONSE_RULE' && matchedItem.ruleId) {
+        const linkedRule = await ResponseRule.findById(matchedItem.ruleId);
+        if (linkedRule) {
+          const payload = this.buildRuleResponsePayload(linkedRule);
+          return {
+            success: true,
+            source: 'INTERACTIVE_ACTION',
+            responseText: payload.responseText,
+            responseImages: payload.responseImages,
+            buttons: payload.buttons,
+            list: payload.list,
+            actionType: 'RESPONSE_RULE',
+            ruleName: linkedRule.name,
+            ruleId: linkedRule._id
+          };
+        }
+      }
+
+      if (actionType === 'WORKFLOW' && matchedItem.workflowId) {
+        console.log(`⚡ Triggering workflow directly linked to interactive selection: ${matchedItem.workflowId}`);
+        workflowEngine.executeWorkflow(matchedItem.workflowId, customer._id, {
+          selectedItemId: matchedItem.id || matchedItem.rowId || matchedItem.value,
+          selectedItemTitle: matchedItem.title || matchedItem.label,
+          selectedItemDescription: matchedItem.description || ''
+        }).catch(err => console.error('Workflow Execution Error in direct interactive reply:', err.message));
+
+        return {
+          success: true,
+          source: 'INTERACTIVE_ACTION',
+          responseText: `Executing request for: ${matchedItem.title || matchedItem.label}...`,
+          actionType: 'WORKFLOW'
+        };
+      }
+
+      if (actionType === 'URL' && matchedItem.actionValue) {
+        return {
+          success: true,
+          source: 'INTERACTIVE_ACTION',
+          responseText: `Here is the link: ${matchedItem.actionValue}`,
+          actionType: 'URL'
+        };
+      }
+
+      if (actionType === 'CATALOG' && matchedItem.actionValue) {
+        return {
+          success: true,
+          source: 'INTERACTIVE_ACTION',
+          responseText: `Here is our catalog link: ${matchedItem.actionValue}`,
+          actionType: 'CATALOG'
+        };
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Error in findActionForInteractiveSelection:', error.message);
+      return null;
+    }
   }
 
   /**
@@ -273,12 +493,12 @@ class AIChatHandler {
               }
             } else if (block.type === 'BUTTONS') {
               if (block.config?.buttons) {
-                const buttonTexts = block.config.buttons.map(b => `• ${b.label}`).join('\n');
+                const buttonTexts = block.config.buttons.map((b, idx) => `${idx + 1}. ${b.label}`).join('\n');
                 responseText += buttonTexts + '\n';
               }
             } else if (block.type === 'RELATED_QUESTIONS') {
               if (block.config?.questions) {
-                responseText += 'Related questions:\n' + block.config.questions.map(q => `• ${q}`).join('\n') + '\n';
+                responseText += 'Related questions:\n' + block.config.questions.map((q, idx) => `${idx + 1}. ${q}`).join('\n') + '\n';
               }
             }
           }
@@ -525,7 +745,25 @@ class AIChatHandler {
 
       // Step 8: CHECK RESPONSE RULES FIRST before AI generation
       console.log('\n🚀 Step 8: Checking Response Rules...');
-      const ruleMatch = await this.checkResponseRules(triggerText, analysis, userId);
+      
+      const selectedId = options.interactiveReply?.id || null;
+      let ruleMatch = await this.findActionForInteractiveSelection(selectedId, triggerText, userId, customer);
+      
+      if (!ruleMatch) {
+        ruleMatch = await this.checkResponseRules(triggerText, analysis, userId);
+      }
+      
+      if (ruleMatch && ruleMatch.bypassResponse) {
+        console.log('✅ Workflow was triggered successfully, bypassing default response rule action.');
+        return {
+          success: true,
+          customerId: customer._id,
+          inboundMessageId: inboundMessage._id,
+          conversationId: conversation._id,
+          messageType: 'WORKFLOW_TRIGGERED',
+          processingTime: new Date()
+        };
+      }
       
       let aiResponse;
       
@@ -663,7 +901,8 @@ class AIChatHandler {
 
       sentResult = await sendAndLog(aiResponse.text, aiResponse.mediaUrl, 'WELCOME', {
         buttons: aiResponse.buttons,
-        list: aiResponse.list
+        list: aiResponse.list,
+        ruleId: aiResponse.ruleId
       });
       totalMessagesSent = 1;
 

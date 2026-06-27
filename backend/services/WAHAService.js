@@ -1,4 +1,4 @@
-﻿// renic-automation-backend/services/WAHAService.js
+// renic-automation-backend/services/WAHAService.js
 // WAHA (WhatsApp HTTP API) - Open-source WhatsApp integration
 // Free, self-hosted, no approval needed
 
@@ -35,17 +35,32 @@ const buildReadableListFallback = (message, listConfig = {}) => {
     lines.push('');
   }
 
+  let globalRowIndex = 0;
   sections.forEach((section, sectionIndex) => {
     const sectionTitle = String(section?.title || 'Options').trim();
     if (sectionTitle) {
       lines.push(sectionTitle);
     }
 
-    (section?.rows || []).forEach(row => {
+    (section?.rows || []).forEach((row, rowIndex) => {
       const rowTitle = String(row?.title || row?.label || 'Option').trim();
       const rowDescription = String(row?.description || '').trim();
       if (!rowTitle) return;
-      lines.push("• " + rowTitle + (rowDescription ? " - " + rowDescription : ""));
+      
+      // Use numbered format with bold: *number. Title* - Description
+      const rowNum = globalRowIndex + 1;
+      const numberedTitle = `*${rowNum}. ${rowTitle}*`;
+      let rowText = numberedTitle + (rowDescription ? ` - ${rowDescription}` : "");
+      
+      if (row.actionUrl) {
+        rowText += `\n   🔗 ${row.actionUrl}`;
+      }
+      if (row.image) {
+        rowText += `\n   🖼️ Image: ${row.image}`;
+      }
+      
+      lines.push(rowText);
+      globalRowIndex++;
     });
 
     if (sectionIndex < sections.length - 1) {
@@ -361,11 +376,15 @@ const sendMessage = async (to, message, options = {}) => {
       try {
         response = await wahaClient.post('/sendButtons', payload);
       } catch (err) {
-        console.warn(`âš ï¸ WAHAService: /sendButtons failed. Falling back to plain text formatting.`);
+        console.warn(`⚠️ WAHAService: /sendButtons failed. Falling back to plain text formatting.`);
         let fallbackText = message;
         options.buttons.forEach((b, idx) => {
-          const emojiNum = ['1ï¸âƒ£', '2ï¸âƒ£', '3ï¸âƒ£'][idx] || 'ðŸ”¹';
-          fallbackText += `\n\n${emojiNum} *${b.label}* _(Reply "${b.value}")_`;
+          if (b.type === 'URL' || b.actionType === 'URL' || b.value?.startsWith('http')) {
+            fallbackText += `\n\n🔗 *${b.label || 'Link'}*: ${b.value}`;
+          } else {
+            const emojiNum = ['1️⃣', '2️⃣', '3️⃣'][idx] || '🔸';
+            fallbackText += `\n\n${emojiNum} *${b.label}* _(Reply "${b.value}")_`;
+          }
         });
         response = await wahaClient.post('/sendText', {
           session: SESSION_NAME,
@@ -389,11 +408,11 @@ const sendMessage = async (to, message, options = {}) => {
       } catch (err) {
         const errorMsg = err.response?.data?.message || '';
         if (err.response?.status === 422 && (errorMsg.includes('Plus version') || errorMsg.includes('engine') || errorMsg.includes('available only'))) {
-          console.warn(`âš ï¸ WAHAService: /sendFile requires Plus version. Falling back to plain text sendText.`);
+          console.warn(`⚠️  WAHAService: /sendFile requires Plus version. Falling back to plain text sendText.`);
           const fallbackPayload = {
             session: SESSION_NAME,
             chatId: formattedPhone,
-            text: `${message}\n\nðŸ–¼ï¸ Catalog Banner: ${options.mediaUrl}`
+            text: `${message}\n\n🖼️  Catalog Banner: ${options.mediaUrl}`
           };
           response = await wahaClient.post('/sendText', fallbackPayload);
         } else {

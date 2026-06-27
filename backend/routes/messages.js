@@ -403,4 +403,111 @@ router.post('/bulk-delete', [
   }
 });
 
+// ============ SEND BULK MESSAGE ============
+router.post('/bulk-send', [
+  body('customerIds').isArray({ min: 1 }),
+  body('content').notEmpty().trim(),
+  body('channel').isIn(['whatsapp', 'instagram'])
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { customerIds, content, channel } = req.body;
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const customerId of customerIds) {
+      try {
+        const customer = await Customer.findOne({
+          _id: customerId,
+          userId: req.user.id
+        });
+
+        if (!customer) continue;
+
+        // Check opt-in status
+        if (!customer.optedIn[channel]) {
+          failCount++;
+          continue;
+        }
+
+        let finalContent = await VariableInterpolationService.interpolateVariables(content, req.user.id, {
+          customer
+        });
+
+        // Translate outbound message if necessary
+        try {
+          const aiMessageAnalyzer = require('../services/aiMessageAnalyzer');
+          const detectedLang = aiMessageAnalyzer.detectLanguage(content);
+          const targetLang = customer.language || 'en';
+          
+          if (detectedLang !== targetLang) {
+            const shopConfig = await aiMessageAnalyzer.getShopConfig(req.user.id);
+            const aiConfig = {
+              provider: shopConfig.useAnthropic && shopConfig.anthropicApiKey ? 'anthropic' : 'gemini',
+              apiKey: (shopConfig.useAnthropic && shopConfig.anthropicApiKey) ? shopConfig.anthropicApiKey : (shopConfig.geminiApiKey || process.env.GEMINI_API_KEY),
+              model: (shopConfig.useAnthropic && shopConfig.anthropicApiKey) ? (shopConfig.anthropicModel || 'claude-3-haiku-20240307') : (shopConfig.geminiModel || process.env.GEMINI_MODEL || 'gemini-1.5-flash')
+            };
+            if (aiConfig.apiKey) {
+              const translated = await aiMessageAnalyzer.translateText(content, targetLang, aiConfig);
+              if (translated && translated.trim()) {
+                finalContent = translated;
+              }
+            }
+          }
+        } catch (err) {
+          console.error('[Translate Outbound Bulk] Translation error:', err.message);
+        }
+
+        let result;
+        if (channel === 'whatsapp') {
+          result = await WhatsAppService.sendMessage(customer.whatsappNumber, finalContent, {});
+        } else if (channel === 'instagram') {
+          const InstagramService = require('../services/InstagramService');
+          result = await InstagramService.sendDirectMessage(customer.instagramHandle || customer.phone, finalContent, {});
+        }
+
+        const message = new Message({
+          userId: req.user.id,
+          customerId: customer._id,
+          content: finalContent,
+          originalContent: content,
+          channel,
+          status: result.success ? 'SENT' : 'FAILED',
+          sentAt: result.success ? new Date() : null,
+          failureReason: result.error,
+          externalMessageId: result.externalMessageId
+        });
+
+        await message.save();
+
+        if (result.success) {
+          successCount++;
+          customer.lastMessageSentDate = new Date();
+          customer.messagesSentCount++;
+          await customer.save();
+        } else {
+          failCount++;
+        }
+      } catch (innerError) {
+        console.error(`Error bulk sending message to ${customerId}:`, innerError);
+        failCount++;
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Bulk message job completed. Sent: ${successCount}, Failed: ${failCount}`,
+      successCount,
+      failCount
+    });
+  } catch (error) {
+    console.error('Bulk Send Error:', error);
+    res.status(500).json({ error: 'Failed to execute bulk sending' });
+  }
+});
+
 module.exports = router;

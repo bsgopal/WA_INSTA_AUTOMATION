@@ -746,6 +746,7 @@ export default function Settings() {
           <Tab icon={<ShoppingBagIcon fontSize="small" />} label="Jewelry Catalog" />
           <Tab icon={<ChatIcon fontSize="small" />} label="AI Sandbox" />
           <Tab icon={<CloudUploadIcon fontSize="small" />} label="Knowledge Documents" />
+          <Tab icon={<PersonIcon fontSize="small" />} label="Active Sessions" />
         </Tabs>
       </Paper>
 
@@ -2258,6 +2259,64 @@ export default function Settings() {
                     })}
                   </Grid>
                 )}
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+      </TabPanel>
+
+      {/* Tab 6: Active Session & Local Storage Details */}
+      <TabPanel value={activeTab} index={5}>
+        <Grid container spacing={3}>
+          <Grid item xs={12} md={8}>
+            <Card elevation={0}>
+              <CardContent sx={{ p: 4 }}>
+                <Typography variant="h6" gutterBottom sx={{ fontWeight: 700 }}>
+                  🔑 Active Session & Credentials
+                </Typography>
+                <Typography variant="body2" color="text.secondary" mb={4}>
+                  The following active session login details are stored in your local browser storage.
+                </Typography>
+
+                <Box sx={{ border: '1px solid #e0e0e0', borderRadius: 2, overflow: 'hidden' }}>
+                  {/* Header */}
+                  <Box sx={{ display: 'grid', gridTemplateColumns: '150px 1fr', gap: 2, p: 2, bgcolor: '#f8fafc', borderBottom: '1px solid #e0e0e0' }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Storage Key</Typography>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Stored Value</Typography>
+                  </Box>
+
+                  {/* Token Row */}
+                  <Box sx={{ display: 'grid', gridTemplateColumns: '150px 1fr', gap: 2, p: 2, borderBottom: '1px solid #e0e0e0', alignItems: 'center' }}>
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: 'primary.main' }}>token</Typography>
+                    <Typography variant="caption" sx={{ wordBreak: 'break-all', fontFamily: 'monospace', color: '#666' }}>
+                      {localStorage.getItem('token') || 'No active token'}
+                    </Typography>
+                  </Box>
+
+                  {/* User Profile Row */}
+                  <Box sx={{ display: 'grid', gridTemplateColumns: '150px 1fr', gap: 2, p: 2, alignItems: 'flex-start' }}>
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: 'primary.main' }}>user</Typography>
+                    <Box sx={{ width: '100%', overflow: 'hidden' }}>
+                      {localStorage.getItem('user') ? (
+                        <Box component="pre" sx={{ 
+                          m: 0, 
+                          p: 1.5, 
+                          bgcolor: '#f1f5f9', 
+                          borderRadius: 1, 
+                          fontSize: '0.8rem', 
+                          fontFamily: 'monospace',
+                          overflowX: 'auto',
+                          whiteSpace: 'pre-wrap',
+                          wordBreak: 'break-all'
+                        }}>
+                          {JSON.stringify(JSON.parse(localStorage.getItem('user')), null, 2)}
+                        </Box>
+                      ) : (
+                        <Typography variant="body2" color="text.secondary">No active user details</Typography>
+                      )}
+                    </Box>
+                  </Box>
+                </Box>
               </CardContent>
             </Card>
           </Grid>

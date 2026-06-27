@@ -32,7 +32,7 @@ router.get('/', [
     }
 
     const campaigns = await Campaign.find(query)
-      .populate('messageTemplate', 'name type')
+      .populate('messageTemplate')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
@@ -70,6 +70,41 @@ router.get('/:id', async (req, res) => {
   } catch (error) {
     console.error('Get Campaign Error:', error);
     res.status(500).json({ error: 'Failed to fetch campaign' });
+  }
+});
+
+// ============ GET CAMPAIGN TARGET CUSTOMERS ============
+router.get('/:id/targets', async (req, res) => {
+  try {
+    const campaign = await Campaign.findOne({
+      _id: req.params.id,
+      userId: req.user.id
+    });
+
+    if (!campaign) {
+      return res.status(404).json({ error: 'Campaign not found' });
+    }
+
+    const query = { userId: req.user.id };
+
+    if (campaign.targetAudience?.segments?.length > 0) {
+      query.rfmSegment = { $in: campaign.targetAudience.segments };
+    }
+
+    if (campaign.channels && campaign.channels.length > 0) {
+      const channelQueries = campaign.channels.map(channel => ({
+        [`optedIn.${channel}`]: true
+      }));
+      if (channelQueries.length > 0) {
+        query.$or = channelQueries;
+      }
+    }
+
+    const customers = await Customer.find(query).select('firstName lastName phone email rfmSegment');
+    res.json(customers);
+  } catch (error) {
+    console.error('Get Campaign Targets Error:', error);
+    res.status(500).json({ error: 'Failed to fetch campaign targets' });
   }
 });
 

@@ -37,6 +37,103 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+// Helper to compile visual builder layout to flat workflow steps
+const compileConditionalSteps = (body) => {
+  const conditions = body.conditions || [];
+  const responseCards = body.responseCards || [];
+  const defaultCard = body.defaultCard || null;
+  const steps = [];
+
+  // Compile conditions
+  for (let i = 0; i < conditions.length; i++) {
+    const cond = conditions[i];
+    const isLast = i === conditions.length - 1;
+    
+    steps.push({
+      id: cond.id,
+      type: 'CONDITION',
+      name: cond.itemTitle ? `Is ${cond.itemTitle}?` : 'Check Selection',
+      config: {
+        field: cond.field || 'selectedItemId',
+        operator: cond.operator || 'equals',
+        value: cond.value
+      },
+      nextStepId: cond.responseCardId,
+      alternateStepId: isLast ? (defaultCard ? 'default' : null) : conditions[i + 1].id
+    });
+  }
+
+  // Compile response cards
+  for (const card of responseCards) {
+    steps.push({
+      id: card.id,
+      type: card.type || 'SEND_MESSAGE',
+      name: card.title || 'Send Message',
+      config: {
+        channel: 'whatsapp',
+        template: card.config?.message || '',
+        mediaUrl: card.config?.mediaUrl || '',
+        buttonUrl: card.config?.buttonUrl || '',
+        buttonLabel: card.config?.buttonLabel || '',
+        ruleId: card.config?.ruleId || '',
+        templateId: card.config?.templateId || '',
+        quickReplyId: card.config?.quickReplyId || '',
+      },
+      nextStepId: null
+    });
+  }
+
+  // Compile default card
+  if (defaultCard) {
+    steps.push({
+      id: 'default',
+      type: defaultCard.type || 'SEND_MESSAGE',
+      name: defaultCard.title || 'Default Response',
+      config: {
+        channel: 'whatsapp',
+        template: defaultCard.config?.message || '',
+        mediaUrl: defaultCard.config?.mediaUrl || '',
+        buttonUrl: defaultCard.config?.buttonUrl || '',
+        buttonLabel: defaultCard.config?.buttonLabel || '',
+        ruleId: defaultCard.config?.ruleId || '',
+        templateId: defaultCard.config?.templateId || '',
+        quickReplyId: defaultCard.config?.quickReplyId || '',
+      },
+      nextStepId: null
+    });
+  }
+
+  return steps;
+};
+
+// ============ CREATE CONDITIONAL WORKFLOW ============
+router.post('/conditional', [
+  body('name').notEmpty().trim(),
+  body('trigger').isObject()
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    // Compile frontend conditions/cards into schema steps
+    const steps = compileConditionalSteps(req.body);
+
+    const workflow = new Workflow({
+      ...req.body,
+      steps,
+      userId: req.user.id
+    });
+
+    await workflow.save();
+    res.status(201).json(workflow);
+  } catch (error) {
+    console.error('Create Conditional Workflow Error:', error);
+    res.status(500).json({ error: 'Failed to create workflow', details: error.message });
+  }
+});
+
 // ============ CREATE WORKFLOW ============
 router.post('/', [
   body('name').notEmpty().trim(),
@@ -66,9 +163,16 @@ router.post('/', [
 // ============ UPDATE WORKFLOW ============
 router.put('/:id', async (req, res) => {
   try {
+    let updatePayload = { ...req.body };
+
+    // If updating visual builder layout, re-compile flat steps
+    if (req.body.conditions || req.body.responseCards) {
+      updatePayload.steps = compileConditionalSteps(req.body);
+    }
+
     const workflow = await Workflow.findOneAndUpdate(
       { _id: req.params.id, userId: req.user.id },
-      { ...req.body, updatedAt: Date.now() },
+      { ...updatePayload, updatedAt: Date.now() },
       { new: true, runValidators: true }
     );
 
@@ -195,7 +299,7 @@ router.get('/:id/stats', async (req, res) => {
 
 // ============ TEST WORKFLOW ============
 router.post('/:id/test', [
-  body('customerId').notEmpty()
+  body('customerId').optional()
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -212,15 +316,46 @@ router.post('/:id/test', [
       return res.status(404).json({ error: 'Workflow not found' });
     }
 
-    // Execute in test mode (don't update stats)
+    let customerId = req.body.customerId;
+    if (!customerId) {
+      const Customer = require('../models/Customer');
+      const defaultCustomer = await Customer.findOne({ userId: req.user.id });
+      if (defaultCustomer) {
+        customerId = defaultCustomer._id;
+      } else {
+        const stubCustomer = await Customer.create({
+          userId: req.user.id,
+          firstName: 'Test',
+          lastName: 'User',
+          phone: '+15555555555',
+          whatsappNumber: '+15555555555',
+          preferredChannel: 'whatsapp'
+        });
+        customerId = stubCustomer._id;
+      }
+    }
+
+    // Execute in test mode (don't update stats) with selection context
     const result = await workflowEngine.executeWorkflow(
       workflow._id,
-      req.body.customerId,
-      { testMode: true }
+      customerId,
+      {
+        testMode: true,
+        selectedItemId: req.body.selectedItemId,
+        selectedItemTitle: req.body.selectedItemTitle,
+        ...(req.body.context || {})
+      }
     );
 
     res.json({
-      ...result,
+      success: result.success,
+      executionTrace: result.trace ? result.trace.map(t => ({
+        stepName: t.name,
+        type: t.type,
+        status: t.success ? 'success' : 'error'
+      })) : [],
+      messageToBeSent: result.trace ? (result.trace.find(t => t.type === 'SEND_MESSAGE')?.data?.messageText || '') : '',
+      branchTaken: result.trace ? (result.trace.find(t => t.type === 'CONDITION')?.conditionMet ? 'Yes Branch' : 'No Branch') : '',
       message: 'Workflow test completed'
     });
   } catch (error) {

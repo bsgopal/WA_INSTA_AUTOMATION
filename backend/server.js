@@ -42,6 +42,7 @@ app.use('/api/quick-replies', require('./middlewares/auth-middleware'), require(
 app.use('/api/ai-chat', require('./middlewares/auth-middleware'), require('./routes/aiChat'));
 app.use('/api/response-rules', require('./middlewares/auth-middleware'), require('./routes/responseRules'));
 app.use('/api/knowledge-documents', require('./middlewares/auth-middleware'), require('./routes/knowledgeDocuments'));
+app.use('/api/lists', require('./middlewares/auth-middleware'), require('./routes/lists'));
 // app.use('/api/multilingual', require('./middlewares/auth-middleware'), require('./routes/multilingual'));
 app.use('/api/webhooks', require('./routes/webhooks'));
 
