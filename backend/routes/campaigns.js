@@ -1,13 +1,83 @@
 // renic-automation-backend/routes/campaigns.js
 const express = require('express');
 const router = express.Router();
+const fs = require('fs');
+const path = require('path');
+const multer = require('multer');
 const Campaign = require('../models/Campaign');
 const Customer = require('../models/Customer');
 const Message = require('../models/Message');
 const WhatsAppService = require('../services/WhatsAppService');
 const GeminiService = require('../services/GeminiService');
 const campaignService = require('../services/campaignService');
+const VariableInterpolationService = require('../services/VariableInterpolationService');
 const { body, validationResult, query } = require('express-validator');
+
+const campaignUploadsDir = path.join(__dirname, '..', 'uploads', 'campaigns');
+if (!fs.existsSync(campaignUploadsDir)) {
+  fs.mkdirSync(campaignUploadsDir, { recursive: true });
+}
+
+const campaignMediaStorage = multer.diskStorage({
+  destination: (_, __, cb) => cb(null, campaignUploadsDir),
+  filename: (_, file, cb) => {
+    const ext = path.extname(file.originalname || '').toLowerCase();
+    const safeBase = path.basename(file.originalname || 'campaign-media', ext)
+      .replace(/[^a-zA-Z0-9-_]/g, '_')
+      .slice(0, 40);
+    cb(null, `${Date.now()}-${safeBase}${ext}`);
+  }
+});
+
+const campaignMediaUpload = multer({
+  storage: campaignMediaStorage,
+  limits: { fileSize: 15 * 1024 * 1024 },
+  fileFilter: (_, file, cb) => {
+    const allowedMimeTypes = [
+      'application/pdf'
+    ];
+    const isImage = file.mimetype.startsWith('image/');
+    const isVideo = file.mimetype.startsWith('video/');
+    if (isImage || isVideo || allowedMimeTypes.includes(file.mimetype)) {
+      return cb(null, true);
+    }
+    cb(new Error('Unsupported file type. Please upload an image, video, or PDF file.'));
+  }
+});
+
+// ============ UPLOAD CAMPAIGN MEDIA ============
+router.post('/media/upload', campaignMediaUpload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'Media file is required' });
+    }
+
+    const mediaType = req.file.mimetype === 'application/pdf'
+      ? 'document'
+      : req.file.mimetype.startsWith('video/')
+        ? 'video'
+        : 'image';
+
+    const uploadedBuffer = fs.readFileSync(req.file.path);
+    const base64Data = uploadedBuffer.toString('base64');
+    const dataUrl = `data:${req.file.mimetype};base64,${base64Data}`;
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const relativeUrl = `/uploads/campaigns/${req.file.filename}`;
+
+    res.json({
+      success: true,
+      mediaType,
+      mediaUrl: `${baseUrl}${relativeUrl}`,
+      mediaPreviewData: dataUrl,
+      mediaMimeType: req.file.mimetype,
+      mediaFileName: req.file.originalname,
+      originalName: req.file.originalname
+    });
+  } catch (error) {
+    console.error('Campaign Media Upload Error:', error);
+    res.status(500).json({ error: 'Failed to upload campaign media' });
+  }
+});
 
 // ============ GET ALL CAMPAIGNS ============
 router.get('/', [
@@ -263,6 +333,146 @@ router.post('/:id/launch', async (req, res) => {
   } catch (error) {
     console.error('Launch Campaign Error:', error);
     res.status(500).json({ error: 'Failed to launch campaign' });
+  }
+});
+
+// ============ MANUAL SEND TO SELECTED CUSTOMERS ============
+router.post('/:id/manual-send', async (req, res) => {
+  try {
+    const { customerIds, sendToAll = false, segmentFilter = null, searchTerm = null } = req.body;
+
+    const campaign = await Campaign.findOne({
+      _id: req.params.id,
+      userId: req.user.id
+    }).populate('messageTemplate');
+
+    if (!campaign) {
+      return res.status(404).json({ error: 'Campaign not found' });
+    }
+
+    const query = { userId: req.user.id };
+
+    if (searchTerm) {
+      query.$or = [
+        { firstName: { $regex: searchTerm, $options: 'i' } },
+        { lastName: { $regex: searchTerm, $options: 'i' } },
+        { email: { $regex: searchTerm, $options: 'i' } },
+        { phone: { $regex: searchTerm, $options: 'i' } },
+        { whatsappNumber: { $regex: searchTerm, $options: 'i' } }
+      ];
+    }
+
+    if (segmentFilter) {
+      query.rfmSegment = segmentFilter;
+    }
+
+    if (!sendToAll && customerIds && customerIds.length > 0) {
+      query._id = { $in: customerIds };
+    }
+
+    query['optedIn.whatsapp'] = true;
+
+    const customers = await Customer.find(query);
+
+    if (customers.length === 0) {
+      return res.status(400).json({ error: 'No customers found matching the selected criteria' });
+    }
+
+    const content = campaign.messageTemplate?.content || '';
+    if (!content) {
+      return res.status(400).json({ error: 'Campaign message template is empty' });
+    }
+
+    const mediaUrl = campaign.mediaUrl || campaign.messageTemplate?.mediaUrl || null;
+    const mediaPreviewData = campaign.mediaPreviewData || null;
+    const mediaType = campaign.mediaType && campaign.mediaType !== 'none'
+      ? campaign.mediaType
+      : (campaign.messageTemplate?.mediaType || null);
+    const mediaMimeType = campaign.mediaMimeType || null;
+    const mediaFileName = campaign.mediaFileName || 'campaign-media';
+    const buttons = campaign.buttonUrl ? [{
+      label: campaign.buttonLabel || 'Open Link',
+      value: campaign.buttonUrl,
+      type: 'URL',
+      actionType: 'URL'
+    }] : null;
+
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const customer of customers) {
+      try {
+        const destinationNumber = customer.whatsappNumber || customer.phone;
+        if (!destinationNumber) {
+          failCount++;
+          continue;
+        }
+
+        const finalContent = await VariableInterpolationService.interpolateVariables(
+          content,
+          req.user.id,
+          { customer }
+        );
+
+        const channel = 'whatsapp';
+        const result = await WhatsAppService.sendMessage(destinationNumber, finalContent, {
+          ...((mediaUrl || mediaPreviewData) ? { mediaUrl, mediaData: mediaPreviewData, mediaType, mediaMimeType, mediaFileName } : {}),
+          ...(buttons ? { buttons } : {})
+        });
+
+        if (result && result.success) {
+          successCount++;
+          customer.lastMessageSentDate = new Date();
+          customer.messagesSentCount++;
+          await customer.save();
+        } else {
+          failCount++;
+        }
+
+        const message = new Message({
+          userId: req.user.id,
+          customerId: customer._id,
+          campaignId: campaign._id,
+          content: finalContent,
+          originalContent: content,
+          channel,
+          status: result?.success ? 'SENT' : 'FAILED',
+          sentAt: result?.success ? new Date() : null,
+          failureReason: result?.error,
+          externalMessageId: result?.externalMessageId,
+          messageType: 'MANUAL',
+          mediaUrl,
+          mediaPreviewData,
+          mediaType,
+          mediaMimeType,
+          clickUrl: campaign.buttonUrl || null,
+          widgetData: buttons ? { buttons } : null
+        });
+
+        await message.save();
+      } catch (innerError) {
+        console.error(`Error sending manual message to customer ${customer._id}:`, innerError);
+        failCount++;
+      }
+    }
+
+    if (successCount === 0) {
+      return res.status(400).json({
+        error: `Manual send failed for all selected customers. Failed: ${failCount}`,
+        successCount,
+        failCount
+      });
+    }
+
+    res.json({
+      success: true,
+      message: `Manual send completed. Sent: ${successCount}, Failed: ${failCount}`,
+      successCount,
+      failCount
+    });
+  } catch (error) {
+    console.error('Manual Send Error:', error);
+    res.status(500).json({ error: 'Failed to execute manual send' });
   }
 });
 

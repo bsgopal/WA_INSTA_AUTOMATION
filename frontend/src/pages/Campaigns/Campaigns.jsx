@@ -6,7 +6,10 @@ import {
   Grid, LinearProgress, Tooltip, Menu, Stack, Card, CardContent,
   FormControl, InputLabel, Select, Tabs, Tab, Alert
 } from '@mui/material';
+import Checkbox from '@mui/material/Checkbox';
+import Radio from '@mui/material/Radio';
 import AddIcon from '@mui/icons-material/Add';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PauseIcon from '@mui/icons-material/Pause';
 import EditIcon from '@mui/icons-material/Edit';
@@ -34,6 +37,13 @@ export default function Campaigns() {
     targetSegment: 'ALL',
     messageTemplate: '',
     messageType: 'TEXT',
+    mediaType: 'none',
+    mediaUrl: '',
+    mediaPreviewData: '',
+    mediaMimeType: '',
+    mediaFileName: '',
+    buttonLabel: '',
+    buttonUrl: '',
     scheduledAt: ''
   });
   const [submitting, setSubmitting] = useState(false);
@@ -49,7 +59,21 @@ export default function Campaigns() {
     draft: 0
   });
   const [templates, setTemplates] = useState([]);
-  
+
+  // Manual send dialog states
+  const [openManualSendDialog, setOpenManualSendDialog] = useState(false);
+  const [manualSendCustomers, setManualSendCustomers] = useState([]);
+  const [manualSendLoading, setManualSendLoading] = useState(false);
+  const [manualSendSending, setManualSendSending] = useState(false);
+  const [manualSendSelected, setManualSendSelected] = useState([]);
+  const [selectedManualCampaignId, setSelectedManualCampaignId] = useState('');
+  const [manualSendSearch, setManualSendSearch] = useState('');
+  const [manualSendFilter, setManualSendFilter] = useState('');
+  const [manualSendSelectAllFiltered, setManualSendSelectAllFiltered] = useState(false);
+  const [mediaUploading, setMediaUploading] = useState(false);
+  const [campaignMediaFile, setCampaignMediaFile] = useState(null);
+  const [editCampaignMediaFile, setEditCampaignMediaFile] = useState(null);
+
   // View & Edit dialog states
   const [detailsTab, setDetailsTab] = useState(0);
   const [campaignTargets, setCampaignTargets] = useState([]);
@@ -63,6 +87,13 @@ export default function Campaigns() {
     targetSegment: 'ALL',
     messageTemplate: '',
     messageType: 'TEXT',
+    mediaType: 'none',
+    mediaUrl: '',
+    mediaPreviewData: '',
+    mediaMimeType: '',
+    mediaFileName: '',
+    buttonLabel: '',
+    buttonUrl: '',
     scheduledAt: ''
   });
 
@@ -92,18 +123,90 @@ export default function Campaigns() {
     }
   };
 
+  const fetchManualSendCustomers = async (overrides = {}) => {
+    const searchValue = overrides.search ?? manualSendSearch;
+    const filterValue = overrides.filter ?? manualSendFilter;
+    try {
+      setManualSendLoading(true);
+      const params = {
+        page: 1,
+        limit: 100
+      };
+      if (filterValue) params.segment = filterValue;
+      if (searchValue) params.search = searchValue;
+      const res = await apiClient.get('/customers', { params });
+      setManualSendCustomers(res.data.customers || []);
+    } catch (err) {
+      console.error('Failed to fetch customers for manual send:', err);
+    } finally {
+      setManualSendLoading(false);
+    }
+  };
+
+  const openManualSendForCampaign = async (campaign) => {
+    setSelectedCampaign(campaign);
+    setManualSendCustomers([]);
+    setManualSendSelected([]);
+    setManualSendSearch('');
+    setManualSendFilter('');
+    setManualSendSelectAllFiltered(false);
+    setOpenManualSendDialog(true);
+    await fetchManualSendCustomers({ search: '', filter: '' });
+  };
+
+  const closeManualSendDialog = () => {
+    setOpenManualSendDialog(false);
+    setManualSendSelected([]);
+    setManualSendCustomers([]);
+    setManualSendSearch('');
+    setManualSendFilter('');
+    setManualSendSelectAllFiltered(false);
+  };
+
+  const handleManualSend = async () => {
+    if (!manualSendSelectAllFiltered && (!manualSendSelected || manualSendSelected.length === 0)) {
+      alert('Please select at least one customer');
+      return;
+    }
+    try {
+      setManualSendSending(true);
+      const response = await apiClient.post(`/campaigns/${selectedCampaign._id}/manual-send`, {
+        customerIds: manualSendSelectAllFiltered ? [] : manualSendSelected,
+        sendToAll: manualSendSelectAllFiltered,
+        segmentFilter: manualSendFilter || null,
+        searchTerm: manualSendSearch || null
+      });
+      const { successCount = 0, failCount = 0 } = response.data || {};
+      setSnackbar({
+        open: true,
+        message: response.data?.message || `Manual send request queued successfully`,
+        severity: failCount > 0 ? 'warning' : 'success'
+      });
+      closeManualSendDialog();
+    } catch (error) {
+      console.error('Failed to send manual message:', error);
+      setSnackbar({
+        open: true,
+        message: error.response?.data?.error || 'Failed to send message',
+        severity: 'error'
+      });
+    } finally {
+      setManualSendSending(false);
+    }
+  };
+
   const fetchCampaigns = async () => {
     try {
       setLoading(true);
       const response = await apiClient.get('/campaigns');
       setCampaigns(response.data.campaigns);
-      
+
       // Calculate stats
       const total = response.data.campaigns.length;
       const active = response.data.campaigns.filter(c => c.status === 'RUNNING').length;
       const completed = response.data.campaigns.filter(c => c.status === 'COMPLETED').length;
       const draft = response.data.campaigns.filter(c => c.status === 'DRAFT').length;
-      
+
       setStats({ total, active, completed, draft });
     } catch (error) {
       console.error('Failed to fetch campaigns:', error);
@@ -152,6 +255,22 @@ export default function Campaigns() {
     }
   };
 
+  const uploadCampaignMedia = async (file) => {
+    const uploadData = new FormData();
+    uploadData.append('file', file);
+    setMediaUploading(true);
+    try {
+      const response = await apiClient.post('/campaigns/media/upload', uploadData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+      return response.data;
+    } finally {
+      setMediaUploading(false);
+    }
+  };
+
   const handleCreateCampaign = async () => {
     if (!formData.name || !formData.topic || !formData.messageTemplate || formData.channels.length === 0) {
       alert('Please fill in all required fields (Name, Topic, Message Template, and Channels)');
@@ -160,6 +279,16 @@ export default function Campaigns() {
 
     try {
       setSubmitting(true);
+      let uploadedMedia = null;
+      if (formData.mediaType !== 'none') {
+        if (campaignMediaFile) {
+          uploadedMedia = await uploadCampaignMedia(campaignMediaFile);
+        } else if (!formData.mediaUrl) {
+          alert('Please upload a media file for this campaign.');
+          return;
+        }
+      }
+
       const payload = {
         name: formData.name,
         topic: formData.topic,
@@ -168,6 +297,13 @@ export default function Campaigns() {
         channels: formData.channels,
         messageTemplate: formData.messageTemplate,
         messageType: formData.messageType || 'TEXT',
+        mediaType: uploadedMedia?.mediaType || formData.mediaType || 'none',
+        mediaUrl: uploadedMedia?.mediaUrl || formData.mediaUrl || '',
+        mediaPreviewData: uploadedMedia?.mediaPreviewData || formData.mediaPreviewData || '',
+        mediaMimeType: uploadedMedia?.mediaMimeType || formData.mediaMimeType || '',
+        mediaFileName: uploadedMedia?.mediaFileName || formData.mediaFileName || '',
+        buttonLabel: formData.buttonLabel || '',
+        buttonUrl: formData.buttonUrl || '',
         targetAudience: {
           segments: formData.targetSegment === 'ALL' ? [] : [formData.targetSegment],
           languages: [],
@@ -193,8 +329,16 @@ export default function Campaigns() {
           targetSegment: 'ALL',
           messageTemplate: '',
           messageType: 'TEXT',
+          mediaType: 'none',
+          mediaUrl: '',
+          mediaPreviewData: '',
+          mediaMimeType: '',
+          mediaFileName: '',
+          buttonLabel: '',
+          buttonUrl: '',
           scheduledAt: ''
         });
+        setCampaignMediaFile(null);
         fetchCampaigns();
       }, 1500);
     } catch (error) {
@@ -213,6 +357,14 @@ export default function Campaigns() {
 
     try {
       setSubmitting(true);
+      let uploadedMedia = null;
+      if (editFormData.mediaType !== 'none' && editCampaignMediaFile) {
+        uploadedMedia = await uploadCampaignMedia(editCampaignMediaFile);
+      } else if (editFormData.mediaType !== 'none' && !editFormData.mediaUrl) {
+        alert('Please upload a media file for this campaign.');
+        return;
+      }
+
       const payload = {
         name: editFormData.name,
         topic: editFormData.topic,
@@ -221,6 +373,13 @@ export default function Campaigns() {
         channels: editFormData.channels,
         messageTemplate: editFormData.messageTemplate,
         messageType: editFormData.messageType || 'TEXT',
+        mediaType: uploadedMedia?.mediaType || editFormData.mediaType || 'none',
+        mediaUrl: uploadedMedia?.mediaUrl || editFormData.mediaUrl || '',
+        mediaPreviewData: uploadedMedia?.mediaPreviewData || editFormData.mediaPreviewData || '',
+        mediaMimeType: uploadedMedia?.mediaMimeType || editFormData.mediaMimeType || '',
+        mediaFileName: uploadedMedia?.mediaFileName || editFormData.mediaFileName || '',
+        buttonLabel: editFormData.buttonLabel || '',
+        buttonUrl: editFormData.buttonUrl || '',
         targetAudience: {
           segments: editFormData.targetSegment === 'ALL' ? [] : [editFormData.targetSegment],
           languages: [],
@@ -236,6 +395,7 @@ export default function Campaigns() {
         severity: 'success'
       });
       setOpenDetailsDialog(false);
+      setEditCampaignMediaFile(null);
       fetchCampaigns();
     } catch (error) {
       console.error('Failed to update campaign:', error);
@@ -279,6 +439,54 @@ export default function Campaigns() {
     return date ? new Date(date).toLocaleDateString() : 'N/A';
   };
 
+  const renderCampaignMediaPreview = (mediaUrl, mediaType, mediaFileName) => {
+    if (!mediaUrl || mediaType === 'none') return null;
+
+    if (mediaType === 'image') {
+      return (
+        <Box
+          component="img"
+          src={mediaUrl}
+          alt={mediaFileName || 'Campaign media'}
+          sx={{ width: '100%', maxHeight: 260, objectFit: 'contain', borderRadius: 2, border: '1px solid #e2e8f0' }}
+        />
+      );
+    }
+
+    if (mediaType === 'video') {
+      return (
+        <Box
+          component="video"
+          src={mediaUrl}
+          controls
+          sx={{ width: '100%', maxHeight: 260, borderRadius: 2, border: '1px solid #e2e8f0' }}
+        />
+      );
+    }
+
+    if (mediaType === 'document') {
+      return (
+        <Box
+          component="iframe"
+          src={mediaUrl}
+          title={mediaFileName || 'Campaign document'}
+          sx={{ width: '100%', height: 320, border: '1px solid #e2e8f0', borderRadius: 2 }}
+        />
+      );
+    }
+
+    return null;
+  };
+
+  const loadFileAsDataUrl = (file, onLoad) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      onLoad(reader.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
   return (
     <Box sx={{ width: '100%', flexGrow: 1 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
@@ -293,7 +501,10 @@ export default function Campaigns() {
         <Button
           variant="contained"
           startIcon={<AddIcon />}
-          onClick={() => setOpenDialog(true)}
+          onClick={() => {
+            setCampaignMediaFile(null);
+            setOpenDialog(true);
+          }}
           disableElevation
         >
           New Campaign
@@ -373,10 +584,52 @@ export default function Campaigns() {
       </Grid>
 
       {/* Campaigns Table */}
-      <TableContainer component={Paper} elevation={0}>
+      <Paper elevation={0} sx={{ overflow: 'hidden' }}>
+        <Stack
+          direction={{ xs: 'column', md: 'row' }}
+          justifyContent="space-between"
+          alignItems={{ xs: 'flex-start', md: 'center' }}
+          spacing={2}
+          sx={{ px: 3, py: 2.5, borderBottom: '1px solid #e5e7eb' }}
+        >
+          <Box>
+            <Typography variant="subtitle1" fontWeight={700}>
+              Campaign List
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Select one campaign to send its message manually.
+            </Typography>
+          </Box>
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            {selectedManualCampaignId && (
+              <Chip
+                label={campaigns.find(item => item._id === selectedManualCampaignId)?.name || '1 selected'}
+                color="primary"
+                variant="outlined"
+              />
+            )}
+            <Button
+              variant="contained"
+              color="secondary"
+              startIcon={<SendIcon />}
+              disabled={!selectedManualCampaignId}
+              onClick={() => {
+                const campaign = campaigns.find(item => item._id === selectedManualCampaignId);
+                if (campaign) {
+                  openManualSendForCampaign(campaign);
+                }
+              }}
+              sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 2.5, px: 2.5 }}
+            >
+              Manual Send
+            </Button>
+          </Stack>
+        </Stack>
+      <TableContainer>
         <Table>
           <TableHead>
             <TableRow>
+              <TableCell padding="checkbox" sx={{ width: 72 }}>Select</TableCell>
               <TableCell>Campaign Name</TableCell>
               <TableCell>Type</TableCell>
               <TableCell>Status</TableCell>
@@ -392,13 +645,13 @@ export default function Campaigns() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={10}>
+                <TableCell colSpan={11}>
                   <LinearProgress />
                 </TableCell>
               </TableRow>
             ) : campaigns.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} align="center">
+                <TableCell colSpan={11} align="center">
                   <Typography variant="body2" color="text.secondary" py={4}>
                     No campaigns yet. Create your first campaign to get started.
                   </Typography>
@@ -406,9 +659,10 @@ export default function Campaigns() {
               </TableRow>
             ) : (
               campaigns.map((campaign) => (
-                <TableRow 
-                  key={campaign._id} 
+                <TableRow
+                  key={campaign._id}
                   hover
+                  selected={selectedManualCampaignId === campaign._id}
                   onClick={() => {
                     setSelectedCampaign(campaign);
                     setDetailsTab(0);
@@ -421,12 +675,43 @@ export default function Campaigns() {
                       targetSegment: campaign.targetAudience?.segments?.[0] || 'ALL',
                       messageTemplate: campaign.messageTemplate?._id || campaign.messageTemplate || '',
                       messageType: campaign.messageType || 'TEXT',
+                      mediaType: campaign.mediaType || 'none',
+                      mediaUrl: campaign.mediaUrl || '',
+                      mediaPreviewData: campaign.mediaPreviewData || '',
+                      mediaMimeType: campaign.mediaMimeType || '',
+                      mediaFileName: campaign.mediaFileName || '',
+                      buttonLabel: campaign.buttonLabel || '',
+                      buttonUrl: campaign.buttonUrl || '',
                       scheduledAt: campaign.scheduledAt ? new Date(campaign.scheduledAt).toISOString().slice(0, 16) : ''
                     });
+                    setEditCampaignMediaFile(null);
                     setOpenDetailsDialog(true);
                   }}
-                  sx={{ cursor: 'pointer' }}
+                  sx={{
+                    cursor: 'pointer',
+                    '&.Mui-selected': {
+                      backgroundColor: '#eef6ff'
+                    },
+                    '&.Mui-selected:hover': {
+                      backgroundColor: '#e3f0ff'
+                    }
+                  }}
                 >
+                  <TableCell
+                    padding="checkbox"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                    }}
+                  >
+                    <Radio
+                      checked={selectedManualCampaignId === campaign._id}
+                      onChange={(e) => {
+                        setSelectedManualCampaignId(e.target.checked ? campaign._id : '');
+                      }}
+                      value={campaign._id}
+                      color="primary"
+                    />
+                  </TableCell>
                   <TableCell>
                     <Typography variant="body2" fontWeight={600} color="primary.main">
                       {campaign.name}
@@ -492,7 +777,7 @@ export default function Campaigns() {
                         </Tooltip>
                       )}
                       <Tooltip title="View Details">
-                        <IconButton 
+                        <IconButton
                           size="small"
                           onClick={(e) => {
                             e.stopPropagation();
@@ -507,8 +792,16 @@ export default function Campaigns() {
                               targetSegment: campaign.targetAudience?.segments?.[0] || 'ALL',
                               messageTemplate: campaign.messageTemplate?._id || campaign.messageTemplate || '',
                               messageType: campaign.messageType || 'TEXT',
+                              mediaType: campaign.mediaType || 'none',
+                              mediaUrl: campaign.mediaUrl || '',
+                              mediaPreviewData: campaign.mediaPreviewData || '',
+                              mediaMimeType: campaign.mediaMimeType || '',
+                              mediaFileName: campaign.mediaFileName || '',
+                              buttonLabel: campaign.buttonLabel || '',
+                              buttonUrl: campaign.buttonUrl || '',
                               scheduledAt: campaign.scheduledAt ? new Date(campaign.scheduledAt).toISOString().slice(0, 16) : ''
                             });
+                            setEditCampaignMediaFile(null);
                             setOpenDetailsDialog(true);
                           }}
                         >
@@ -535,9 +828,10 @@ export default function Campaigns() {
           </TableBody>
         </Table>
       </TableContainer>
+      </Paper>
 
       {/* Create Campaign Dialog */}
-      <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="md" fullWidth>
+      <Dialog open={openDialog} onClose={() => { setCampaignMediaFile(null); setOpenDialog(false); }} maxWidth="lg" fullWidth>
         <DialogTitle sx={{ fontWeight: 600, fontSize: '1.25rem' }}>Create New Campaign</DialogTitle>
         <DialogContent>
           <Stack spacing={2} mt={1}>
@@ -629,7 +923,7 @@ export default function Campaigns() {
                 ))}
               </Select>
             </FormControl>
-            
+
             {formData.messageTemplate && (
               <TextField
                 label="Template Content Preview (Read Only)"
@@ -643,6 +937,86 @@ export default function Campaigns() {
                 variant="filled"
               />
             )}
+            <FormControl fullWidth>
+              <InputLabel>Media Type</InputLabel>
+              <Select
+                value={formData.mediaType}
+                label="Media Type"
+                onChange={(e) => {
+                  const nextType = e.target.value;
+                  setFormData({
+                    ...formData,
+                    mediaType: nextType,
+                    mediaUrl: nextType === 'none' ? '' : formData.mediaUrl,
+                    mediaPreviewData: nextType === 'none' ? '' : formData.mediaPreviewData,
+                    mediaMimeType: nextType === 'none' ? '' : formData.mediaMimeType,
+                    mediaFileName: nextType === 'none' ? '' : formData.mediaFileName
+                  });
+                  if (nextType === 'none') {
+                    setCampaignMediaFile(null);
+                  }
+                }}
+              >
+                <MenuItem value="none">No media</MenuItem>
+                <MenuItem value="image">Image</MenuItem>
+                <MenuItem value="video">Video</MenuItem>
+                <MenuItem value="document">PDF / Document</MenuItem>
+              </Select>
+            </FormControl>
+            {formData.mediaType !== 'none' && (
+              <Stack spacing={1}>
+                <Button
+                  component="label"
+                  variant="outlined"
+                  startIcon={<CloudUploadIcon />}
+                  sx={{ alignSelf: 'flex-start', textTransform: 'none', fontWeight: 600 }}
+                >
+                  {formData.mediaType === 'document' ? 'Upload PDF' : 'Upload File'}
+                  <input
+                    hidden
+                    type="file"
+                    accept={formData.mediaType === 'document' ? 'application/pdf' : formData.mediaType === 'video' ? 'video/*' : 'image/*'}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0] || null;
+                      setCampaignMediaFile(file);
+                      if (file) {
+                        loadFileAsDataUrl(file, (dataUrl) => {
+                          setFormData(prev => ({
+                            ...prev,
+                            mediaPreviewData: dataUrl
+                          }));
+                        });
+                        setFormData(prev => ({
+                          ...prev,
+                          mediaFileName: file.name,
+                          mediaMimeType: file.type
+                        }));
+                      }
+                    }}
+                  />
+                </Button>
+                <Typography variant="body2" color="text.secondary">
+                  {campaignMediaFile?.name || formData.mediaFileName || 'No file selected'}
+                </Typography>
+                {(formData.mediaPreviewData || formData.mediaUrl) && renderCampaignMediaPreview(formData.mediaPreviewData || formData.mediaUrl, formData.mediaType, formData.mediaFileName)}
+              </Stack>
+            )}
+            <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+              <TextField
+                label="Button Label (Optional)"
+                fullWidth
+                placeholder="Visit Website"
+                value={formData.buttonLabel}
+                onChange={(e) => setFormData({ ...formData, buttonLabel: e.target.value })}
+              />
+              <TextField
+                label="Button URL (Optional)"
+                fullWidth
+                placeholder="https://example.com"
+                value={formData.buttonUrl}
+                onChange={(e) => setFormData({ ...formData, buttonUrl: e.target.value })}
+              />
+            </Stack>
             <TextField
               label="Schedule (Optional)"
               type="datetime-local"
@@ -654,9 +1028,9 @@ export default function Campaigns() {
           </Stack>
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setOpenDialog(false)}>Cancel</Button>
-          <Button 
-            variant="contained" 
+          <Button onClick={() => { setCampaignMediaFile(null); setOpenDialog(false); }}>Cancel</Button>
+          <Button
+            variant="contained"
             disableElevation
             onClick={handleCreateCampaign}
             disabled={submitting}
@@ -667,14 +1041,14 @@ export default function Campaigns() {
       </Dialog>
 
       {/* Campaign Details Dialog */}
-      <Dialog 
-        open={openDetailsDialog} 
-        onClose={() => setOpenDetailsDialog(false)} 
-        maxWidth="sm" 
+      <Dialog
+        open={openDetailsDialog}
+        onClose={() => { setEditCampaignMediaFile(null); setOpenDetailsDialog(false); }}
+        maxWidth="lg"
         fullWidth
         PaperProps={{
-          sx: { 
-            borderRadius: 4, 
+          sx: {
+            borderRadius: 4,
             overflow: 'hidden',
             boxShadow: '0 8px 32px rgba(0,0,0,0.15)'
           }
@@ -700,8 +1074,8 @@ export default function Campaigns() {
                     </Typography>
                   )}
                 </Box>
-                <Chip 
-                  label={selectedCampaign.status} 
+                <Chip
+                  label={selectedCampaign.status}
                   size="small"
                   sx={{ fontWeight: 600, px: 1, bgcolor: '#ffffff', color: '#1565c0' }}
                 />
@@ -710,9 +1084,9 @@ export default function Campaigns() {
 
             {/* View & Edit Tabs */}
             <Box sx={{ borderBottom: 1, borderColor: 'divider', bgcolor: '#f8fafc' }}>
-              <Tabs 
-                value={detailsTab} 
-                onChange={(e, newValue) => setDetailsTab(newValue)} 
+              <Tabs
+                value={detailsTab}
+                onChange={(e, newValue) => setDetailsTab(newValue)}
                 variant="fullWidth"
               >
                 <Tab label="View Details" sx={{ textTransform: 'none', fontWeight: 600 }} />
@@ -778,7 +1152,7 @@ export default function Campaigns() {
                     <Typography variant="caption" sx={{ fontWeight: 700, color: '#5f6368', letterSpacing: '0.8px', display: 'block', mb: 1.5 }}>
                       DELIVERY PROGRESS
                     </Typography>
-                    
+
                     <Grid container spacing={2} sx={{ mb: 2 }}>
                       <Grid item xs={3}>
                         <Typography variant="h6" sx={{ fontWeight: 700, color: '#202124' }}>
@@ -817,8 +1191,8 @@ export default function Campaigns() {
                             {(((selectedCampaign.totalSent + selectedCampaign.totalFailed) / selectedCampaign.totalTargets) * 100).toFixed(0)}%
                           </Typography>
                         </Box>
-                        <LinearProgress 
-                          variant="determinate" 
+                        <LinearProgress
+                          variant="determinate"
                           value={Math.min(100, (((selectedCampaign.totalSent + selectedCampaign.totalFailed) / selectedCampaign.totalTargets) * 100))}
                           sx={{ height: 6, borderRadius: 3 }}
                         />
@@ -831,16 +1205,37 @@ export default function Campaigns() {
                     <Typography variant="caption" sx={{ fontWeight: 700, color: '#5f6368', letterSpacing: '0.8px', display: 'block', mb: 1 }}>
                       MESSAGE TEMPLATE CONTENT
                     </Typography>
-                    <Box sx={{ 
-                      p: 2, 
-                      bgcolor: '#f8fafc', 
-                      border: '1px solid #e2e8f0', 
-                      borderRadius: 2 
+                  <Box sx={{
+                      p: 2,
+                      bgcolor: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: 2
                     }}>
                       <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', color: '#1e293b' }}>
                         {selectedCampaign.messageTemplate?.content || 'No template content loaded'}
                       </Typography>
                     </Box>
+                    {(selectedCampaign.mediaUrl || selectedCampaign.buttonUrl) && (
+                      <Stack spacing={1} sx={{ mt: 1.5 }}>
+                        {selectedCampaign.mediaUrl && (
+                          <>
+                            <Typography variant="body2" color="text.secondary">
+                              Media: {selectedCampaign.mediaFileName || selectedCampaign.mediaType || 'file'}
+                            </Typography>
+                            {renderCampaignMediaPreview(
+                              selectedCampaign.mediaPreviewData || selectedCampaign.mediaUrl,
+                              selectedCampaign.mediaType,
+                              selectedCampaign.mediaFileName
+                            )}
+                          </>
+                        )}
+                        {selectedCampaign.buttonUrl && (
+                          <Typography variant="body2" color="text.secondary">
+                            Button: {(selectedCampaign.buttonLabel || 'Open Link')} - {selectedCampaign.buttonUrl}
+                          </Typography>
+                        )}
+                      </Stack>
+                    )}
                   </Box>
                 </Stack>
               </DialogContent>
@@ -945,11 +1340,11 @@ export default function Campaigns() {
                   </FormControl>
 
                   {editFormData.messageTemplate && (
-                    <Box sx={{ 
-                      p: 2, 
-                      bgcolor: '#f8fafc', 
-                      border: '1px solid #e2e8f0', 
-                      borderRadius: 2 
+                    <Box sx={{
+                      p: 2,
+                      bgcolor: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: 2
                     }}>
                       <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748b', display: 'block', mb: 1 }}>
                         TEMPLATE CONTENT PREVIEW:
@@ -959,6 +1354,94 @@ export default function Campaigns() {
                       </Typography>
                     </Box>
                   )}
+
+                  <FormControl fullWidth>
+                    <InputLabel>Media Type</InputLabel>
+                    <Select
+                      value={editFormData.mediaType}
+                      label="Media Type"
+                      onChange={(e) => {
+                        const nextType = e.target.value;
+                        setEditFormData({
+                          ...editFormData,
+                          mediaType: nextType,
+                          mediaUrl: nextType === 'none' ? '' : editFormData.mediaUrl,
+                          mediaPreviewData: nextType === 'none' ? '' : editFormData.mediaPreviewData,
+                          mediaMimeType: nextType === 'none' ? '' : editFormData.mediaMimeType,
+                          mediaFileName: nextType === 'none' ? '' : editFormData.mediaFileName
+                        });
+                        if (nextType === 'none') {
+                          setEditCampaignMediaFile(null);
+                        }
+                      }}
+                      disabled={selectedCampaign.status === 'RUNNING' || submitting}
+                      sx={{ borderRadius: 1.5 }}
+                    >
+                      <MenuItem value="none">No media</MenuItem>
+                      <MenuItem value="image">Image</MenuItem>
+                      <MenuItem value="video">Video</MenuItem>
+                      <MenuItem value="document">PDF / Document</MenuItem>
+                    </Select>
+                  </FormControl>
+
+                  {editFormData.mediaType !== 'none' && (
+                    <Stack spacing={1}>
+                      <Button
+                        component="label"
+                        variant="outlined"
+                        startIcon={<CloudUploadIcon />}
+                        disabled={selectedCampaign.status === 'RUNNING' || submitting}
+                        sx={{ alignSelf: 'flex-start', textTransform: 'none', fontWeight: 600 }}
+                      >
+                        {editFormData.mediaType === 'document' ? 'Upload PDF' : 'Upload File'}
+                        <input
+                          hidden
+                          type="file"
+                          accept={editFormData.mediaType === 'document' ? 'application/pdf' : editFormData.mediaType === 'video' ? 'video/*' : 'image/*'}
+                          onChange={(e) => {
+                            const file = e.target.files?.[0] || null;
+                            setEditCampaignMediaFile(file);
+                            if (file) {
+                              loadFileAsDataUrl(file, (dataUrl) => {
+                                setEditFormData(prev => ({
+                                  ...prev,
+                                  mediaPreviewData: dataUrl
+                                }));
+                              });
+                              setEditFormData(prev => ({
+                                ...prev,
+                                mediaFileName: file.name,
+                                mediaMimeType: file.type
+                              }));
+                            }
+                          }}
+                        />
+                      </Button>
+                      <Typography variant="body2" color="text.secondary">
+                        {editCampaignMediaFile?.name || editFormData.mediaFileName || 'No file selected'}
+                      </Typography>
+                      {(editFormData.mediaPreviewData || editFormData.mediaUrl) && renderCampaignMediaPreview(editFormData.mediaPreviewData || editFormData.mediaUrl, editFormData.mediaType, editFormData.mediaFileName)}
+                    </Stack>
+                  )}
+
+                  <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+                    <TextField
+                      label="Button Label (Optional)"
+                      fullWidth
+                      value={editFormData.buttonLabel}
+                      onChange={(e) => setEditFormData({ ...editFormData, buttonLabel: e.target.value })}
+                      disabled={selectedCampaign.status === 'RUNNING' || submitting}
+                      InputProps={{ sx: { borderRadius: 1.5 } }}
+                    />
+                    <TextField
+                      label="Button URL (Optional)"
+                      fullWidth
+                      value={editFormData.buttonUrl}
+                      onChange={(e) => setEditFormData({ ...editFormData, buttonUrl: e.target.value })}
+                      disabled={selectedCampaign.status === 'RUNNING' || submitting}
+                      InputProps={{ sx: { borderRadius: 1.5 } }}
+                    />
+                  </Stack>
 
                   <TextField
                     label="Schedule (Optional)"
@@ -975,10 +1458,10 @@ export default function Campaigns() {
             )}
 
             <DialogActions sx={{ px: 3, pb: 3, pt: 1, display: 'flex', gap: 2, justifyContent: 'space-between' }}>
-              <Button 
-                onClick={() => setOpenDetailsDialog(false)}
+              <Button
+                onClick={() => { setEditCampaignMediaFile(null); setOpenDetailsDialog(false); }}
                 variant="outlined"
-                sx={{ 
+                sx={{
                   borderColor: '#dadce0',
                   color: '#202124',
                   textTransform: 'none',
@@ -1028,6 +1511,7 @@ export default function Campaigns() {
                   )}
                 </Stack>
               ) : (
+
                 /* Edit mode action buttons */
                 <Button
                   variant="contained"
@@ -1051,6 +1535,174 @@ export default function Campaigns() {
         message={snackbar.message}
         severity={snackbar.severity}
       />
+      <Dialog open={openManualSendDialog} onClose={closeManualSendDialog} maxWidth="lg" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700 }}>Select Customers for Manual Send</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            {selectedCampaign?.messageTemplate?.content && (
+              <Alert severity="info">
+                Sending campaign message: {selectedCampaign.messageTemplate.content}
+              </Alert>
+            )}
+            <Stack direction="row" spacing={2}>
+              <TextField
+                label="Search Customer"
+                size="small"
+                fullWidth
+                value={manualSendSearch}
+                onChange={(e) => setManualSendSearch(e.target.value)}
+                sx={{ minWidth: 220 }}
+              />
+              <FormControl size="small" sx={{ minWidth: 180 }}>
+                <InputLabel>Customer Type</InputLabel>
+                <Select
+                  value={manualSendFilter}
+                  label="Customer Type"
+                  onChange={(e) => {
+                    const nextFilter = e.target.value;
+                    setManualSendFilter(nextFilter);
+                    setManualSendSelected([]);
+                    fetchManualSendCustomers({ filter: nextFilter });
+                  }}
+                >
+                  <MenuItem value="">All</MenuItem>
+                  <MenuItem value="VIP">VIP</MenuItem>
+                  <MenuItem value="LOYAL">Loyal</MenuItem>
+                  <MenuItem value="REGULAR">Regular</MenuItem>
+                  <MenuItem value="NEW">New</MenuItem>
+                  <MenuItem value="AT_RISK">At Risk</MenuItem>
+                  <MenuItem value="INACTIVE">Inactive</MenuItem>
+                  <MenuItem value="LOST">Lost</MenuItem>
+                </Select>
+              </FormControl>
+              <Button
+                variant="outlined"
+                onClick={() => {
+                  setManualSendSelected([]);
+                  fetchManualSendCustomers();
+                }}
+                sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 2, px: 3 }}
+              >
+                Search
+              </Button>
+            </Stack>
+
+            <Stack direction="row" alignItems="center" justifyContent="space-between">
+              <Typography variant="body2" color="text.secondary">
+                Select one customer, multiple customers, or all customers in the current filter.
+              </Typography>
+              <Stack direction="row" alignItems="center" spacing={1}>
+                <Checkbox
+                  checked={manualSendSelectAllFiltered}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setManualSendSelectAllFiltered(checked);
+                    if (checked) {
+                      setManualSendSelected([]);
+                    }
+                  }}
+                />
+                <Typography variant="body2">Send to all filtered</Typography>
+              </Stack>
+            </Stack>
+
+            {manualSendLoading ? (
+              <LinearProgress />
+            ) : (
+              <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 320 }}>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell padding="checkbox">
+                        <Checkbox
+                          disabled={manualSendSelectAllFiltered}
+                          indeterminate={manualSendSelected.length > 0 && manualSendSelected.length < manualSendCustomers.length}
+                          checked={manualSendCustomers.length > 0 && manualSendSelected.length === manualSendCustomers.length}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setManualSendSelected(manualSendCustomers.map(c => c._id));
+                            } else {
+                              setManualSendSelected([]);
+                            }
+                          }}
+                        />
+                      </TableCell>
+                      <TableCell>Name</TableCell>
+                      <TableCell>Phone</TableCell>
+                      <TableCell>Customer Type</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {manualSendCustomers.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={4} align="center">
+                          <Typography variant="body2" sx={{ py: 2, color: '#64748b' }}>
+                            No customers found
+                          </Typography>
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      manualSendCustomers.map((customer) => (
+                        <TableRow key={customer._id} hover selected={manualSendSelected.includes(customer._id)}>
+                          <TableCell padding="checkbox">
+                            <Checkbox
+                              disabled={manualSendSelectAllFiltered}
+                              checked={manualSendSelected.includes(customer._id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setManualSendSelected([...manualSendSelected, customer._id]);
+                                } else {
+                                  setManualSendSelected(manualSendSelected.filter(id => id !== customer._id));
+                                }
+                              }}
+                            />
+                          </TableCell>
+                          <TableCell>{customer.firstName} {customer.lastName || ''}</TableCell>
+                          <TableCell>{customer.whatsappNumber || customer.phone || '-'}</TableCell>
+                          <TableCell>{customer.rfmSegment || '-'}</TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 3, pt: 1, display: 'flex', gap: 2, justifyContent: 'space-between' }}>
+          <Button
+            onClick={closeManualSendDialog}
+            variant="outlined"
+            sx={{
+              borderColor: '#dadce0',
+              color: '#202124',
+              textTransform: 'none',
+              fontWeight: 600,
+              borderRadius: 2,
+              px: 3,
+              py: 0.8,
+              '&:hover': {
+                borderColor: '#dadce0',
+                backgroundColor: '#f8fafc'
+              }
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            color="primary"
+            disableElevation
+            onClick={handleManualSend}
+            disabled={manualSendSending || (!manualSendSelectAllFiltered && manualSendSelected.length === 0)}
+            sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 2, px: 3 }}
+          >
+            {manualSendSending ? 'Sending...' : 'Send Message'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
     </Box>
   );
 }
+

@@ -224,10 +224,17 @@ router.post('/whatsapp', async (req, res) => {
       }
     }
 
-    if (event === 'message.status') {
-      const { id, status } = data;
-      await WhatsAppService.updateMessageStatus(id, status);
-      console.log(`Message ${id} status updated to ${status}`);
+    if (event === 'message.status' || event === 'message.ack') {
+      const statusPayload = data || {};
+      const messageId = statusPayload.id;
+      const rawStatus = event === 'message.ack'
+        ? (statusPayload.ackName || statusPayload.ack)
+        : statusPayload.status;
+      await WhatsAppService.handleStatusUpdate({
+        event,
+        data: statusPayload
+      });
+      console.log(`Message ${messageId} status updated from ${event} to ${rawStatus}`);
     }
 
     res.status(200).send('OK');

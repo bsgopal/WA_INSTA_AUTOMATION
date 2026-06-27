@@ -63,6 +63,19 @@ const CampaignSchema = new mongoose.Schema({
     enum: ['en', 'hi', 'ta', 'te', 'mr', 'gu', 'kn', 'ml', 'pa'],
     default: 'en'
   },
+
+  // Rich content options
+  mediaUrl: String,
+  mediaPreviewData: String,
+  mediaType: {
+    type: String,
+    enum: ['none', 'image', 'video', 'document'],
+    default: 'none'
+  },
+  mediaMimeType: String,
+  mediaFileName: String,
+  buttonLabel: String,
+  buttonUrl: String,
   
   // Schedule
   scheduleType: {

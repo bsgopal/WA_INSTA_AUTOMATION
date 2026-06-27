@@ -17,6 +17,19 @@ async function executeCampaign(campaign, customers) {
 
     const batchSize = campaign.batchSize || 100;
     const throttleDelay = campaign.throttleDelay || 1000;
+    const mediaUrl = campaign.mediaUrl || campaign.messageTemplate?.mediaUrl || null;
+    const mediaPreviewData = campaign.mediaPreviewData || null;
+    const mediaType = campaign.mediaType && campaign.mediaType !== 'none'
+      ? campaign.mediaType
+      : (campaign.messageTemplate?.mediaType || null);
+    const mediaMimeType = campaign.mediaMimeType || null;
+    const mediaFileName = campaign.mediaFileName || 'campaign-media';
+    const buttons = campaign.buttonUrl ? [{
+      label: campaign.buttonLabel || 'Open Link',
+      value: campaign.buttonUrl,
+      type: 'URL',
+      actionType: 'URL'
+    }] : null;
 
     console.log(`[CampaignService] Starting execution of campaign ${campaign.name} (${campaign._id}) for ${customers.length} target customers.`);
 
@@ -42,7 +55,10 @@ async function executeCampaign(campaign, customers) {
             const result = await WhatsAppService.sendMessage(
               customer.whatsappNumber,
               personalizedContent,
-              {}
+              {
+                ...((mediaUrl || mediaPreviewData) ? { mediaUrl, mediaData: mediaPreviewData, mediaType, mediaMimeType, mediaFileName } : {}),
+                ...(buttons ? { buttons } : {})
+              }
             );
 
             // Create message record
@@ -55,7 +71,13 @@ async function executeCampaign(campaign, customers) {
               status: result.success ? 'SENT' : 'FAILED',
               sentAt: result.success ? new Date() : null,
               failureReason: result.error,
-              externalMessageId: result.externalMessageId
+              externalMessageId: result.externalMessageId,
+              mediaUrl,
+              mediaPreviewData,
+              mediaType,
+              mediaMimeType,
+              clickUrl: campaign.buttonUrl || null,
+              widgetData: buttons ? { buttons } : null
             });
 
             await message.save();

@@ -19,6 +19,18 @@ const extractStringId = (id) => {
   return String(id);
 };
 
+const extractMessageIdFromResponse = (responseData) => {
+  if (!responseData) return '';
+  return extractStringId(
+    responseData.id ||
+    responseData.messageId ||
+    responseData.message?.id ||
+    responseData.message?._serialized ||
+    responseData.data?.id ||
+    responseData.key?.id
+  );
+};
+
 const buildReadableListFallback = (message, listConfig = {}) => {
   const title = String(listConfig.title || 'Options').trim();
   const sections = Array.isArray(listConfig.sections) ? listConfig.sections : [];
@@ -302,8 +314,22 @@ const formatPhoneNumber = (phone) => {
  */
 const sendMessage = async (to, message, options = {}) => {
   try {
+    const sessionState = await getSessionStatus();
+    if (!sessionState.success || !sessionState.authenticated) {
+      return {
+        success: false,
+        error: 'WhatsApp session is not connected. Please reconnect in Settings.',
+        channel: 'whatsapp',
+        to,
+        failureReason: 'SESSION_NOT_CONNECTED'
+      };
+    }
+
     const formattedPhone = formatPhoneNumber(to);
     let response;
+    const mediaDataUrl =
+      (typeof options.mediaData === 'string' && options.mediaData.startsWith('data:') ? options.mediaData : null) ||
+      (typeof options.mediaUrl === 'string' && options.mediaUrl.startsWith('data:') ? options.mediaUrl : null);
 
     // 1. Handle interactive list messages
     if (options.list) {
@@ -341,10 +367,17 @@ const sendMessage = async (to, message, options = {}) => {
     // 1.5 Handle split sending for media card with buttons
     else if (options.mediaUrl && options.buttons && options.buttons.length > 0) {
       try {
+        const filePayload = mediaDataUrl
+          ? {
+              mimetype: options.mediaMimeType || mediaDataUrl.match(/^data:(.*?);base64,/)?.[1] || 'application/octet-stream',
+              filename: options.mediaFileName || 'campaign-media',
+              data: mediaDataUrl.split(',')[1]
+            }
+          : { url: options.mediaUrl };
         await wahaClient.post('/sendFile', {
           session: SESSION_NAME,
           chatId: formattedPhone,
-          file: { url: options.mediaUrl },
+          file: filePayload,
           caption: message
         });
       } catch (err) {
@@ -395,12 +428,19 @@ const sendMessage = async (to, message, options = {}) => {
     }
     // 3. Handle file media
     else if (options.mediaUrl) {
+      const filePayload = mediaDataUrl
+        ? {
+            mimetype: options.mediaMimeType || mediaDataUrl.match(/^data:(.*?);base64,/)?.[1] || 'application/octet-stream',
+            filename: options.mediaFileName || 'campaign-media',
+            data: mediaDataUrl.split(',')[1]
+          }
+        : {
+            url: options.mediaUrl
+          };
       const payload = {
         session: SESSION_NAME,
         chatId: formattedPhone,
-        file: {
-          url: options.mediaUrl
-        },
+        file: filePayload,
         caption: message
       };
       try {
@@ -430,10 +470,22 @@ const sendMessage = async (to, message, options = {}) => {
       response = await wahaClient.post('/sendText', payload);
     }
 
+    const externalMessageId = extractMessageIdFromResponse(response.data);
+    if (!externalMessageId) {
+      console.error('WAHA Send Warning: response missing message id', response.data);
+      return {
+        success: false,
+        error: 'WAHA did not return a message ID. Message may not have been sent.',
+        channel: 'whatsapp',
+        to: formattedPhone,
+        failureReason: 'MISSING_MESSAGE_ID'
+      };
+    }
+
     return {
       success: true,
-      externalMessageId: extractStringId(response.data.id),
-      status: 'SENT',
+      externalMessageId,
+      status: 'QUEUED',
       sentAt: new Date(),
       channel: 'whatsapp',
       to: formattedPhone
@@ -546,15 +598,22 @@ const handleIncomingMessage = async (data) => {
  */
 const handleStatusUpdate = async (data) => {
   try {
-    const { event, data: eventData } = data;
+    const { event, data: eventData, payload } = data;
+    const statusPayload = eventData || payload || {};
 
-    if (event === 'message.status') {
-      const { id, status } = eventData;
+    if (event === 'message.status' || event === 'message.ack') {
+      const { id, status, ack, ackName } = statusPayload;
+      const normalizedStatus = event === 'message.ack'
+        ? mapWAHAAckStatus(ackName || ack)
+        : mapWAHAStatus(status);
 
       const message = await Message.findOneAndUpdate(
         { externalMessageId: extractStringId(id) },
         {
-          status: mapWAHAStatus(status),
+          status: normalizedStatus,
+          failureReason: normalizedStatus === 'FAILED'
+            ? `WAHA ${event}: ${ackName || ack || status || 'unknown'}`
+            : undefined,
           updatedAt: new Date()
         },
         { new: true }
@@ -566,7 +625,7 @@ const handleStatusUpdate = async (data) => {
         await ConversationMessage.findOneAndUpdate(
           { platformMessageId: extractStringId(id) },
           {
-            status: mapWAHAStatus(status),
+            status: normalizedStatus,
             updatedAt: new Date()
           }
         );
@@ -577,7 +636,7 @@ const handleStatusUpdate = async (data) => {
       return {
         success: true,
         messageId: message?._id,
-        status: mapWAHAStatus(status)
+        status: normalizedStatus
       };
     }
 
@@ -602,6 +661,26 @@ const mapWAHAStatus = (wahaStatus) => {
   };
 
   return statusMap[wahaStatus] || 'PENDING';
+};
+
+const mapWAHAAckStatus = (ackValue) => {
+  const normalized = typeof ackValue === 'string' ? ackValue.toUpperCase() : ackValue;
+  const ackMap = {
+    [-1]: 'FAILED',
+    0: 'PENDING',
+    1: 'SENT',
+    2: 'DELIVERED',
+    3: 'READ',
+    4: 'READ',
+    ERROR: 'FAILED',
+    PENDING: 'PENDING',
+    SERVER: 'SENT',
+    DEVICE: 'DELIVERED',
+    READ: 'READ',
+    PLAYED: 'READ'
+  };
+
+  return ackMap[normalized] || 'PENDING';
 };
 
 /**
