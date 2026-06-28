@@ -14,7 +14,7 @@ const upload = multer({ dest: 'uploads/' });
 // ============ GET ALL CUSTOMERS ============
 router.get('/', [
   query('page').optional().isInt({ min: 1 }),
-  query('limit').optional().isInt({ min: 1, max: 100 }),
+  query('limit').optional().isInt({ min: 1, max: 1000 }),
   query('search').optional().isString(),
   query('segment').optional().isString(),
   query('language').optional().isString(),

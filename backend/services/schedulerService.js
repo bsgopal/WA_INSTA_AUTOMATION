@@ -43,14 +43,18 @@ class SchedulerService {
           // Get target customers
           const query = { userId: campaign.userId };
 
-          if (campaign.targetAudience?.segments?.length > 0) {
-            query.rfmSegment = { $in: campaign.targetAudience.segments };
-          }
-          if (campaign.targetAudience?.languages?.length > 0) {
-            query.language = { $in: campaign.targetAudience.languages };
-          }
-          if (campaign.targetAudience?.loyaltyTiers?.length > 0) {
-            query.loyaltyTier = { $in: campaign.targetAudience.loyaltyTiers };
+          if (campaign.targetAudience?.customFilter?.targetedCustomerIds?.length > 0) {
+            query._id = { $in: campaign.targetAudience.customFilter.targetedCustomerIds };
+          } else {
+            if (campaign.targetAudience?.segments?.length > 0) {
+              query.rfmSegment = { $in: campaign.targetAudience.segments };
+            }
+            if (campaign.targetAudience?.languages?.length > 0) {
+              query.language = { $in: campaign.targetAudience.languages };
+            }
+            if (campaign.targetAudience?.loyaltyTiers?.length > 0) {
+              query.loyaltyTier = { $in: campaign.targetAudience.loyaltyTiers };
+            }
           }
 
           // Only send to opted-in customers

@@ -1,6 +1,89 @@
-// renic-automation-backend/services/aiMessageAnalyzer.js
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const mongoose = require('mongoose');
+
+function getLevenshteinDistance(a, b) {
+  if (a.length === 0) return b.length;
+  if (b.length === 0) return a.length;
+  const matrix = [];
+  for (let i = 0; i <= b.length; i++) {
+    matrix[i] = [i];
+  }
+  for (let j = 0; j <= a.length; j++) {
+    matrix[0][j] = j;
+  }
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      if (b.charAt(i - 1) === a.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1,
+          matrix[i][j - 1] + 1,
+          matrix[i - 1][j] + 1
+        );
+      }
+    }
+  }
+  return matrix[b.length][a.length];
+}
+
+function fuzzyMatch(text, keyword, threshold = 0.8) {
+  const textLower = text.toLowerCase().trim();
+  const keywordLower = keyword.toLowerCase().trim();
+  if (textLower.includes(keywordLower)) return true;
+  
+  const dist = getLevenshteinDistance(textLower, keywordLower);
+  const maxLen = Math.max(textLower.length, keywordLower.length);
+  if (maxLen > 0) {
+    const similarity = 1 - (dist / maxLen);
+    if (similarity >= threshold) return true;
+  }
+  
+  const textWords = textLower.split(/\s+/).filter(w => w.length > 2);
+  const keywordWords = keywordLower.split(/\s+/).filter(w => w.length > 2);
+  
+  if (keywordWords.length > 0 && textWords.length > 0) {
+    const allWordsMatched = keywordWords.every(kw => {
+      return textWords.some(tw => {
+        if (tw.includes(kw) || kw.includes(tw)) return true;
+        const wDist = getLevenshteinDistance(tw, kw);
+        const wMaxLen = Math.max(tw.length, kw.length);
+        return (1 - (wDist / wMaxLen)) >= threshold;
+      });
+    });
+    if (allWordsMatched) return true;
+  }
+  return false;
+}
+
+function detectEmotionAndEnrichText(text) {
+  if (!text) return '';
+  const lower = text.toLowerCase();
+  let enriched = text;
+  
+  const mappings = [
+    { keywords: ['bridal', 'wedding', 'engagement', 'marriage', 'couple'], emojis: ' 💍❤️👰' },
+    { keywords: ['gold', 'rate', 'price', 'rates', 'certified'], emojis: ' 🟡✨' },
+    { keywords: ['diamond', 'luxury', 'premium', 'solitaire', 'gem'], emojis: ' 💎✨👑' },
+    { keywords: ['discount', 'offer', 'sale', 'save', 'percent', 'promo'], emojis: ' 🏷️🎁💥' },
+    { keywords: ['collection', 'gallery', 'showcase', 'catalog', 'design'], emojis: ' 🛍️✨' },
+    { keywords: ['love', 'gift', 'anniversary', 'special', 'heart'], emojis: ' ❤️💝' },
+    { keywords: ['new', 'arrival', 'launched', 'fresh', 'latest'], emojis: ' 🌟🆕' },
+    { keywords: ['apology', 'sorry', 'inconvenience', 'complaint'], emojis: ' 🙏' },
+    { keywords: ['support', 'help', 'contact', 'call', 'direct'], emojis: ' 📞💬' }
+  ];
+
+  for (const map of mappings) {
+    if (map.keywords.some(kw => lower.includes(kw))) {
+      const alreadyHas = map.emojis.trim().split('').some(emoji => text.includes(emoji));
+      if (!alreadyHas) {
+        enriched = enriched.trim() + map.emojis;
+      }
+      break;
+    }
+  }
+  return enriched;
+}
 
 const LOCALIZATIONS = {
   en: {
@@ -3959,9 +4042,8 @@ Please reply with the number (1-6) of your choice! / कृपया अपन�
           if (rule.triggerType === 'KEYWORD') {
             const keywords = rule.triggerValue.split(',').map(k => k.trim().toLowerCase());
             const matched = keywords.some(k => k && (
-              lowerMsg === k || 
-              lowerMsg.includes(k) || 
-              (lowerIncomingText && (lowerIncomingText === k || lowerIncomingText.includes(k)))
+              fuzzyMatch(lowerMsg, k) || 
+              (lowerIncomingText && fuzzyMatch(lowerIncomingText, k))
             ));
             if (matched) {
               matchedRule = rule;
@@ -4001,6 +4083,7 @@ Please reply with the number (1-6) of your choice! / कृपया अपन�
             const blockText = block.config?.text || '';
             let personalized = await aiSmartFeatures.personalizeMessage(blockText, customerProfile);
             personalized = await this.translateText(personalized, lang, aiConfig);
+            personalized = detectEmotionAndEnrichText(personalized);
             responseText += (responseText ? '\n\n' : '') + personalized;
           } else if (block.type === 'CARD') {
             const title = block.config?.title || '';
@@ -4012,6 +4095,10 @@ Please reply with the number (1-6) of your choice! / कृपया अपन�
 
             if (personalizedTitle) personalizedTitle = await this.translateText(personalizedTitle, lang, aiConfig);
             if (personalizedDesc) personalizedDesc = await this.translateText(personalizedDesc, lang, aiConfig);
+
+            // Enrich title & description with thematic emojis
+            if (personalizedTitle) personalizedTitle = detectEmotionAndEnrichText(personalizedTitle);
+            if (personalizedDesc) personalizedDesc = detectEmotionAndEnrichText(personalizedDesc);
 
             let cardText = '';
             if (personalizedTitle) cardText += `*${personalizedTitle}*\n`;

@@ -197,14 +197,18 @@ router.post('/', [
     if (req.body.targetAudience) {
       const query = { userId: req.user.id };
 
-      if (req.body.targetAudience.segments?.length > 0) {
-        query.rfmSegment = { $in: req.body.targetAudience.segments };
-      }
-      if (req.body.targetAudience.languages?.length > 0) {
-        query.language = { $in: req.body.targetAudience.languages };
-      }
-      if (req.body.targetAudience.loyaltyTiers?.length > 0) {
-        query.loyaltyTier = { $in: req.body.targetAudience.loyaltyTiers };
+      if (req.body.targetAudience.customFilter?.targetedCustomerIds?.length > 0) {
+        query._id = { $in: req.body.targetAudience.customFilter.targetedCustomerIds };
+      } else {
+        if (req.body.targetAudience.segments?.length > 0) {
+          query.rfmSegment = { $in: req.body.targetAudience.segments };
+        }
+        if (req.body.targetAudience.languages?.length > 0) {
+          query.language = { $in: req.body.targetAudience.languages };
+        }
+        if (req.body.targetAudience.loyaltyTiers?.length > 0) {
+          query.loyaltyTier = { $in: req.body.targetAudience.loyaltyTiers };
+        }
       }
 
       estimatedReach = await Customer.countDocuments(query);
@@ -281,6 +285,42 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
+// ============ SCHEDULE CAMPAIGN ============
+router.post('/:id/schedule', async (req, res) => {
+  try {
+    const { scheduledAt } = req.body;
+
+    if (!scheduledAt) {
+      return res.status(400).json({ error: 'scheduledAt date is required' });
+    }
+
+    const scheduledDate = new Date(scheduledAt);
+    if (scheduledDate < new Date()) {
+      return res.status(400).json({ error: 'Scheduled time must be in the future' });
+    }
+
+    const campaign = await Campaign.findOneAndUpdate(
+      { _id: req.params.id, userId: req.user.id, status: 'DRAFT' },
+      { 
+        status: 'SCHEDULED',
+        scheduledAt: scheduledDate,
+        scheduleType: 'SCHEDULED'
+      },
+      { new: true }
+    );
+
+    if (!campaign) {
+      return res.status(404).json({ error: 'Campaign not found or not in DRAFT status' });
+    }
+
+    console.log(`📅 Campaign scheduled: ${campaign.name} for ${scheduledDate}`);
+    res.json(campaign);
+  } catch (error) {
+    console.error('Schedule Campaign Error:', error);
+    res.status(500).json({ error: 'Failed to schedule campaign' });
+  }
+});
+
 // ============ LAUNCH CAMPAIGN ============
 router.post('/:id/launch', async (req, res) => {
   try {
@@ -300,14 +340,18 @@ router.post('/:id/launch', async (req, res) => {
     // Get target customers
     const query = { userId: req.user.id };
 
-    if (campaign.targetAudience?.segments?.length > 0) {
-      query.rfmSegment = { $in: campaign.targetAudience.segments };
-    }
-    if (campaign.targetAudience?.languages?.length > 0) {
-      query.language = { $in: campaign.targetAudience.languages };
-    }
-    if (campaign.targetAudience?.loyaltyTiers?.length > 0) {
-      query.loyaltyTier = { $in: campaign.targetAudience.loyaltyTiers };
+    if (campaign.targetAudience?.customFilter?.targetedCustomerIds?.length > 0) {
+      query._id = { $in: campaign.targetAudience.customFilter.targetedCustomerIds };
+    } else {
+      if (campaign.targetAudience?.segments?.length > 0) {
+        query.rfmSegment = { $in: campaign.targetAudience.segments };
+      }
+      if (campaign.targetAudience?.languages?.length > 0) {
+        query.language = { $in: campaign.targetAudience.languages };
+      }
+      if (campaign.targetAudience?.loyaltyTiers?.length > 0) {
+        query.loyaltyTier = { $in: campaign.targetAudience.loyaltyTiers };
+      }
     }
 
     // Only send to opted-in customers
@@ -341,12 +385,28 @@ router.post('/:id/manual-send', async (req, res) => {
   try {
     const { customerIds, sendToAll = false, segmentFilter = null, searchTerm = null } = req.body;
 
+    console.log(`📨 Manual Send Request:`, {
+      campaignId: req.params.id,
+      userId: req.user?.id,
+      hasUser: !!req.user,
+      customerIds,
+      sendToAll,
+      segmentFilter,
+      searchTerm
+    });
+
+    if (!req.user || !req.user.id) {
+      console.error('❌ Manual Send: No authenticated user');
+      return res.status(401).json({ error: 'Unauthorized - no user session' });
+    }
+
     const campaign = await Campaign.findOne({
       _id: req.params.id,
       userId: req.user.id
     }).populate('messageTemplate');
 
     if (!campaign) {
+      console.error(`❌ Campaign not found: ${req.params.id}`);
       return res.status(404).json({ error: 'Campaign not found' });
     }
 
@@ -374,13 +434,30 @@ router.post('/:id/manual-send', async (req, res) => {
 
     const customers = await Customer.find(query);
 
+    console.log(`📋 Found customers:`, {
+      queryUsed: JSON.stringify(query),
+      customersFound: customers.length,
+      customerIds: customers.map(c => c._id)
+    });
+
     if (customers.length === 0) {
-      return res.status(400).json({ error: 'No customers found matching the selected criteria' });
+      console.error('❌ No customers found matching criteria:', query);
+      return res.status(400).json({ 
+        error: 'No customers found matching the selected criteria',
+        queryUsed: query,
+        sentToAll: sendToAll,
+        customerIdsRequested: customerIds?.length || 0
+      });
     }
 
     const content = campaign.messageTemplate?.content || '';
     if (!content) {
-      return res.status(400).json({ error: 'Campaign message template is empty' });
+      console.error('❌ Campaign message template is empty');
+      return res.status(400).json({ 
+        error: 'Campaign message template is empty',
+        hasMessageTemplate: !!campaign.messageTemplate,
+        templateContent: content
+      });
     }
 
     const mediaUrl = campaign.mediaUrl || campaign.messageTemplate?.mediaUrl || null;
@@ -400,6 +477,25 @@ router.post('/:id/manual-send', async (req, res) => {
     let successCount = 0;
     let failCount = 0;
 
+    console.log(`📨 Campaign Manual Send Started for ${customers.length} customers`, {
+      campaignId: campaign._id,
+      campaignName: campaign.name,
+      hasMediaUrl: !!mediaUrl,
+      hasMediaPreviewData: !!mediaPreviewData,
+      mediaType,
+      mediaFileName,
+      mediaUrl: mediaUrl ? mediaUrl.substring(0, 100) : 'none',
+      mediaPreviewDataLength: mediaPreviewData ? mediaPreviewData.length : 0,
+      mediaPreviewDataStart: mediaPreviewData ? mediaPreviewData.substring(0, 50) : 'none',
+      campaignFields: {
+        'campaign.mediaUrl': campaign.mediaUrl ? campaign.mediaUrl.substring(0, 100) : 'undefined',
+        'campaign.mediaPreviewData': campaign.mediaPreviewData ? 'present' : 'undefined',
+        'campaign.mediaType': campaign.mediaType,
+        'campaign.mediaMimeType': campaign.mediaMimeType,
+        'campaign.mediaFileName': campaign.mediaFileName
+      }
+    });
+
     for (const customer of customers) {
       try {
         const destinationNumber = customer.whatsappNumber || customer.phone;
@@ -415,10 +511,43 @@ router.post('/:id/manual-send', async (req, res) => {
         );
 
         const channel = 'whatsapp';
+        
+        // Prepare media payload - prefer HTTP URL over base64 for reliability
+        const mediaPayload = {};
+        if (mediaUrl) {
+          // Use HTTP URL - most reliable for WAHA
+          mediaPayload.mediaUrl = mediaUrl;
+          mediaPayload.mediaType = mediaType;
+          mediaPayload.mediaMimeType = mediaMimeType;
+          mediaPayload.mediaFileName = mediaFileName;
+          console.log(`📨 Campaign Manual Send: Using HTTP URL media for customer ${customer._id}`, {
+            mediaUrl,
+            mediaType,
+            mediaMimeType,
+            mediaFileName
+          });
+        } else if (mediaPreviewData) {
+          // Fall back to base64 if URL not available
+          mediaPayload.mediaData = mediaPreviewData;
+          mediaPayload.mediaType = mediaType;
+          mediaPayload.mediaMimeType = mediaMimeType;
+          mediaPayload.mediaFileName = mediaFileName;
+          console.log(`📨 Campaign Manual Send: Using base64 media for customer ${customer._id}`, {
+            mediaType,
+            mediaMimeType,
+            mediaFileName,
+            base64Length: mediaPreviewData.length
+          });
+        } else {
+          console.log(`📨 Campaign Manual Send: Sending text only for customer ${customer._id}`);
+        }
+        
         const result = await WhatsAppService.sendMessage(destinationNumber, finalContent, {
-          ...((mediaUrl || mediaPreviewData) ? { mediaUrl, mediaData: mediaPreviewData, mediaType, mediaMimeType, mediaFileName } : {}),
+          ...mediaPayload,
           ...(buttons ? { buttons } : {})
         });
+
+        console.log(`📬 Campaign Manual Send Result for ${destinationNumber}:`, result);
 
         if (result && result.success) {
           successCount++;
@@ -427,6 +556,7 @@ router.post('/:id/manual-send', async (req, res) => {
           await customer.save();
         } else {
           failCount++;
+          console.warn(`Campaign manual send failed for customer ${customer._id}:`, result?.error || result?.failureReason);
         }
 
         const message = new Message({
@@ -442,11 +572,11 @@ router.post('/:id/manual-send', async (req, res) => {
           externalMessageId: result?.externalMessageId,
           messageType: 'MANUAL',
           mediaUrl,
-          mediaPreviewData,
           mediaType,
           mediaMimeType,
           clickUrl: campaign.buttonUrl || null,
           widgetData: buttons ? { buttons } : null
+          // NOTE: NOT storing mediaPreviewData to avoid large document sizes
         });
 
         await message.save();
@@ -457,10 +587,13 @@ router.post('/:id/manual-send', async (req, res) => {
     }
 
     if (successCount === 0) {
-      return res.status(400).json({
-        error: `Manual send failed for all selected customers. Failed: ${failCount}`,
+      console.warn(`⚠️  Manual send had no successes. FailCount: ${failCount}`);
+      return res.status(200).json({
+        success: false,
+        message: `Manual send failed for all selected customers. Failed: ${failCount}`,
         successCount,
-        failCount
+        failCount,
+        partialSuccess: false
       });
     }
 
@@ -468,11 +601,22 @@ router.post('/:id/manual-send', async (req, res) => {
       success: true,
       message: `Manual send completed. Sent: ${successCount}, Failed: ${failCount}`,
       successCount,
-      failCount
+      failCount,
+      partialSuccess: failCount > 0
     });
   } catch (error) {
-    console.error('Manual Send Error:', error);
-    res.status(500).json({ error: 'Failed to execute manual send' });
+    console.error('❌ Manual Send Error:', error);
+    console.error('📋 Error Stack:', error.stack);
+    console.error('📋 Error Details:', {
+      message: error.message,
+      code: error.code,
+      statusCode: error.statusCode
+    });
+    res.status(500).json({ 
+      error: 'Failed to execute manual send',
+      details: error.message,
+      errorCode: error.code
+    });
   }
 });
 
@@ -513,6 +657,30 @@ router.post('/:id/resume', async (req, res) => {
   } catch (error) {
     console.error('Resume Campaign Error:', error);
     res.status(500).json({ error: 'Failed to resume campaign' });
+  }
+});
+
+// ============ COMPLETE CAMPAIGN ============
+router.post('/:id/complete', async (req, res) => {
+  try {
+    const campaign = await Campaign.findOneAndUpdate(
+      { _id: req.params.id, userId: req.user.id, status: { $in: ['RUNNING', 'PAUSED', 'SCHEDULED'] } },
+      { 
+        status: 'COMPLETED',
+        completedAt: new Date()
+      },
+      { new: true }
+    );
+
+    if (!campaign) {
+      return res.status(404).json({ error: 'Campaign not found or already completed' });
+    }
+
+    console.log(`✅ Campaign marked as complete: ${campaign.name} (${campaign._id})`);
+    res.json(campaign);
+  } catch (error) {
+    console.error('Complete Campaign Error:', error);
+    res.status(500).json({ error: 'Failed to complete campaign' });
   }
 });
 

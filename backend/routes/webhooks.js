@@ -230,11 +230,13 @@ router.post('/whatsapp', async (req, res) => {
       const rawStatus = event === 'message.ack'
         ? (statusPayload.ackName || statusPayload.ack)
         : statusPayload.status;
-      await WhatsAppService.handleStatusUpdate({
-        event,
-        data: statusPayload
-      });
-      console.log(`Message ${messageId} status updated from ${event} to ${rawStatus}`);
+      
+      try {
+        await WhatsAppService.updateMessageStatus(messageId, rawStatus);
+        console.log(`Message ${messageId} status updated from ${event} to ${rawStatus}`);
+      } catch (err) {
+        console.error(`Failed to update message status for ${messageId}:`, err.message);
+      }
     }
 
     res.status(200).send('OK');

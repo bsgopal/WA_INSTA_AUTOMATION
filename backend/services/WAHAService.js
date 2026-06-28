@@ -365,7 +365,7 @@ const sendMessage = async (to, message, options = {}) => {
       }
     }
     // 1.5 Handle split sending for media card with buttons
-    else if (options.mediaUrl && options.buttons && options.buttons.length > 0) {
+    else if ((mediaDataUrl || options.mediaUrl) && options.buttons && options.buttons.length > 0) {
       try {
         const filePayload = mediaDataUrl
           ? {
@@ -427,36 +427,117 @@ const sendMessage = async (to, message, options = {}) => {
       }
     }
     // 3. Handle file media
-    else if (options.mediaUrl) {
-      const filePayload = mediaDataUrl
-        ? {
-            mimetype: options.mediaMimeType || mediaDataUrl.match(/^data:(.*?);base64,/)?.[1] || 'application/octet-stream',
-            filename: options.mediaFileName || 'campaign-media',
-            data: mediaDataUrl.split(',')[1]
+    else if (mediaDataUrl || options.mediaUrl) {
+      // WAHA has specific endpoints for different media types
+      // Try type-specific endpoint first, then fallback to /sendFile
+      
+      if (!options.mediaUrl) {
+        console.warn(`⚠️  WAHAService: No HTTP URL available, skipping file send and sending text-only message`);
+        const fallbackText = message + `\n\n📎 [${options.mediaFileName || 'File'} attached but could not be sent]`;
+        response = await wahaClient.post('/sendText', {
+          session: SESSION_NAME,
+          chatId: formattedPhone,
+          text: fallbackText
+        });
+      } else {
+        const mediaType = options.mediaType || 'image';
+        console.log(`📤 WAHAService: Attempting to send ${mediaType} media via HTTP URL to ${formattedPhone}`, {
+          mediaType,
+          mediaFileName: options.mediaFileName,
+          url: options.mediaUrl.substring(0, 100)
+        });
+
+        // Determine endpoint based on media type
+        let endpoint = '/sendFile'; // Default fallback
+        if (mediaType === 'image') {
+          endpoint = '/sendImage';
+        } else if (mediaType === 'video') {
+          endpoint = '/sendVideo';
+        } else if (mediaType === 'document' || mediaType === 'pdf') {
+          endpoint = '/sendDocument';
+        } else if (mediaType === 'audio') {
+          endpoint = '/sendAudio';
+        }
+
+        const payload = {
+          session: SESSION_NAME,
+          chatId: formattedPhone,
+          url: options.mediaUrl,
+          caption: message
+        };
+
+        let mediaAttemptFailed = false;
+        let lastError = null;
+
+        // Try type-specific endpoint
+        try {
+          console.log(`🔄 WAHAService: Trying endpoint ${endpoint}...`);
+          response = await wahaClient.post(endpoint, payload);
+          console.log(`✅ WAHAService: ${endpoint} success response:`, response.data);
+        } catch (typeSpecificErr) {
+          mediaAttemptFailed = true;
+          lastError = typeSpecificErr;
+          const errStatus = typeSpecificErr.response?.status;
+          const errMsg = typeSpecificErr.response?.data?.description || typeSpecificErr.message;
+          
+          console.warn(`⚠️  WAHAService: ${endpoint} failed (${errStatus}): ${errMsg}`);
+
+          // If type-specific endpoint failed, try generic /sendFile
+          if (endpoint !== '/sendFile') {
+            try {
+              console.log(`🔄 WAHAService: Falling back to /sendFile endpoint...`);
+              response = await wahaClient.post('/sendFile', payload);
+              console.log(`✅ WAHAService: /sendFile fallback success:`, response.data);
+              mediaAttemptFailed = false; // Reset since fallback succeeded
+            } catch (fileSendErr) {
+              lastError = fileSendErr;
+              const fileErrStatus = fileSendErr.response?.status;
+              const fileErrMsg = fileSendErr.response?.data?.description || fileSendErr.message;
+              console.error(`❌ WAHAService: /sendFile also failed (${fileErrStatus}):`, fileErrMsg);
+            }
           }
-        : {
-            url: options.mediaUrl
-          };
-      const payload = {
-        session: SESSION_NAME,
-        chatId: formattedPhone,
-        file: filePayload,
-        caption: message
-      };
-      try {
-        response = await wahaClient.post('/sendFile', payload);
-      } catch (err) {
-        const errorMsg = err.response?.data?.message || '';
-        if (err.response?.status === 422 && (errorMsg.includes('Plus version') || errorMsg.includes('engine') || errorMsg.includes('available only'))) {
-          console.warn(`⚠️  WAHAService: /sendFile requires Plus version. Falling back to plain text sendText.`);
-          const fallbackPayload = {
-            session: SESSION_NAME,
-            chatId: formattedPhone,
-            text: `${message}\n\n🖼️  Catalog Banner: ${options.mediaUrl}`
-          };
-          response = await wahaClient.post('/sendText', fallbackPayload);
-        } else {
-          throw err;
+        }
+
+        // If media send completely failed, check if it's a Plus version issue
+        if (mediaAttemptFailed && lastError) {
+          const errStatus = lastError.response?.status;
+          const errData = lastError.response?.data || {};
+          const errMsg = errData.description || errData.message || lastError.message || '';
+          
+          console.log(`🔍 WAHAService: Error details:`, {
+            status: errStatus,
+            description: errData.description,
+            message: errData.message,
+            fullMsg: errMsg,
+            isPlusRequired: errMsg.includes('Plus version') || errMsg.includes('NOWEB')
+          });
+          
+          if (errStatus === 422 && (errMsg.includes('Plus version') || errMsg.includes('NOWEB') || errMsg.includes('available only'))) {
+            console.warn(`⚠️  WAHAService: WAHA Plus version required for media. Falling back to link-in-text method.`);
+            
+            // Send message with media link as text instead
+            const mediaEmoji = mediaType === 'image' ? '🖼️' 
+                             : mediaType === 'video' ? '🎥'
+                             : mediaType === 'audio' ? '🎵'
+                             : '📎';
+            
+            const linkText = `${message}\n\n${mediaEmoji} ${options.mediaFileName || 'Media'}: ${options.mediaUrl}`;
+            
+            try {
+              response = await wahaClient.post('/sendText', {
+                session: SESSION_NAME,
+                chatId: formattedPhone,
+                text: linkText
+              });
+              console.log(`✅ WAHAService: Sent message with media link as fallback`);
+            } catch (linkErr) {
+              console.error(`❌ WAHAService: Even text fallback failed:`, linkErr.message);
+              throw linkErr;
+            }
+          } else {
+            // Some other error, re-throw it
+            throw lastError;
+          }
         }
       }
     } 

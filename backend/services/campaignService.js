@@ -52,11 +52,30 @@ async function executeCampaign(campaign, customers) {
               campaign.userId,
               { customer }
             );
+            
+            // Prepare media payload - always use base64 when available
+            const mediaPayload = {};
+            if (mediaPreviewData) {
+              // Use base64 data URL from database - most reliable
+              mediaPayload.mediaData = mediaPreviewData;
+              mediaPayload.mediaType = mediaType;
+              mediaPayload.mediaMimeType = mediaMimeType;
+              mediaPayload.mediaFileName = mediaFileName;
+              console.log(`[CampaignService] Using base64 media for customer ${customer._id}`);
+            } else if (mediaUrl) {
+              // Fall back to HTTP URL if base64 not available
+              mediaPayload.mediaUrl = mediaUrl;
+              mediaPayload.mediaType = mediaType;
+              mediaPayload.mediaMimeType = mediaMimeType;
+              mediaPayload.mediaFileName = mediaFileName;
+              console.log(`[CampaignService] Using HTTP URL media for customer ${customer._id}`);
+            }
+            
             const result = await WhatsAppService.sendMessage(
               customer.whatsappNumber,
               personalizedContent,
               {
-                ...((mediaUrl || mediaPreviewData) ? { mediaUrl, mediaData: mediaPreviewData, mediaType, mediaMimeType, mediaFileName } : {}),
+                ...mediaPayload,
                 ...(buttons ? { buttons } : {})
               }
             );
@@ -73,11 +92,11 @@ async function executeCampaign(campaign, customers) {
               failureReason: result.error,
               externalMessageId: result.externalMessageId,
               mediaUrl,
-              mediaPreviewData,
               mediaType,
               mediaMimeType,
               clickUrl: campaign.buttonUrl || null,
               widgetData: buttons ? { buttons } : null
+              // NOTE: NOT storing mediaPreviewData to avoid large document sizes
             });
 
             await message.save();
@@ -108,7 +127,7 @@ async function executeCampaign(campaign, customers) {
       finalCampaign.completedAt = new Date();
       finalCampaign.deliveryRate = finalCampaign.totalSent > 0 ? (finalCampaign.totalDelivered / finalCampaign.totalSent * 100) : 0;
       await finalCampaign.save();
-      console.log(`[CampaignService] Campaign ${finalCampaign.name} execution completed.`);
+      console.log(`✅ [CampaignService] Campaign ${finalCampaign.name} execution completed. Sent: ${finalCampaign.totalSent}, Failed: ${finalCampaign.totalFailed}`);
     }
   } catch (error) {
     console.error('[CampaignService] Execute Campaign Error:', error);

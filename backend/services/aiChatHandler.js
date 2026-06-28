@@ -9,6 +9,90 @@ const ownerNotificationService = require('./ownerNotificationService');
 const WhatsAppService = require('./WhatsAppService');
 const VariableInterpolationService = require('./VariableInterpolationService');
 
+function getLevenshteinDistance(a, b) {
+  if (a.length === 0) return b.length;
+  if (b.length === 0) return a.length;
+  const matrix = [];
+  for (let i = 0; i <= b.length; i++) {
+    matrix[i] = [i];
+  }
+  for (let j = 0; j <= a.length; j++) {
+    matrix[0][j] = j;
+  }
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      if (b.charAt(i - 1) === a.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1,
+          matrix[i][j - 1] + 1,
+          matrix[i - 1][j] + 1
+        );
+      }
+    }
+  }
+  return matrix[b.length][a.length];
+}
+
+function fuzzyMatch(text, keyword, threshold = 0.8) {
+  const textLower = text.toLowerCase().trim();
+  const keywordLower = keyword.toLowerCase().trim();
+  if (textLower.includes(keywordLower)) return true;
+  
+  const dist = getLevenshteinDistance(textLower, keywordLower);
+  const maxLen = Math.max(textLower.length, keywordLower.length);
+  if (maxLen > 0) {
+    const similarity = 1 - (dist / maxLen);
+    if (similarity >= threshold) return true;
+  }
+  
+  const textWords = textLower.split(/\s+/).filter(w => w.length > 2);
+  const keywordWords = keywordLower.split(/\s+/).filter(w => w.length > 2);
+  
+  if (keywordWords.length > 0 && textWords.length > 0) {
+    const allWordsMatched = keywordWords.every(kw => {
+      return textWords.some(tw => {
+        if (tw.includes(kw) || kw.includes(tw)) return true;
+        const wDist = getLevenshteinDistance(tw, kw);
+        const wMaxLen = Math.max(tw.length, kw.length);
+        return (1 - (wDist / wMaxLen)) >= threshold;
+      });
+    });
+    if (allWordsMatched) return true;
+  }
+  return false;
+}
+
+function detectEmotionAndEnrichText(text) {
+  if (!text) return '';
+  const lower = text.toLowerCase();
+  let enriched = text;
+  
+  const mappings = [
+    { keywords: ['bridal', 'wedding', 'engagement', 'marriage', 'couple'], emojis: ' 💍❤️👰' },
+    { keywords: ['gold', 'rate', 'price', 'rates', 'certified'], emojis: ' 🟡✨' },
+    { keywords: ['diamond', 'luxury', 'premium', 'solitaire', 'gem'], emojis: ' 💎✨👑' },
+    { keywords: ['discount', 'offer', 'sale', 'save', 'percent', 'promo'], emojis: ' 🏷️🎁💥' },
+    { keywords: ['collection', 'gallery', 'showcase', 'catalog', 'design'], emojis: ' 🛍️✨' },
+    { keywords: ['love', 'gift', 'anniversary', 'special', 'heart'], emojis: ' ❤️💝' },
+    { keywords: ['new', 'arrival', 'launched', 'fresh', 'latest'], emojis: ' 🌟🆕' },
+    { keywords: ['apology', 'sorry', 'inconvenience', 'complaint'], emojis: ' 🙏' },
+    { keywords: ['support', 'help', 'contact', 'call', 'direct'], emojis: ' 📞💬' }
+  ];
+
+  for (const map of mappings) {
+    if (map.keywords.some(kw => lower.includes(kw))) {
+      const alreadyHas = map.emojis.trim().split('').some(emoji => text.includes(emoji));
+      if (!alreadyHas) {
+        enriched = enriched.trim() + map.emojis;
+      }
+      break;
+    }
+  }
+  return enriched;
+}
+
 class AIChatHandler {
   isPlaceholderName(name, phoneNumber) {
     const normalizedName = String(name || '').trim().toLowerCase();
@@ -36,7 +120,7 @@ class AIChatHandler {
     const addTextPart = value => {
       const cleanValue = this.cleanReplyValue(value);
       if (cleanValue) {
-        textParts.push(cleanValue);
+        textParts.push(detectEmotionAndEnrichText(cleanValue));
       }
     };
 
@@ -438,20 +522,16 @@ class AIChatHandler {
       if (!matchedRule) {
         for (const rule of activeRules.filter(r => r.triggerType === 'KEYWORD')) {
           const keywords = rule.triggerValue.split(',').map(kw => kw.toLowerCase().trim());
-          const messageWords = messageTextLower.split(/\s+/);
           
-          // Check if any keyword is in the message
+          // Check if any keyword matches fuzzily in the message
           const hasKeyword = keywords.some(keyword => {
-            // Match whole words or partial keywords
-            return messageWords.some(word => 
-              word.includes(keyword) || keyword.includes(word)
-            ) || messageTextLower.includes(keyword);
+            return fuzzyMatch(messageTextLower, keyword);
           });
           
           if (hasKeyword) {
             matchedRule = rule;
             matchType = 'KEYWORD';
-            console.log(`  ✅ KEYWORD rule found: "${rule.name}" (keyword match)`);
+            console.log(`  ✅ KEYWORD rule found: "${rule.name}" (fuzzy match)`);
             break;
           }
         }
