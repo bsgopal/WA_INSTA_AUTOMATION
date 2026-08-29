@@ -50,13 +50,32 @@ export default function AIProviderStatus({ compact = false, sx = {} }) {
     ? (state.settings?.anthropicModel || 'claude-3-haiku-20240307')
     : (state.settings?.geminiModel || 'gemini-1.5-flash');
 
+  if (compact) {
+    return (
+      <Stack direction="row" spacing={0.75} alignItems="center" sx={{ ...sx, py: 0.25, px: 1 }}>
+        <Box 
+          sx={{ 
+            width: 6, 
+            height: 6, 
+            borderRadius: '50%', 
+            bgcolor: '#10b981',
+            boxShadow: '0 0 0 2px rgba(16, 185, 129, 0.2)'
+          }} 
+        />
+        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, fontSize: '0.72rem' }}>
+          AI Copilot: {activeProvider} ({activeModel})
+        </Typography>
+      </Stack>
+    );
+  }
+
   return (
     <Box sx={sx}>
       <Stack
-        direction={compact ? 'column' : 'row'}
-        spacing={compact ? 0.5 : 1.5}
-        alignItems={compact ? 'flex-start' : 'center'}
-        sx={{ p: compact ? 0 : 1.5, borderRadius: 2, bgcolor: compact ? 'transparent' : '#f8fafc', border: compact ? 'none' : '1px solid #e2e8f0' }}
+        direction="row"
+        spacing={1.5}
+        alignItems="center"
+        sx={{ p: 1.5, borderRadius: 2, bgcolor: '#f8fafc', border: '1px solid #e2e8f0' }}
       >
         <Chip
           label={`${activeProvider} active`}

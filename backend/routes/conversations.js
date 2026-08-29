@@ -17,11 +17,56 @@ router.get('/', async (req, res) => {
     if (status) query.status = status;
     if (assignedTo) query.assignedTo = assignedTo;
     if (platform) query.primaryPlatform = platform;
+
+    // Filter out empty conversations (empty shells)
+    query.lastMessage = { $ne: null };
+
+    // Set up conditions using $and to avoid overriding fields like $or
+    const conditions = [];
+
     if (search) {
-      query.$or = [
-        { title: { $regex: search, $options: 'i' } },
-        { 'lastMessage.content': { $regex: search, $options: 'i' } }
-      ];
+      const matchingCustomers = await Customer.find({
+        userId,
+        $or: [
+          { firstName: { $regex: search, $options: 'i' } },
+          { lastName: { $regex: search, $options: 'i' } },
+          { phone: { $regex: search, $options: 'i' } },
+          { whatsappNumber: { $regex: search, $options: 'i' } }
+        ]
+      }).select('_id');
+      const matchingCustomerIds = matchingCustomers.map(c => c._id);
+
+      conditions.push({
+        $or: [
+          { title: { $regex: search, $options: 'i' } },
+          { 'lastMessage.content': { $regex: search, $options: 'i' } },
+          { customerId: { $in: matchingCustomerIds } }
+        ]
+      });
+    }
+
+    // Filter by the active business phone number configured by the user
+    const ShopConfig = require('../models/ShopConfig');
+    const shop = await ShopConfig.findOne({ userId });
+    if (shop) {
+      const activeNumber = shop.metaApiEnabled && shop.metaDisplayPhoneNumber
+        ? shop.metaDisplayPhoneNumber
+        : shop.contactPhone;
+
+      if (activeNumber) {
+        conditions.push({
+          $or: [
+            { businessPhoneNumber: activeNumber },
+            { businessPhoneNumber: { $exists: false } },
+            { businessPhoneNumber: null },
+            { businessPhoneNumber: '' }
+          ]
+        });
+      }
+    }
+
+    if (conditions.length > 0) {
+      query.$and = conditions;
     }
 
     const skip = (page - 1) * limit;
@@ -332,6 +377,10 @@ router.post('/:id/messages', [
       return res.status(404).json({ error: 'Customer not found' });
     }
 
+    if (platform === 'WHATSAPP' && sender === 'TEAM' && !customer.whatsappNumber) {
+      return res.status(400).json({ error: 'Cannot send WhatsApp message: customer WhatsApp number is missing.' });
+    }
+
     let result = { success: true };
     let finalContent = content;
     
@@ -363,7 +412,40 @@ router.post('/:id/messages', [
 
     if (platform === 'WHATSAPP' && sender === 'TEAM') {
       const WhatsAppService = require('../services/WhatsAppService');
-      result = await WhatsAppService.sendMessage(customer.whatsappNumber, finalContent);
+      const ShopConfig = require('../models/ShopConfig');
+      const shop = await ShopConfig.findOne({ userId: req.user.id });
+      const sendOptions = { userId: req.user.id };
+      const mediaUrl = typeof media === 'string' ? media : media?.url || media?.mediaUrl || '';
+      const mediaType = typeof media === 'string' ? 'image' : media?.type || 'image';
+      const hasMedia = !!mediaUrl;
+
+      if (shop?.metaForwardReplies) {
+        sendOptions.forceWaha = true;
+      } else {
+        const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        const recentCustomerMessage = await ConversationMessage.findOne({
+          conversationId: conversation._id,
+          'sender.type': 'CUSTOMER',
+          createdAt: { $gte: twentyFourHoursAgo }
+        });
+        
+        const shouldUseTemplate = shop?.metaApiEnabled && !recentCustomerMessage;
+
+        if (shouldUseTemplate) {
+          const templateLang = customer.language || 'en';
+
+          sendOptions.forceMeta = true;
+          sendOptions.templateName = hasMedia ? 'sales_promotion' : 'message';
+          sendOptions.templateLanguage = templateLang;
+          sendOptions.templateParams = hasMedia ? [] : [{ type: 'text', text: finalContent }];
+          if (hasMedia) {
+            sendOptions.mediaUrl = mediaUrl;
+            sendOptions.mediaType = mediaType;
+          }
+        }
+      }
+
+      result = await WhatsAppService.sendMessage(customer.whatsappNumber, finalContent, sendOptions);
       
       if (!result.success) {
         if (result.failureReason === 422) {
@@ -390,7 +472,8 @@ router.post('/:id/messages', [
         name: sender === 'TEAM' ? req.user.name : 'Customer'
       },
       status: 'SENT',
-      platformMessageId: result.externalMessageId
+      platformMessageId: result.externalMessageId,
+      businessPhoneNumber: conversation.businessPhoneNumber || ''
     });
 
     await message.save();
@@ -408,6 +491,7 @@ router.post('/:id/messages', [
         language: customer.language || 'en',
         status: 'SENT',
         externalMessageId: result.externalMessageId,
+        businessPhoneNumber: conversation.businessPhoneNumber || '',
         aiGenerated: false,
         tags: ['outbound', 'manual']
       });

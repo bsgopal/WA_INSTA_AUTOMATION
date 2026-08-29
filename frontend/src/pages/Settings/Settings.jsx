@@ -20,10 +20,13 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import InfoIcon from '@mui/icons-material/Info';
 import CloseIcon from '@mui/icons-material/Close';
 import PersonIcon from '@mui/icons-material/Person';
-import CurrencyRupeeIcon from '@mui/icons-material/CurrencyRupee';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
+import CloudIcon from '@mui/icons-material/Cloud';
+import KeyIcon from '@mui/icons-material/Key';
+import ForwardIcon from '@mui/icons-material/Forward';
 
 import apiClient from '../../api/client';
+import { API_ORIGIN } from '../../api/base';
 import CustomSnackbar from '../../components/Snackbar';
 
 function TabPanel(props) {
@@ -38,7 +41,23 @@ function TabPanel(props) {
       {...other}
     >
       {value === index && (
-        <Box sx={{ pt: 3, width: '100%' }}>
+        <Box
+          sx={{
+            pt: 3,
+            width: '100%',
+            '@keyframes tabFadeIn': {
+              from: {
+                opacity: 0,
+                transform: 'translateY(6px)'
+              },
+              to: {
+                opacity: 1,
+                transform: 'translateY(0)'
+              }
+            },
+            animation: 'tabFadeIn 0.25s cubic-bezier(0.25, 0.8, 0.25, 1) forwards'
+          }}
+        >
           {children}
         </Box>
       )}
@@ -103,11 +122,6 @@ export default function Settings() {
   const [shopConfig, setShopConfig] = useState({
     shopName: 'Renic Jewellers',
     websiteUrl: 'https://kanalli.in/',
-    goldRate22K: 7200,
-    goldRate24K: 7850,
-    silverRate: 95,
-    platinumRate: 3200,
-    customStartPrice: 8500,
     address: '123 Gold Bazaar, T. Nagar, Chennai, Tamil Nadu - 600017',
     operatingHours: '10:00 AM - 8:30 PM (Monday to Saturday)',
     contactPhone: '+91 9345578103',
@@ -154,6 +168,10 @@ export default function Settings() {
   const [loadingWhatsapp, setLoadingWhatsapp] = useState(false);
   const [whatsappQr, setWhatsappQr] = useState('');
   const [loadingQr, setLoadingQr] = useState(false);
+  const [qrError, setQrError] = useState('');
+  const [restartingSession, setRestartingSession] = useState(false);
+  const qrRetryTimer = useRef(null);
+  const whatsappQrRef = useRef('');
 
   // Instagram Session Management State
   const [instagramStatus, setInstagramStatus] = useState({
@@ -162,6 +180,90 @@ export default function Settings() {
     error: null
   });
   const [loadingInstagram, setLoadingInstagram] = useState(false);
+
+  // Meta API Configuration State
+  const [metaConfig, setMetaConfig] = useState({
+    metaApiEnabled: false,
+    metaAppId: '',
+    metaAppSecret: '',
+    metaPhoneNumberId: '',
+    metaAccessToken: '',
+    metaWebhookVerifyToken: '',
+    metaBusinessAccountId: '',
+    metaForwardReplies: false,
+    metaHandoffMessage: 'Hi {name}! You replied to our promotional number. Our support team will now continue this chat with you on this number. How can we help you?',
+    metaAutoReplyMessage: 'Hi {name}, how can I help you?'
+  });
+  const [metaTesting, setMetaTesting] = useState(false);
+  const [metaTestResult, setMetaTestResult] = useState(null);
+  
+  // System Status State
+  const [systemStatus, setSystemStatus] = useState({
+    ngrok: { running: false, url: null },
+    waha: { running: false }
+  });
+
+  const fetchSystemStatus = async () => {
+    try {
+      const response = await apiClient.get('/shop-config/system-status');
+      if (response.data.success) {
+        setSystemStatus(response.data.status);
+      }
+    } catch (error) {
+      console.error('Failed to load system status:', error);
+    }
+  };
+
+  const fetchMetaConfig = async () => {
+    try {
+      const response = await apiClient.get('/shop-config/meta-config');
+      if (response.data.success) {
+        setMetaConfig(response.data.metaConfig);
+      }
+    } catch (error) {
+      console.error('Failed to load Meta config:', error);
+    }
+  };
+
+  const handleMetaConfigChange = (field, value) => {
+    setMetaConfig(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleSaveMetaConfig = async () => {
+    try {
+      setSavingConfig(true);
+      const response = await apiClient.post('/shop-config/meta-config', metaConfig);
+      if (response.data.success) {
+        setSnackbar({ open: true, message: 'Meta API configuration saved successfully!', severity: 'success' });
+      }
+    } catch (error) {
+      console.error('Failed to save Meta config:', error);
+      setSnackbar({ open: true, message: 'Failed to save Meta API configuration.', severity: 'error' });
+    } finally {
+      setSavingConfig(false);
+    }
+  };
+
+  const handleTestMetaConnection = async () => {
+    try {
+      setMetaTesting(true);
+      setMetaTestResult(null);
+      const response = await apiClient.post('/shop-config/meta-test');
+      if (response.data.success) {
+        setMetaTestResult({ success: true, message: 'Meta API connection successful!' });
+        setSnackbar({ open: true, message: 'Meta API connection successful!', severity: 'success' });
+      } else {
+        setMetaTestResult({ success: false, message: response.data.error || 'Connection failed' });
+        setSnackbar({ open: true, message: response.data.error || 'Connection failed', severity: 'error' });
+      }
+    } catch (error) {
+      console.error('Meta API test error:', error);
+      setMetaTestResult({ success: false, message: 'Failed to test Meta API connection' });
+      setSnackbar({ open: true, message: 'Failed to test Meta API connection.', severity: 'error' });
+    } finally {
+      setMetaTesting(false);
+    }
+  };
 
   const [knowledgeDocs, setKnowledgeDocs] = useState([]);
   const [loadingDocs, setLoadingDocs] = useState(false);
@@ -223,24 +325,65 @@ export default function Settings() {
   const fetchWhatsappQr = async () => {
     try {
       setLoadingQr(true);
+      setQrError('');
       const response = await apiClient.get('/ai-chat/whatsapp/qr');
       if (response.data.success && response.data.qrCode) {
+        whatsappQrRef.current = response.data.qrCode;
         setWhatsappQr(response.data.qrCode);
+      } else if (response.data.status === 'STARTING' || response.data.status === 'STOPPING') {
+        setQrError(response.data.error || 'WhatsApp session is starting up, please wait a few seconds...');
+        if (qrRetryTimer.current) clearTimeout(qrRetryTimer.current);
+        qrRetryTimer.current = setTimeout(() => {
+          if (!whatsappStatus.authenticated) fetchWhatsappQr();
+        }, response.data.retryAfter || 8000);
+      } else {
+        setQrError(response.data.error || 'Failed to load QR code.');
       }
     } catch (error) {
       console.error('Failed to fetch WhatsApp QR:', error);
+      setQrError('Failed to reach the WhatsApp service. Make sure the Docker (WAHA) container is running.');
     } finally {
       setLoadingQr(false);
     }
   };
 
+  const handleRestartSession = async () => {
+    try {
+      setRestartingSession(true);
+      const response = await apiClient.post('/ai-chat/whatsapp/session/restart');
+      if (response.data.success) {
+        setSnackbar({ open: true, message: 'WhatsApp session restarted. Fetching fresh QR code...', severity: 'info' });
+        whatsappQrRef.current = '';
+        setWhatsappQr('');
+        setQrError('');
+        setTimeout(async () => {
+          await fetchWhatsappStatus();
+          fetchWhatsappQr();
+        }, 6000);
+      } else {
+        setSnackbar({ open: true, message: response.data.error || 'Failed to restart WhatsApp session.', severity: 'error' });
+      }
+    } catch (error) {
+      console.error('Failed to restart WhatsApp session:', error);
+      setSnackbar({ open: true, message: 'Failed to restart WhatsApp session.', severity: 'error' });
+    } finally {
+      setRestartingSession(false);
+    }
+  };
+
   const fetchWhatsappStatus = async () => {
     try {
-      const response = await apiClient.get('/ai-chat/whatsapp/status');
+      const response = await apiClient.get('/ai-chat/whatsapp/waha-status');
       setWhatsappStatus(response.data);
       if (response.data.success && !response.data.authenticated) {
-        fetchWhatsappQr();
+        // Only fetch a fresh QR if we don't already have one displayed.
+        // WAHA regenerates the QR on every /auth/qr call, so re-fetching while
+        // polling would invalidate the code the user is trying to scan.
+        if (!whatsappQrRef.current) {
+          fetchWhatsappQr();
+        }
       } else if (response.data.success && response.data.authenticated) {
+        whatsappQrRef.current = '';
         setWhatsappQr('');
       }
     } catch (error) {
@@ -313,10 +456,24 @@ export default function Settings() {
     fetchWhatsappStatus();
     fetchInstagramStatus();
     fetchKnowledgeDocs();
+    fetchMetaConfig();
+    fetchSystemStatus();
     // Poll WhatsApp status every 12 seconds
     const interval = setInterval(fetchWhatsappStatus, 12000);
-    return () => clearInterval(interval);
+    // Poll System status every 30 seconds
+    const sysInterval = setInterval(fetchSystemStatus, 30000);
+    return () => {
+      clearInterval(interval);
+      clearInterval(sysInterval);
+    };
   }, []);
+
+  // Fetch QR Code automatically when switching to the WhatsApp tab
+  useEffect(() => {
+    if (activeTab === 2 && !whatsappStatus.authenticated) {
+      fetchWhatsappQr();
+    }
+  }, [activeTab, whatsappStatus.authenticated]);
 
   // Scroll chat sandbox
   useEffect(() => {
@@ -570,7 +727,7 @@ export default function Settings() {
   const getImageUrl = (url) => {
     if (!url) return '';
     if (url.startsWith('http')) return url;
-    return `http://localhost:5000${url}`;
+    return `${API_ORIGIN}${url}`;
   };
 
   const formatActionTypeLabel = (actionType, fallback = 'Quick Reply') => {
@@ -713,1615 +870,1031 @@ export default function Settings() {
   };
 
   return (
-    <Box sx={{ width: '100%', flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" sx={{ fontWeight: 700, letterSpacing: '-0.5px' }} gutterBottom>
-          Jeweller CRM Settings
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Configure automated responses, jewellery details, product items, and test chatbot flows
-        </Typography>
-      </Box>
-
-      {/* Tabs Menu */}
-      <Paper elevation={0} sx={{ borderBottom: 1, borderColor: 'divider', mb: 1, px: 2 }}>
+    <Box sx={{ width: '100%', flexGrow: 1, display: 'flex', flexDirection: 'column', gap: 3.5 }}>
+      {/* Top Tabs */}
+      <Paper 
+        elevation={0} 
+        sx={{ 
+          p: 0.8, 
+          bgcolor: '#f1f5f9', 
+          borderRadius: '14px', 
+          border: '1px solid #e2e8f0' 
+        }}
+      >
         <Tabs
           value={activeTab}
           onChange={(_, val) => setActiveTab(val)}
-          variant="scrollable"
-          scrollButtons="auto"
-          textColor="primary"
-          indicatorColor="primary"
+          variant="fullWidth"
           sx={{
+            minHeight: 44,
+            '& .MuiTabs-indicator': {
+              display: 'none'
+            },
             '& .MuiTab-root': {
-              minHeight: 64,
-              fontWeight: 600,
-              fontSize: '0.95rem',
-              gap: 1
+              minHeight: 44,
+              fontWeight: 700,
+              fontSize: '0.85rem',
+              textTransform: 'none',
+              borderRadius: '10px',
+              color: '#64748b',
+              transition: 'all 0.2s ease',
+              gap: 1.2,
+              '&.Mui-selected': {
+                color: '#2563eb',
+                bgcolor: '#ffffff',
+                boxShadow: '0 4px 6px -1px rgba(0,0,0,0.08), 0 2px 4px -1px rgba(0,0,0,0.03)'
+              },
+              '&:hover:not(.Mui-selected)': {
+                bgcolor: 'rgba(255,255,255,0.4)',
+                color: '#334155'
+              }
             }
           }}
         >
-          <Tab icon={<SettingsIcon fontSize="small" />} label="Integrations" />
-          <Tab icon={<StorefrontIcon fontSize="small" />} label="Knowledge Base" />
-          <Tab icon={<ShoppingBagIcon fontSize="small" />} label="Jewelry Catalog" />
-          <Tab icon={<ChatIcon fontSize="small" />} label="AI Sandbox" />
-          <Tab icon={<CloudUploadIcon fontSize="small" />} label="Knowledge Documents" />
-          <Tab icon={<PersonIcon fontSize="small" />} label="Active Sessions" />
+          <Tab icon={<StorefrontIcon sx={{ fontSize: 18 }} />} iconPosition="start" label="Store Details" />
+          <Tab icon={<SmartToyIcon sx={{ fontSize: 18 }} />} iconPosition="start" label="AI & Policies" />
+          <Tab icon={<ChatIcon sx={{ fontSize: 18 }} />} iconPosition="start" label="WhatsApp Login" />
+          <Tab icon={<CloudIcon sx={{ fontSize: 18 }} />} iconPosition="start" label="Meta API Config" />
         </Tabs>
       </Paper>
 
-      {/* Tab 1: System Integrations */}
-      <TabPanel value={activeTab} index={0}>
-        <Grid container spacing={3}>
-          <Grid item xs={12} md={8}>
-            <Card elevation={0}>
-              <CardContent sx={{ p: 4 }}>
-                <Typography variant="h6" gutterBottom sx={{ fontWeight: 700 }}>
-                  API Keys & System Integrations
-                </Typography>
-                <Typography variant="body2" color="text.secondary" mb={4}>
-                  Manage communication credentials and core AI keys
-                </Typography>
+      {/* Tab Panels */}
+      {loadingConfig ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+          <CircularProgress />
+        </Box>
+      ) : (
+        <Box sx={{ width: '100%' }}>
+          {/* Tab 1: Store Details */}
+          {activeTab === 0 && (
+            <Grid container spacing={3.5} sx={{
+              '@keyframes tabFadeIn': {
+                from: { opacity: 0, transform: 'translateY(6px)' },
+                to: { opacity: 1, transform: 'translateY(0)' }
+              },
+              animation: 'tabFadeIn 0.25s cubic-bezier(0.25, 0.8, 0.25, 1) forwards'
+            }}>
 
-                <Stack spacing={3}>
-                  <TextField
-                    label="Google Gemini API Key"
-                    fullWidth
-                    type="password"
-                    value={integrations.geminiKey}
-                    onChange={(e) => handleIntegrationChange('geminiKey', e.target.value)}
-                    placeholder="AIzaSy..."
-                    helperText="Used to power AI conversational responses in Rupees (INR) and capture customer details."
-                  />
-
-                  <Card variant="outlined" sx={{ borderRadius: 3, borderColor: '#e8eef7', bgcolor: '#fafbfd' }}>
-                    <CardContent sx={{ p: 3 }}>
-                      <Stack spacing={2}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap' }}>
-                          <Box>
-                            <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>AI Provider Routing</Typography>
-                            <Typography variant="body2" color="text.secondary">
-                              Choose which provider powers live responses. Anthropic is used first when enabled and configured.
-                            </Typography>
-                          </Box>
-                          <Chip
-                            label={integrations.useAnthropic ? 'Anthropic active' : 'Gemini active'}
-                            color={integrations.useAnthropic ? 'secondary' : 'primary'}
-                            size="small"
-                            sx={{ fontWeight: 700, height: 24 }}
-                          />
-                        </Box>
-
-                        <FormControlLabel
-                          control={
-                            <Switch
-                              checked={integrations.useAnthropic}
-                              onChange={(e) => handleIntegrationChange('useAnthropic', e.target.checked)}
-                            />
-                          }
-                          label="Use Anthropic as primary AI provider"
-                        />
-
-                        {integrations.useAnthropic && (
-                          <TextField
-                            label="Anthropic API Key"
-                            fullWidth
-                            type="password"
-                            value={integrations.anthropicApiKey}
-                            onChange={(e) => handleIntegrationChange('anthropicApiKey', e.target.value)}
-                            placeholder="sk-ant-..."
-                            helperText="Required when Anthropic is enabled."
-                          />
-                        )}
-
-                        <TextField
-                          label="Anthropic Model"
-                          fullWidth
-                          value={integrations.anthropicModel}
-                          onChange={(e) => handleIntegrationChange('anthropicModel', e.target.value)}
-                          placeholder="claude-3-haiku-20240307"
-                          helperText="Used when Anthropic is enabled."
-                        />
-
-                        <TextField
-                          label="Gemini Model"
-                          fullWidth
-                          value={integrations.geminiModel}
-                          onChange={(e) => handleIntegrationChange('geminiModel', e.target.value)}
-                          placeholder="gemini-1.5-flash"
-                          helperText="Fallback model when Gemini is active."
-                        />
-
-                        <Alert severity={integrations.useAnthropic ? 'info' : 'success'} sx={{ borderRadius: 2 }}>
-                          {integrations.useAnthropic
-                            ? 'Anthropic will handle live AI replies when an API key is present. Gemini remains available as the configured fallback.'
-                            : 'Gemini is currently the primary provider for live AI replies.'}
-                        </Alert>
-                      </Stack>
-                    </CardContent>
-                  </Card>
-
-                  <TextField
-                    label="Twilio Account SID"
-                    fullWidth
-                    type="password"
-                    value={integrations.twilioSid}
-                    onChange={(e) => handleIntegrationChange('twilioSid', e.target.value)}
-                    placeholder="AC..."
-                  />
-
-                  <TextField
-                    label="Twilio Auth Token"
-                    fullWidth
-                    type="password"
-                    value={integrations.twilioToken}
-                    onChange={(e) => handleIntegrationChange('twilioToken', e.target.value)}
-                    placeholder="Token string"
-                  />
-
-                  <TextField
-                    label="Instagram Access Token"
-                    fullWidth
-                    type="password"
-                    value={integrations.instagramToken}
-                    onChange={(e) => handleIntegrationChange('instagramToken', e.target.value)}
-                    placeholder="IG..."
-                  />
-                </Stack>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          <Grid item xs={12} md={4}>
-            <Card elevation={0}>
-              <CardContent sx={{ p: 4 }}>
-                <Typography variant="h6" gutterBottom sx={{ fontWeight: 700 }}>
-                  Preferences
-                </Typography>
-                <Typography variant="body2" color="text.secondary" mb={3}>
-                  Configure system localization and auto-reply defaults
-                </Typography>
-
-                <Stack spacing={3}>
-                  <FormControl fullWidth>
-                    <InputLabel>Default Language</InputLabel>
-                    <Select
-                      value={integrations.defaultLanguage}
-                      label="Default Language"
-                      onChange={(e) => handleIntegrationChange('defaultLanguage', e.target.value)}
-                    >
-                      <MenuItem value="en">English (India)</MenuItem>
-                      <MenuItem value="hi">Hindi (हिंदी)</MenuItem>
-                      <MenuItem value="ta">Tamil (தமிழ்)</MenuItem>
-                      <MenuItem value="te">Telugu (తెలుగు)</MenuItem>
-                    </Select>
-                  </FormControl>
-
-                  <FormControl fullWidth>
-                    <InputLabel>Timezone</InputLabel>
-                    <Select
-                      value={integrations.timezone}
-                      label="Timezone"
-                      onChange={(e) => handleIntegrationChange('timezone', e.target.value)}
-                    >
-                      <MenuItem value="Asia/Kolkata">Asia/Kolkata (IST)</MenuItem>
-                      <MenuItem value="America/New_York">America/New_York (EST)</MenuItem>
-                      <MenuItem value="Europe/London">Europe/London (GMT)</MenuItem>
-                    </Select>
-                  </FormControl>
-
-                  <Divider />
-
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={integrations.autoReply}
-                        onChange={(e) => handleIntegrationChange('autoReply', e.target.checked)}
-                      />
-                    }
-                    label="Enable Auto-Reply System"
-                  />
-
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={integrations.emailNotifications}
-                        onChange={(e) => handleIntegrationChange('emailNotifications', e.target.checked)}
-                      />
-                    }
-                    label="Email Alerts on Hot Leads"
-                  />
-                </Stack>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          {/* WhatsApp Link Connection Manager */}
-          <Grid item xs={12}>
-            <Card elevation={0} sx={{ border: '1px solid #e8eef7' }}>
-              <CardContent sx={{ p: 4 }}>
-                <Typography variant="h6" gutterBottom sx={{ fontWeight: 700 }}>
-                  WhatsApp Device Connection (WAHA Provider)
-                </Typography>
-                <Typography variant="body2" color="text.secondary" mb={3}>
-                  Scan the WhatsApp Web QR code to link your phone number and authorize automation workflows.
-                </Typography>
-
-                <Grid container spacing={3} alignItems="center">
-                  <Grid item xs={12} md={6}>
-                    <Box sx={{ p: 3, borderRadius: 3, bgcolor: '#fafafa', border: '1px dashed #e0e0e0' }}>
-                      <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
-                        Connection Status:
-                      </Typography>
-                      
-                      <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 2 }}>
-                        <Box
-                          sx={{
-                            width: 12,
-                            height: 12,
-                            borderRadius: '50%',
-                            bgcolor: whatsappStatus.authenticated ? '#4caf50' : '#ff9800',
-                            boxShadow: `0 0 8px ${whatsappStatus.authenticated ? '#4caf50' : '#ff9800'}`
-                          }}
-                        />
-                        <Typography variant="body1" sx={{ fontWeight: 700 }}>
-                          {whatsappStatus.authenticated ? 'Connected' :
-                           whatsappStatus.status === 'SCAN_QR_CODE' ? 'Awaiting Scan' :
-                           whatsappStatus.status === 'STARTING' ? 'Starting...' :
-                           whatsappStatus.status === 'STOPPED' ? 'Disconnected' :
-                           whatsappStatus.status || 'UNKNOWN'}
-                        </Typography>
-                        <Chip
-                          label={whatsappStatus.authenticated ? 'AUTHENTICATED' : 'DISCONNECTED'}
-                          color={whatsappStatus.authenticated ? 'success' : 'warning'}
-                          size="small"
-                          sx={{ fontWeight: 700, fontSize: '0.65rem', height: 18 }}
-                        />
-                      </Stack>
-
-                      {whatsappStatus.authenticated ? (
-                        <Box>
-                          <Typography variant="body2" color="text.primary" sx={{ mb: 0.5 }}>
-                            Connected Number: <strong>{whatsappStatus.phoneNumber ? whatsappStatus.phoneNumber.split('@')[0] : 'N/A'}</strong>
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
-                            Customers should send message "Hi" to this number to test.
-                          </Typography>
-                          <Button
-                            variant="outlined"
-                            color="error"
-                            size="small"
-                            onClick={handleWhatsappLogout}
-                            disabled={loadingWhatsapp}
-                            sx={{ borderRadius: 2 }}
-                          >
-                            Disconnect Session
-                          </Button>
-                        </Box>
-                      ) : (
-                        <Box>
-                          {whatsappStatus.phoneNumber && (
-                            <Alert severity="warning" sx={{ mb: 3, borderRadius: 2 }}>
-                              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                                Stale Connection Detected
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1.5 }}>
-                                A cached session for <strong>{whatsappStatus.phoneNumber.split('@')[0]}</strong> is currently disconnected or failed. To link a new number, please reset this connection first.
-                              </Typography>
-                              <Button
-                                variant="outlined"
-                                color="error"
-                                size="small"
-                                onClick={handleWhatsappLogout}
-                                disabled={loadingWhatsapp}
-                                sx={{ borderRadius: 2 }}
-                              >
-                                Disconnect & Reset Session
-                              </Button>
-                            </Alert>
-                          )}
-                          <Typography variant="body2" color="text.secondary" mb={2}>
-                            Your device is not linked. Select your preferred authentication method to link WhatsApp:
-                          </Typography>
-                          
-                          <Stack direction="row" spacing={2} sx={{ mb: 3 }}>
-                            <Button 
-                              variant={!showPairingForm ? "contained" : "outlined"}
-                              onClick={() => setShowPairingForm(false)}
-                              size="small"
-                              sx={{ borderRadius: 2 }}
-                            >
-                              Scan QR Code
-                            </Button>
-                            <Button 
-                              variant={showPairingForm ? "contained" : "outlined"}
-                              onClick={() => setShowPairingForm(true)}
-                              size="small"
-                              sx={{ borderRadius: 2 }}
-                            >
-                              Use Pairing Code
-                            </Button>
-                          </Stack>
-
-                          {!showPairingForm ? (
-                            <Box>
-                              <Typography variant="caption" color="text.secondary" component="ol" sx={{ pl: 2, mb: 2, display: 'block' }}>
-                                <li>Open WhatsApp on your phone</li>
-                                <li>Tap Menu or Settings and select Linked Devices</li>
-                                <li>Tap Link a Device and point your phone to the screen to scan QR</li>
-                              </Typography>
-                              <Button
-                                variant="contained"
-                                color="primary"
-                                size="small"
-                                onClick={fetchWhatsappStatus}
-                                sx={{ borderRadius: 2 }}
-                              >
-                                Check Connection Status
-                              </Button>
-                            </Box>
-                          ) : (
-                            <Box>
-                              <Typography variant="body2" color="text.secondary" mb={2}>
-                                Enter your WhatsApp phone number (with country code, e.g. +91 98765 43210) to generate an 8-character pairing code:
-                              </Typography>
-                              <Stack direction="row" spacing={1.5} sx={{ mb: 2 }}>
-                                <TextField
-                                  label="WhatsApp Number"
-                                  size="small"
-                                  placeholder="+919876543210"
-                                  value={pairingPhone}
-                                  onChange={(e) => setPairingPhone(e.target.value)}
-                                  sx={{ flexGrow: 1 }}
-                                />
-                                <Button
-                                  variant="contained"
-                                  color="secondary"
-                                  onClick={handleRequestPairingCode}
-                                  disabled={requestingCode}
-                                  sx={{ borderRadius: 2, px: 3 }}
-                                >
-                                  {requestingCode ? <CircularProgress size={20} color="inherit" /> : "Get Code"}
-                                </Button>
-                              </Stack>
-
-                              {pairingCode && (
-                                <Box sx={{ p: 2, borderRadius: 2, bgcolor: '#ede7f6', border: '1px solid #d1c4e9', textAlign: 'center', mb: 2 }}>
-                                  <Typography variant="caption" color="text.secondary" display="block" mb={1}>
-                                    Your WhatsApp Pairing Code:
-                                  </Typography>
-                                  <Typography variant="h4" sx={{ fontWeight: 800, color: 'secondary.main', letterSpacing: 2, fontFamily: 'monospace' }}>
-                                    {pairingCode}
-                                  </Typography>
-                                  <Typography variant="caption" color="text.secondary" display="block" mt={1}>
-                                    Go to WhatsApp ➔ Linked Devices ➔ Link with phone number instead, and enter this code.
-                                  </Typography>
-                                </Box>
-                              )}
-
-                              <Button
-                                variant="outlined"
-                                size="small"
-                                onClick={fetchWhatsappStatus}
-                                sx={{ borderRadius: 2 }}
-                              >
-                                Check Connection Status
-                              </Button>
-                            </Box>
-                          )}
-                        </Box>
-                      )}
-                    </Box>
-                  </Grid>
-
-                  <Grid item xs={12} md={6} sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                    {whatsappStatus.authenticated ? (
-                      <Box sx={{ textAlign: 'center', py: 3 }}>
-                        <Avatar
-                          sx={{
-                            width: 100,
-                            height: 100,
-                            bgcolor: 'success.50',
-                            color: 'success.main',
-                            mx: 'auto',
-                            mb: 2,
-                            boxShadow: '0 8px 16px rgba(76, 175, 80, 0.12)'
-                          }}
-                        >
-                          <StorefrontIcon sx={{ fontSize: 48 }} />
-                        </Avatar>
-                        <Typography variant="body1" sx={{ fontWeight: 700, color: 'success.main' }}>
-                          WhatsApp Automation Active
+              {/* Shop Details Configuration */}
+              <Grid item xs={12} md={6}>
+                <Card 
+                  elevation={0} 
+                  sx={{ 
+                    borderRadius: '16px', 
+                    border: '1px solid #e2e8f0', 
+                    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)',
+                    bgcolor: '#ffffff',
+                    height: '100%'
+                  }}
+                >
+                  <CardContent sx={{ p: 4 }}>
+                    <Stack direction="row" spacing={2} sx={{ alignItems: 'center', mb: 3 }}>
+                      <Box sx={{ width: 40, height: 40, borderRadius: '10px', bgcolor: '#DBEAFE', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <StorefrontIcon sx={{ color: '#2563EB', fontSize: 20 }} />
+                      </Box>
+                      <Box>
+                        <Typography variant="h6" sx={{ fontWeight: 800, color: '#1e293b' }}>
+                          Store Information
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
-                          Listening for incoming customer messages 24/7
+                          Core store details referenced by the AI to answer business and location inquiries
                         </Typography>
                       </Box>
-                    ) : (
-                      !showPairingForm ? (
-                        <Paper
-                          variant="outlined"
-                          sx={{
-                            p: 2,
-                            width: 250,
-                            height: 250,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            borderRadius: 3,
-                            bgcolor: '#ffffff',
-                            border: '1px solid #e0e0e0',
-                            position: 'relative'
-                          }}
-                        >
-                          {whatsappQr ? (
-                            <img
-                              src={whatsappQr}
-                              alt="Scan to login"
-                              style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                            />
-                          ) : (
-                            <Box sx={{ textAlign: 'center', p: 2 }}>
-                              <Typography variant="caption" color="text.secondary" display="block" mb={1}>
-                                {loadingQr ? 'Generating QR code...' : 'QR code is loading or WAHA container is starting...'}
-                              </Typography>
-                              <Button size="small" variant="text" onClick={fetchWhatsappStatus}>
-                                Retry Connection
-                              </Button>
-                            </Box>
-                          )}
+                    </Stack>
+
+                    <Stack spacing={2.5}>
+                      <TextField
+                        label="Store Name"
+                        fullWidth
+                        value={shopConfig.shopName}
+                        onChange={(e) => handleConfigChange('shopName', e.target.value)}
+                        InputProps={{ sx: { borderRadius: '12px' } }}
+                      />
+                      <TextField
+                        label="Store Address"
+                        fullWidth
+                        multiline
+                        rows={2}
+                        value={shopConfig.address}
+                        onChange={(e) => handleConfigChange('address', e.target.value)}
+                        InputProps={{ sx: { borderRadius: '12px' } }}
+                      />
+                      <TextField
+                        label="Jewelry Website URL (One URL)"
+                        fullWidth
+                        value={shopConfig.websiteUrl || ''}
+                        placeholder="e.g. https://kanalli.in/"
+                        onChange={(e) => handleConfigChange('websiteUrl', e.target.value)}
+                        InputProps={{ sx: { borderRadius: '12px' } }}
+                      />
+                      <TextField
+                        label="Catalog Cover Image URL (One URL Image)"
+                        fullWidth
+                        value={shopConfig.catalogImageUrl || ''}
+                        placeholder="e.g. https://kanalli.in/wp-content/uploads/...logo.png"
+                        onChange={(e) => handleConfigChange('catalogImageUrl', e.target.value)}
+                        helperText="Used to scrape logo/banner dynamically if left blank."
+                        InputProps={{ sx: { borderRadius: '12px' } }}
+                      />
+
+                      <Grid container spacing={2.5}>
+                        <Grid item xs={6}>
+                          <TextField
+                            label="Contact Phone"
+                            fullWidth
+                            value={shopConfig.contactPhone}
+                            onChange={(e) => handleConfigChange('contactPhone', e.target.value)}
+                            InputProps={{ sx: { borderRadius: '12px' } }}
+                          />
+                        </Grid>
+                        <Grid item xs={6}>
+                          <TextField
+                            label="Operating Hours"
+                            fullWidth
+                            value={shopConfig.operatingHours}
+                            onChange={(e) => handleConfigChange('operatingHours', e.target.value)}
+                            InputProps={{ sx: { borderRadius: '12px' } }}
+                          />
+                        </Grid>
+                      </Grid>
+                    </Stack>
+                  </CardContent>
+                </Card>
+              </Grid>
+
+              {/* Save Button for Store & Rates */}
+              <Grid item xs={12}>
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1 }}>
+                  <Button
+                    variant="contained"
+                    size="large"
+                    startIcon={<SaveIcon />}
+                    onClick={() => handleSaveShopConfig()}
+                    disabled={savingConfig}
+                    sx={{ 
+                      borderRadius: '12px', 
+                      fontWeight: 700, 
+                      px: 4, 
+                      py: 1.5, 
+                      textTransform: 'none',
+                      bgcolor: '#2563EB',
+                      boxShadow: '0 4px 14px rgba(37, 99, 235, 0.25)',
+                      '&:hover': {
+                        bgcolor: '#1d4ed8',
+                        boxShadow: '0 6px 20px rgba(37, 99, 235, 0.35)'
+                      }
+                    }}
+                  >
+                    {savingConfig ? 'Saving Store Settings...' : 'Save Settings'}
+                  </Button>
+                </Box>
+              </Grid>
+            </Grid>
+          )}
+
+          {/* Tab 2: AI & Policies */}
+          {activeTab === 1 && (
+            <Grid container spacing={3.5} sx={{
+              '@keyframes tabFadeIn': {
+                from: { opacity: 0, transform: 'translateY(6px)' },
+                to: { opacity: 1, transform: 'translateY(0)' }
+              },
+              animation: 'tabFadeIn 0.25s cubic-bezier(0.25, 0.8, 0.25, 1) forwards'
+            }}>
+              {/* Policies & Instructions */}
+              <Grid item xs={12}>
+                <Card 
+                  elevation={0}
+                  sx={{ 
+                    borderRadius: '16px', 
+                    border: '1px solid #e2e8f0', 
+                    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)',
+                    bgcolor: '#ffffff'
+                  }}
+                >
+                  <CardContent sx={{ p: 4 }}>
+                    <Stack direction="row" spacing={2} sx={{ alignItems: 'center', mb: 3 }}>
+                      <Box sx={{ width: 40, height: 40, borderRadius: '10px', bgcolor: '#F0FDF4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <SmartToyIcon sx={{ color: '#16A34A', fontSize: 20 }} />
+                      </Box>
+                      <Box>
+                        <Typography variant="h6" sx={{ fontWeight: 800, color: '#1e293b' }}>
+                          Policies & Custom AI Behavior
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          Define purchase rules, return policies, and prompt behavior instructions for your AI agent
+                        </Typography>
+                      </Box>
+                    </Stack>
+
+                    <Stack spacing={3}>
+                      <TextField
+                        label="Return & Buyback Policy"
+                        fullWidth
+                        multiline
+                        rows={3}
+                        value={shopConfig.returnPolicy}
+                        onChange={(e) => handleConfigChange('returnPolicy', e.target.value)}
+                        InputProps={{ sx: { borderRadius: '12px' } }}
+                      />
+                      <TextField
+                        label="Custom AI Behavior Instructions"
+                        fullWidth
+                        multiline
+                        rows={4}
+                        value={shopConfig.aiCustomInstructions}
+                        onChange={(e) => handleConfigChange('aiCustomInstructions', e.target.value)}
+                        placeholder="e.g. Always offer custom metal/carat configurations. Address customers with respect. Suggest visiting the website for checkout."
+                        InputProps={{ sx: { borderRadius: '12px' } }}
+                        helperText="Provide specific guidelines on tone, language preference, and catalog presentation."
+                      />
+                    </Stack>
+                  </CardContent>
+                </Card>
+              </Grid>
+
+              {/* FAQ Management */}
+              <Grid item xs={12}>
+                <Card 
+                  elevation={0}
+                  sx={{ 
+                    borderRadius: '16px', 
+                    border: '1px solid #e2e8f0', 
+                    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)',
+                    bgcolor: '#ffffff',
+                    mt: 1
+                  }}
+                >
+                  <CardContent sx={{ p: 4 }}>
+                    <Stack direction="row" spacing={2} sx={{ alignItems: 'center', mb: 3 }}>
+                      <Box sx={{ width: 40, height: 40, borderRadius: '10px', bgcolor: '#EEF2FF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <InfoIcon sx={{ color: '#4F46E5', fontSize: 20 }} />
+                      </Box>
+                      <Box>
+                        <Typography variant="h6" sx={{ fontWeight: 800, color: '#1e293b' }}>
+                          Frequently Asked Questions (FAQs)
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          Teach the AI specific answers to typical user inquiries (returns, delivery times, pricing, etc.)
+                        </Typography>
+                      </Box>
+                    </Stack>
+
+                    {/* FAQ List */}
+                    <Box sx={{ mb: 4 }}>
+                      {(!shopConfig.faqs || shopConfig.faqs.length === 0) ? (
+                        <Paper variant="outlined" sx={{ p: 3, textAlign: 'center', borderRadius: '12px', borderStyle: 'dashed', bgcolor: '#f8fafc', borderColor: '#e2e8f0' }}>
+                          <Typography variant="body2" color="text.secondary">
+                            No FAQs added yet. Use the fields below to add your first FAQ item.
+                          </Typography>
                         </Paper>
                       ) : (
-                        <Box sx={{ textAlign: 'center', p: 4, borderRadius: 3, bgcolor: '#f3e5f5', border: '1px dashed #d1c4e9', maxWidth: 280 }}>
-                          <SmartToyIcon sx={{ fontSize: 48, color: 'secondary.main', mb: 1.5 }} />
-                          <Typography variant="body2" sx={{ fontWeight: 700, mb: 1 }}>
-                            Pairing Code Auth Active
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary" display="block" mb={1.5}>
-                            Requesting an 8-character pairing code directly bypasses camera scanning limitations.
-                          </Typography>
-                        </Box>
-                      )
-                    )}
-                  </Grid>
-                </Grid>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          {/* Instagram Link Connection Manager */}
-          <Grid item xs={12}>
-            <Card elevation={0} sx={{ border: '1px solid #e8eef7' }}>
-              <CardContent sx={{ p: 4 }}>
-                <Typography variant="h6" gutterBottom sx={{ fontWeight: 700 }}>
-                  Instagram DM Connection (Meta Graph API)
-                </Typography>
-                <Typography variant="body2" color="text.secondary" mb={3}>
-                  Connect your Instagram Business / Creator profile directly to Meta's Cloud API to automate direct messages.
-                </Typography>
-
-                <Grid container spacing={3} alignItems="center">
-                  <Grid item xs={12} md={6}>
-                    <Box sx={{ p: 3, borderRadius: 3, bgcolor: '#fafafa', border: '1px dashed #e0e0e0' }}>
-                      <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
-                        Connection Status:
-                      </Typography>
-                      
-                      <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 2 }}>
-                        <Box
-                          sx={{
-                            width: 12,
-                            height: 12,
-                            borderRadius: '50%',
-                            bgcolor: instagramStatus.success ? '#4caf50' : '#ff9800',
-                            boxShadow: `0 0 8px ${instagramStatus.success ? '#4caf50' : '#ff9800'}`
-                          }}
-                        />
-                        <Typography variant="body1" sx={{ fontWeight: 700 }}>
-                          {instagramStatus.success ? 'Connected' : 'Disconnected'}
-                        </Typography>
-                        <Chip
-                          label={instagramStatus.success ? 'AUTHENTICATED' : 'NOT CONFIGURED'}
-                          color={instagramStatus.success ? 'success' : 'warning'}
-                          size="small"
-                          sx={{ fontWeight: 700, fontSize: '0.65rem', height: 18 }}
-                        />
-                      </Stack>
-
-                      {instagramStatus.success && instagramStatus.profile ? (
-                        <Box>
-                          <Typography variant="body2" color="text.primary" sx={{ mb: 0.5 }}>
-                            Connected Account: <strong>{instagramStatus.profile.name}</strong> (@{instagramStatus.profile.username})
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
-                            Direct Messages received on this Instagram account will be automatically handled by your Gemini AI assistant.
-                          </Typography>
-                          <Button
-                            variant="outlined"
-                            size="small"
-                            onClick={fetchInstagramStatus}
-                            disabled={loadingInstagram}
-                            sx={{ borderRadius: 2 }}
-                            startIcon={<RefreshIcon fontSize="small" />}
-                          >
-                            Refresh Details
-                          </Button>
-                        </Box>
-                      ) : (
-                        <Box>
-                          <Typography variant="body2" color="text.secondary" mb={2}>
-                            Your Instagram profile is not linked or the credentials are invalid. Please check your Access Token and Page ID in the configuration.
-                          </Typography>
-                          <Button
-                            variant="contained"
-                            color="primary"
-                            size="small"
-                            onClick={fetchInstagramStatus}
-                            disabled={loadingInstagram}
-                            sx={{ borderRadius: 2 }}
-                          >
-                            Verify Connection
-                          </Button>
-                        </Box>
+                        <Stack spacing={2}>
+                          {shopConfig.faqs.map((faq, index) => (
+                            <Paper 
+                              key={index} 
+                              variant="outlined" 
+                              sx={{ 
+                                p: 2.5, 
+                                borderRadius: '12px', 
+                                border: '1px solid #e2e8f0',
+                                position: 'relative',
+                                '&:hover': { bgcolor: '#f8fafc' }
+                              }}
+                            >
+                              <IconButton 
+                                size="small" 
+                                onClick={() => handleDeleteFaq(index)}
+                                sx={{ position: 'absolute', top: 12, right: 12, color: 'text.disabled', '&:hover': { color: 'error.main' } }}
+                              >
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                              <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#1e293b', pr: 4 }}>
+                                Q: {faq.question}
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary" sx={{ mt: 1, pr: 4 }}>
+                                A: {faq.answer}
+                              </Typography>
+                            </Paper>
+                          ))}
+                        </Stack>
                       )}
                     </Box>
-                  </Grid>
 
-                  <Grid item xs={12} md={6} sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                    {instagramStatus.success && instagramStatus.profile ? (
-                      <Box sx={{ textAlign: 'center', py: 3 }}>
-                        <Avatar
-                          src={instagramStatus.profile.profilePic}
-                          sx={{
-                            width: 100,
-                            height: 100,
-                            mx: 'auto',
-                            mb: 2,
-                            boxShadow: '0 8px 16px rgba(233, 30, 99, 0.12)',
-                            border: '3px solid #e91e63'
-                          }}
-                        >
-                          {instagramStatus.profile.name ? instagramStatus.profile.name[0] : 'I'}
-                        </Avatar>
-                        <Typography variant="body1" sx={{ fontWeight: 700, color: '#e91e63' }}>
-                          Instagram Automation Active
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          AI chatbot is actively listening for new Instagram DMs
-                        </Typography>
-                      </Box>
-                    ) : (
-                      <Box sx={{ textAlign: 'center', py: 3 }}>
-                        <Avatar
-                          sx={{
-                            width: 100,
-                            height: 100,
-                            bgcolor: 'grey.100',
-                            color: 'grey.400',
-                            mx: 'auto',
-                            mb: 2
-                          }}
-                        >
-                          <ChatIcon sx={{ fontSize: 48 }} />
-                        </Avatar>
-                        <Typography variant="body1" sx={{ fontWeight: 700, color: 'text.secondary' }}>
-                          No Active Profile
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          Configure tokens above to link your Instagram account
-                        </Typography>
-                      </Box>
-                    )}
-                  </Grid>
-                </Grid>
-              </CardContent>
-            </Card>
-          </Grid>
+                    <Divider sx={{ my: 3 }} />
 
-          <Grid item xs={12}>
-            <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-              <Button
-                variant="contained"
-                size="large"
-                startIcon={<SaveIcon />}
-                onClick={handleSaveIntegrations}
-                disableElevation
-              >
-                Save Integration Settings
-              </Button>
-            </Box>
-          </Grid>
-        </Grid>
-      </TabPanel>
-
-      {/* Tab 2: Knowledge Base */}
-      <TabPanel value={activeTab} index={1}>
-        {loadingConfig ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-            <CircularProgress />
-          </Box>
-        ) : (
-          <Grid container spacing={3}>
-            {/* Metal Rates Configuration */}
-            <Grid item xs={12} md={6}>
-              <Card elevation={0} sx={{ height: '100%' }}>
-                <CardContent sx={{ p: 4 }}>
-                  <Typography variant="h6" gutterBottom sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <CurrencyRupeeIcon color="primary" fontSize="small" />
-                    Metal Rates (INR / gram)
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" mb={3}>
-                    Set current pricing dynamically references by the AI for response generation
-                  </Typography>
-
-                  <Grid container spacing={2}>
-                    <Grid item xs={6}>
-                      <TextField
-                        label="Gold 22K (per gram)"
-                        fullWidth
-                        type="number"
-                        value={shopConfig.goldRate22K}
-                        onChange={(e) => handleConfigChange('goldRate22K', parseFloat(e.target.value))}
-                        InputProps={{ startAdornment: <Typography sx={{ mr: 1, color: 'text.secondary' }}>₹</Typography> }}
-                      />
-                    </Grid>
-                    <Grid item xs={6}>
-                      <TextField
-                        label="Gold 24K (per gram)"
-                        fullWidth
-                        type="number"
-                        value={shopConfig.goldRate24K}
-                        onChange={(e) => handleConfigChange('goldRate24K', parseFloat(e.target.value))}
-                        InputProps={{ startAdornment: <Typography sx={{ mr: 1, color: 'text.secondary' }}>₹</Typography> }}
-                      />
-                    </Grid>
-                    <Grid item xs={6}>
-                      <TextField
-                        label="Silver (per gram)"
-                        fullWidth
-                        type="number"
-                        value={shopConfig.silverRate}
-                        onChange={(e) => handleConfigChange('silverRate', parseFloat(e.target.value))}
-                        InputProps={{ startAdornment: <Typography sx={{ mr: 1, color: 'text.secondary' }}>₹</Typography> }}
-                      />
-                    </Grid>
-                    <Grid item xs={6}>
-                      <TextField
-                        label="Platinum (per gram)"
-                        fullWidth
-                        type="number"
-                        value={shopConfig.platinumRate}
-                        onChange={(e) => handleConfigChange('platinumRate', parseFloat(e.target.value))}
-                        InputProps={{ startAdornment: <Typography sx={{ mr: 1, color: 'text.secondary' }}>₹</Typography> }}
-                      />
-                    </Grid>
-                    <Grid item xs={12}>
-                      <TextField
-                        label="Custom Jewelry Starting Price"
-                        fullWidth
-                        type="number"
-                        value={shopConfig.customStartPrice || 8500}
-                        onChange={(e) => handleConfigChange('customStartPrice', parseFloat(e.target.value))}
-                        InputProps={{ startAdornment: <Typography sx={{ mr: 1, color: 'text.secondary' }}>₹</Typography> }}
-                        helperText="Starting price for customized bridal and luxury designs, displayed in price inquiries."
-                      />
-                    </Grid>
-                  </Grid>
-                </CardContent>
-              </Card>
-            </Grid>
-
-            {/* Shop Details Configuration */}
-            <Grid item xs={12} md={6}>
-              <Card elevation={0} sx={{ height: '100%' }}>
-                <CardContent sx={{ p: 4 }}>
-                  <Typography variant="h6" gutterBottom sx={{ fontWeight: 700 }}>
-                    Store Information
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" mb={3}>
-                    Core store details that the AI uses to answer location and operating queries
-                  </Typography>
-
-                  <Stack spacing={2}>
-                    <TextField
-                      label="Store Name"
-                      fullWidth
-                      value={shopConfig.shopName}
-                      onChange={(e) => handleConfigChange('shopName', e.target.value)}
-                    />
-                    <TextField
-                      label="Jewelry Website URL (One URL)"
-                      fullWidth
-                      value={shopConfig.websiteUrl || ''}
-                      placeholder="e.g. https://kanalli.in/"
-                      onChange={(e) => handleConfigChange('websiteUrl', e.target.value)}
-                    />
-                    <TextField
-                      label="Catalog Cover Image URL (One URL Image)"
-                      fullWidth
-                      value={shopConfig.catalogImageUrl || ''}
-                      placeholder="e.g. https://kanalli.in/wp-content/uploads/...logo.png"
-                      onChange={(e) => handleConfigChange('catalogImageUrl', e.target.value)}
-                      helperText="If left blank, the system will automatically try to scrape the logo/banner from the Shop Website URL."
-                    />
-
-                    <TextField
-                      label="Contact Phone"
-                      fullWidth
-                      value={shopConfig.contactPhone}
-                      onChange={(e) => handleConfigChange('contactPhone', e.target.value)}
-                    />
-                    <TextField
-                      label="Operating Hours"
-                      fullWidth
-                      value={shopConfig.operatingHours}
-                      onChange={(e) => handleConfigChange('operatingHours', e.target.value)}
-                    />
-                  </Stack>
-                </CardContent>
-              </Card>
-            </Grid>
-
-            {/* Address & Policy Settings */}
-            <Grid item xs={12}>
-              <Card elevation={0}>
-                <CardContent sx={{ p: 4 }}>
-                  <Typography variant="h6" gutterBottom sx={{ fontWeight: 700 }}>
-                    Policies & Custom AI Instructions
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" mb={3}>
-                    Address layout and return policies that the AI references
-                  </Typography>
-
-                  <Stack spacing={3}>
-                    <TextField
-                      label="Store Address"
-                      fullWidth
-                      multiline
-                      rows={2}
-                      value={shopConfig.address}
-                      onChange={(e) => handleConfigChange('address', e.target.value)}
-                    />
-                    <TextField
-                      label="Return & Buyback Policy"
-                      fullWidth
-                      multiline
-                      rows={2}
-                      value={shopConfig.returnPolicy}
-                      onChange={(e) => handleConfigChange('returnPolicy', e.target.value)}
-                    />
-                    <TextField
-                      label="Custom AI Behavior Instructions"
-                      fullWidth
-                      multiline
-                      rows={3}
-                      value={shopConfig.aiCustomInstructions}
-                      onChange={(e) => handleConfigChange('aiCustomInstructions', e.target.value)}
-                      placeholder="e.g. Always offer gold customization. Address customers politely."
-                    />
-                  </Stack>
-                </CardContent>
-              </Card>
-            </Grid>
-
-            {/* Dynamic FAQs Configuration */}
-            <Grid item xs={12}>
-              <Card elevation={0}>
-                <CardContent sx={{ p: 4 }}>
-                  <Typography variant="h6" gutterBottom sx={{ fontWeight: 700 }}>
-                    Frequently Asked Questions (FAQs)
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" mb={3}>
-                    Add specific questions and answers for direct AI lookup
-                  </Typography>
-
-                  <Paper variant="outlined" sx={{ p: 3, mb: 3, bgcolor: '#fafbfe' }}>
-                    <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 600 }}>
-                      Add New FAQ
+                    {/* Add New FAQ Form */}
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 2, color: '#334155' }}>
+                      Add a New FAQ Item
                     </Typography>
-                    <Grid container spacing={2} alignItems="flex-end">
-                      <Grid item xs={12} md={5}>
+                    <Grid container spacing={2.5} sx={{ alignItems: 'flex-start' }}>
+                      <Grid item xs={12} sm={5}>
                         <TextField
                           label="Question"
                           fullWidth
-                          size="small"
                           value={newFaq.question}
                           onChange={(e) => setNewFaq({ ...newFaq, question: e.target.value })}
-                          placeholder="e.g. Do you offer engraving?"
+                          placeholder="e.g. Do you ship internationally?"
+                          InputProps={{ sx: { borderRadius: '12px' } }}
                         />
                       </Grid>
-                      <Grid item xs={12} md={5}>
+                      <Grid item xs={12} sm={5}>
                         <TextField
                           label="Answer"
                           fullWidth
-                          size="small"
+                          multiline
+                          maxRows={3}
                           value={newFaq.answer}
                           onChange={(e) => setNewFaq({ ...newFaq, answer: e.target.value })}
-                          placeholder="e.g. Yes, we offer free name engraving on all gold rings."
+                          placeholder="e.g. Yes, we ship worldwide. Shipping rates vary by country."
+                          InputProps={{ sx: { borderRadius: '12px' } }}
                         />
                       </Grid>
-                      <Grid item xs={12} md={2}>
+                      <Grid item xs={12} sm={2}>
                         <Button
-                          variant="contained"
+                          variant="outlined"
                           fullWidth
                           startIcon={<AddIcon />}
                           onClick={handleAddFaq}
-                          disableElevation
+                          sx={{ 
+                            borderRadius: '12px', 
+                            py: 1.8, 
+                            fontWeight: 700,
+                            textTransform: 'none',
+                            borderWidth: 1.5,
+                            '&:hover': { borderWidth: 1.5 }
+                          }}
                         >
-                          Add FAQ
+                          Add Item
                         </Button>
                       </Grid>
                     </Grid>
-                  </Paper>
+                  </CardContent>
+                </Card>
+              </Grid>
 
-                  <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2 }}>
-                    Current Store FAQs ({shopConfig.faqs.length})
+              {/* Save Button for AI & Policies */}
+              <Grid item xs={12}>
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1 }}>
+                  <Button
+                    variant="contained"
+                    size="large"
+                    startIcon={<SaveIcon />}
+                    onClick={() => handleSaveShopConfig()}
+                    disabled={savingConfig}
+                    sx={{ 
+                      borderRadius: '12px', 
+                      fontWeight: 700, 
+                      px: 4, 
+                      py: 1.5, 
+                      textTransform: 'none',
+                      bgcolor: '#2563EB',
+                      boxShadow: '0 4px 14px rgba(37, 99, 235, 0.25)',
+                      '&:hover': {
+                        bgcolor: '#1d4ed8',
+                        boxShadow: '0 6px 20px rgba(37, 99, 235, 0.35)'
+                      }
+                    }}
+                  >
+                    {savingConfig ? 'Saving AI Settings...' : 'Save Settings'}
+                  </Button>
+                </Box>
+              </Grid>
+            </Grid>
+          )}
+
+          {/* Tab 3: WhatsApp Login & Status */}
+          {activeTab === 2 && (
+            <Box sx={{
+              '@keyframes tabFadeIn': {
+                from: { opacity: 0, transform: 'translateY(6px)' },
+                to: { opacity: 1, transform: 'translateY(0)' }
+              },
+              animation: 'tabFadeIn 0.25s cubic-bezier(0.25, 0.8, 0.25, 1) forwards',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 3.5
+            }}>
+              {/* Header Status Card */}
+              <Card elevation={0} sx={{ borderRadius: '16px', border: '1px solid', borderColor: whatsappStatus.authenticated ? '#A7F3D0' : '#FDE68A', overflow: 'hidden' }}>
+                <Box sx={{
+                  p: 4,
+                  background: whatsappStatus.authenticated 
+                    ? 'linear-gradient(135deg, #ECFDF5 0%, #F0FDF4 100%)' 
+                    : 'linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%)',
+                  display: 'flex',
+                  flexDirection: { xs: 'column', sm: 'row' },
+                  justifyContent: 'space-between',
+                  alignItems: { xs: 'flex-start', sm: 'center' },
+                  gap: 2
+                }}>
+                  <Box>
+                    <Typography variant="h5" sx={{ fontWeight: 800, color: whatsappStatus.authenticated ? '#065F46' : '#92400E', mb: 0.5, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                      <Box sx={{ 
+                        width: 12, 
+                        height: 12, 
+                        borderRadius: '50%', 
+                        bgcolor: whatsappStatus.authenticated ? '#10B981' : '#F59E0B',
+                        boxShadow: whatsappStatus.authenticated ? '0 0 12px #10B981' : '0 0 12px #F59E0B',
+                        animation: 'pulse 2s infinite'
+                      }} />
+                      {whatsappStatus.authenticated ? 'WhatsApp Active & Connected' : 'WhatsApp Connection Required'}
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: whatsappStatus.authenticated ? '#047857' : '#B45309', fontWeight: 500 }}>
+                      {whatsappStatus.authenticated 
+                        ? `Your WhatsApp service is fully authorized and running under session ID: default`
+                        : 'Connect your WhatsApp business/personal number to enable automated campaign broadcasting and AI chat responses.'}
+                    </Typography>
+                  </Box>
+
+                  {whatsappStatus.authenticated && (
+                    <Button
+                      variant="outlined"
+                      color="error"
+                      onClick={handleWhatsappLogout}
+                      sx={{ 
+                        borderRadius: '10px', 
+                        fontWeight: 700, 
+                        borderColor: '#FCA5A5', 
+                        color: '#DC2626', 
+                        bgcolor: '#FFFFFF',
+                        '&:hover': { bgcolor: '#FEF2F2', borderColor: '#EF4444' },
+                        textTransform: 'none',
+                        px: 3
+                      }}
+                    >
+                      Disconnect Account
+                    </Button>
+                  )}
+                </Box>
+              </Card>
+
+              {/* Main Panel Content */}
+              {whatsappStatus.authenticated ? (
+                /* Connected State View */
+                <Card 
+                  elevation={0} 
+                  sx={{ 
+                    borderRadius: '16px', 
+                    border: '1px solid #e2e8f0', 
+                    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)',
+                    p: 4, 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    alignItems: 'center', 
+                    textAlign: 'center', 
+                    py: 6,
+                    bgcolor: '#ffffff'
+                  }}
+                >
+                  <Box sx={{ 
+                    width: 80, 
+                    height: 80, 
+                    borderRadius: '50%', 
+                    bgcolor: '#E8F5E9', 
+                    display: 'flex', 
+                    justifyContent: 'center', 
+                    alignItems: 'center',
+                    mb: 3,
+                    boxShadow: '0 8px 16px rgba(16, 185, 129, 0.1)'
+                  }}>
+                    <SmartToyIcon sx={{ fontSize: 40, color: '#2E7D32' }} />
+                  </Box>
+                  
+                  <Typography variant="h5" sx={{ fontWeight: 800, mb: 1, color: '#1F2937' }}>
+                    Connected to {(() => {
+                      if (!whatsappStatus.phoneNumber) return 'WhatsApp';
+                      if (whatsappStatus.channel === 'meta_api') return whatsappStatus.phoneNumber;
+                      const clean = whatsappStatus.phoneNumber.replace('@c.us', '').replace('@s.whatsapp.net', '');
+                      return clean.startsWith('+') ? clean : '+' + clean;
+                    })()}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 460, mb: 4, lineHeight: 1.6 }}>
+                    {whatsappStatus.channel === 'meta_api'
+                      ? 'The Meta WhatsApp Cloud API is successfully configured. Automated campaigns, broadcasts, and AI responses will deploy automatically.'
+                      : 'The AI Auto-Responder engine is successfully listening to incoming messages. Any campaigns or auto-replies configured in the platform will deploy automatically.'}
                   </Typography>
 
-                  {shopConfig.faqs.length === 0 ? (
-                    <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic', py: 2 }}>
-                      No custom FAQs defined yet.
-                    </Typography>
-                  ) : (
-                    <List sx={{ border: '1px solid #e8eef7', borderRadius: 2, bgcolor: '#ffffff', p: 0 }}>
-                      {shopConfig.faqs.map((faq, index) => (
-                        <Box key={index}>
-                          <ListItem sx={{ py: 2 }}>
-                            <ListItemText
-                              primary={
-                                <Typography variant="body2" fontWeight={600}>
-                                  Q: {faq.question}
-                                </Typography>
-                              }
-                              secondary={
-                                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                                  A: {faq.answer}
-                                </Typography>
-                              }
-                            />
-                            <ListItemSecondaryAction>
-                              <IconButton
-                                edge="end"
-                                aria-label="delete"
-                                color="error"
-                                onClick={() => handleDeleteFaq(index)}
-                              >
-                                <DeleteIcon fontSize="small" />
-                              </IconButton>
-                            </ListItemSecondaryAction>
-                          </ListItem>
-                          {index < shopConfig.faqs.length - 1 && <Divider />}
+                  <Grid container spacing={3} sx={{ maxWidth: 800, mx: 'auto' }}>
+                    <Grid item xs={12} sm={4}>
+                      <Paper variant="outlined" sx={{ p: 2.5, borderRadius: '12px', textAlign: 'left', bgcolor: '#F8FAFC', borderColor: '#e2e8f0', height: '100%' }}>
+                        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>PROVIDER MODE</Typography>
+                        <Typography variant="body1" sx={{ fontWeight: 700, mt: 0.5, color: '#334155' }}>
+                          {whatsappStatus.channel === 'meta_api' ? 'Meta Cloud API' : 'Docker WAHA (QR Mode)'}
+                        </Typography>
+                      </Paper>
+                    </Grid>
+                    <Grid item xs={12} sm={4}>
+                      <Paper variant="outlined" sx={{ p: 2.5, borderRadius: '12px', textAlign: 'left', bgcolor: '#F8FAFC', borderColor: '#e2e8f0', height: '100%' }}>
+                        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>ENDPOINT HOST</Typography>
+                        <Typography variant="body1" sx={{ fontWeight: 700, mt: 0.5, color: '#334155', wordBreak: 'break-all' }}>
+                          {whatsappStatus.channel === 'meta_api' ? 'graph.facebook.com' : 'localhost:3000'}
+                        </Typography>
+                      </Paper>
+                    </Grid>
+                    <Grid item xs={12} sm={4}>
+                      <Paper variant="outlined" sx={{ p: 2.5, borderRadius: '12px', textAlign: 'left', bgcolor: systemStatus.ngrok.running ? '#ECFDF5' : '#FEF2F2', borderColor: systemStatus.ngrok.running ? '#A7F3D0' : '#FECACA', height: '100%' }}>
+                        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
+                          PUBLIC TUNNEL (NGROK)
+                          <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: systemStatus.ngrok.running ? '#10B981' : '#EF4444' }} />
+                        </Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 600, mt: 0.5, color: systemStatus.ngrok.running ? '#065F46' : '#991B1B', wordBreak: 'break-all' }}>
+                          {systemStatus.ngrok.running ? systemStatus.ngrok.url : 'Not Running'}
+                        </Typography>
+                      </Paper>
+                    </Grid>
+                  </Grid>
+                </Card>
+              ) : (
+                /* Pairing Options (Disconnected State) */
+                <Grid container spacing={4}>
+                  {/* Option 1: QR Code Card */}
+                  <Grid item xs={12} md={6}>
+                    <Card elevation={0} sx={{ borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', bgcolor: '#ffffff', height: '100%', display: 'flex', flexDirection: 'column' }}>
+                      <CardContent sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                        <Box sx={{ 
+                          width: 56, 
+                          height: 56, 
+                          borderRadius: '12px', 
+                          bgcolor: '#EFF6FF', 
+                          display: 'flex', 
+                          justifyContent: 'center', 
+                          alignItems: 'center',
+                          mb: 2.5
+                        }}>
+                          <SmartToyIcon sx={{ fontSize: 28, color: '#2563EB' }} />
                         </Box>
-                      ))}
-                    </List>
-                  )}
+                        
+                        <Typography variant="h6" sx={{ fontWeight: 800, mb: 1, color: '#1F2937' }}>
+                          Option 1: Scan QR Code
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 300, mb: 4, lineHeight: 1.5 }}>
+                          Open WhatsApp on your mobile phone &rarr; Settings &rarr; Linked Devices &rarr; Link a Device, then scan the QR code below.
+                        </Typography>
+
+                        <Box sx={{ 
+                          width: 240, 
+                          height: 240, 
+                          borderRadius: '16px', 
+                          border: '1px solid #E5E7EB',
+                          bgcolor: '#FFFFFF',
+                          boxShadow: '0 10px 25px -5px rgba(0,0,0,0.05)',
+                          display: 'flex',
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          position: 'relative',
+                          p: 2,
+                          mb: 3
+                        }}>
+                          {loadingQr ? (
+                            <CircularProgress size={36} />
+                          ) : whatsappQr ? (
+                            <img src={whatsappQr} alt="WhatsApp QR Code" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                          ) : qrError ? (
+                            <Typography variant="caption" color="text.secondary" px={3} sx={{ textAlign: 'center' }}>
+                              {qrError}
+                            </Typography>
+                          ) : (
+                            <Typography variant="caption" color="text.secondary" px={3}>
+                              Press refresh to load the QR code.
+                            </Typography>
+                          )}
+                        </Box>
+
+                        <Stack direction="row" spacing={1.5}>
+                          <Button
+                            variant="outlined"
+                            startIcon={<RefreshIcon />}
+                            onClick={fetchWhatsappQr}
+                            disabled={loadingQr}
+                            sx={{ 
+                              borderRadius: '10px', 
+                              fontWeight: 700,
+                              textTransform: 'none',
+                              px: 3,
+                              borderColor: '#D1D5DB',
+                              color: '#4B5563',
+                              '&:hover': { bgcolor: '#F9FAFB', borderColor: '#9CA3AF' }
+                            }}
+                          >
+                            Refresh QR Code
+                          </Button>
+                          {!whatsappStatus.authenticated && (
+                            <Button
+                              variant="contained"
+                              startIcon={<RefreshIcon />}
+                              onClick={handleRestartSession}
+                              disabled={restartingSession}
+                              sx={{ 
+                                borderRadius: '10px', 
+                                fontWeight: 700,
+                                textTransform: 'none',
+                                px: 3,
+                                bgcolor: '#D97706',
+                                '&:hover': { bgcolor: '#B45309' }
+                              }}
+                            >
+                              {restartingSession ? 'Restarting...' : 'Restart Session'}
+                            </Button>
+                          )}
+                        </Stack>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+
+                  {/* Option 2: Pairing Code Card */}
+                  <Grid item xs={12} md={6}>
+                    <Card elevation={0} sx={{ borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', bgcolor: '#ffffff', height: '100%', display: 'flex', flexDirection: 'column' }}>
+                      <CardContent sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                        <Box sx={{ 
+                          width: 56, 
+                          height: 56, 
+                          borderRadius: '12px', 
+                          bgcolor: '#F0FDF4', 
+                          display: 'flex', 
+                          justifyContent: 'center', 
+                          alignItems: 'center',
+                          mb: 2.5
+                        }}>
+                          <SendIcon sx={{ fontSize: 24, color: '#16A34A', transform: 'rotate(-45deg)', mt: -0.5 }} />
+                        </Box>
+                        
+                        <Typography variant="h6" sx={{ fontWeight: 800, mb: 1, color: '#1F2937' }}>
+                          Option 2: Use 8-Character Code
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 320, mb: 4, lineHeight: 1.5 }}>
+                          Enter your phone number (including country code, e.g. 919876543210) to receive an 8-character code to pair instantly.
+                        </Typography>
+
+                        <Stack spacing={2} sx={{ width: '100%', maxWidth: 300, mb: 3 }}>
+                          <TextField
+                            label="WhatsApp Phone Number"
+                            placeholder="e.g. 919345578103"
+                            value={pairingPhone}
+                            onChange={(e) => setPairingPhone(e.target.value)}
+                            fullWidth
+                            InputProps={{
+                              sx: { borderRadius: '12px' }
+                            }}
+                          />
+                          <Button
+                            variant="contained"
+                            fullWidth
+                            onClick={handleRequestPairingCode}
+                            disabled={requestingCode}
+                            disableElevation
+                            sx={{ 
+                              borderRadius: '12px', 
+                              fontWeight: 700,
+                              py: 1.5,
+                              textTransform: 'none',
+                              bgcolor: '#2563EB',
+                              '&:hover': { bgcolor: '#1d4ed8' }
+                            }}
+                          >
+                            {requestingCode ? 'Requesting Code...' : 'Get Pairing Code'}
+                          </Button>
+                        </Stack>
+
+                        {pairingCode && (
+                          <Paper elevation={0} sx={{ 
+                            bgcolor: '#EFF6FF', 
+                            p: 3, 
+                            borderRadius: '16px', 
+                            border: '1px solid #BFDBFE', 
+                            width: '100%', 
+                            maxWidth: 300,
+                            boxShadow: '0 4px 12px rgba(37, 99, 235, 0.05)'
+                          }}>
+                            <Typography variant="caption" color="primary" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.8, display: 'block', mb: 1.5 }}>
+                              Enter Code on Phone
+                            </Typography>
+                            <Typography variant="h4" sx={{ fontWeight: 850, color: '#1E40AF', letterSpacing: 4 }}>
+                              {pairingCode}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 2, lineHeight: 1.4 }}>
+                              Tap "Link with Phone Number" on your WhatsApp mobile application to link.
+                            </Typography>
+                          </Paper>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                </Grid>
+              )}
+            </Box>
+          )}
+        </Box>
+      )}
+
+      {/* Tab 4: Meta API Configuration */}
+      {activeTab === 3 && (
+        <Box sx={{
+          '@keyframes tabFadeIn': {
+            from: { opacity: 0, transform: 'translateY(6px)' },
+            to: { opacity: 1, transform: 'translateY(0)' }
+          },
+          animation: 'tabFadeIn 0.25s cubic-bezier(0.25, 0.8, 0.25, 1) forwards',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 3.5
+        }}>
+          {/* Meta API Status Card */}
+          <Card elevation={0} sx={{ borderRadius: '16px', border: '1px solid', borderColor: metaConfig.metaApiEnabled ? '#A7F3D0' : '#FDE68A', overflow: 'hidden' }}>
+            <Box sx={{
+              p: 4,
+              background: metaConfig.metaApiEnabled
+                ? 'linear-gradient(135deg, #ECFDF5 0%, #F0FDF4 100%)'
+                : 'linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%)',
+              display: 'flex',
+              flexDirection: { xs: 'column', sm: 'row' },
+              justifyContent: 'space-between',
+              alignItems: { xs: 'flex-start', sm: 'center' },
+              gap: 2
+            }}>
+              <Box>
+                <Typography variant="h5" sx={{ fontWeight: 800, color: metaConfig.metaApiEnabled ? '#065F46' : '#92400E', mb: 0.5, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                  <Box sx={{
+                    width: 12,
+                    height: 12,
+                    borderRadius: '50%',
+                    bgcolor: metaConfig.metaApiEnabled ? '#10B981' : '#F59E0B',
+                    boxShadow: metaConfig.metaApiEnabled ? '0 0 12px #10B981' : '0 0 12px #F59E0B',
+                    animation: 'pulse 2s infinite'
+                  }} />
+                  {metaConfig.metaApiEnabled ? 'Meta API Connected' : 'Meta API Not Configured'}
+                </Typography>
+                <Typography variant="body2" sx={{ color: metaConfig.metaApiEnabled ? '#047857' : '#B45309', fontWeight: 500 }}>
+                  {metaConfig.metaApiEnabled
+                    ? 'Bulk messages will be sent via Meta WhatsApp Cloud API. Docker/WAHA fallback is disabled.'
+                    : 'Configure your Meta API credentials to send bulk messages via WhatsApp Cloud API. If not configured, the system will fall back to Docker/WAHA.'}
+                </Typography>
+              </Box>
+
+              {metaConfig.metaApiEnabled && (
+                <Button
+                  variant="outlined"
+                  color="error"
+                  onClick={() => {
+                    setMetaConfig(prev => ({ ...prev, metaApiEnabled: false }));
+                    handleSaveMetaConfig();
+                  }}
+                  sx={{
+                    borderRadius: '10px',
+                    fontWeight: 700,
+                    borderColor: '#FCA5A5',
+                    color: '#DC2626',
+                    bgcolor: '#FFFFFF',
+                    '&:hover': { bgcolor: '#FEF2F2', borderColor: '#EF4444' },
+                    textTransform: 'none',
+                    px: 3
+                  }}
+                >
+                  Disable Meta API
+                </Button>
+              )}
+            </Box>
+          </Card>
+
+          {/* Lead Handoff / Forwarding Card */}
+          <Card elevation={0} sx={{ borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', bgcolor: '#ffffff' }}>
+            <CardContent sx={{ p: 4 }}>
+              <Stack direction="row" spacing={2} sx={{ alignItems: 'center', mb: 3 }}>
+                <Box sx={{ width: 40, height: 40, borderRadius: '10px', bgcolor: '#ECFDF5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <ForwardIcon sx={{ color: '#059669', fontSize: 20 }} />
+                </Box>
+                <Box>
+                  <Typography variant="h6" sx={{ fontWeight: 800, color: '#1e293b' }}>
+                    Lead Handoff — Forward Replies to WhatsApp
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    When a customer replies to your Meta campaign number, a handoff message is sent to them from your QR-logged WhatsApp so your staff can continue the chat there
+                  </Typography>
+                </Box>
+              </Stack>
+
+              <Stack spacing={2.5}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={!!metaConfig.metaForwardReplies}
+                      onChange={(e) => handleMetaConfigChange('metaForwardReplies', e.target.checked)}
+                      color="success"
+                      disabled={!metaConfig.metaApiEnabled}
+                    />
+                  }
+                  label="Forward customer replies to my WhatsApp (connected in the WhatsApp Login tab)"
+                />
+
+                <TextField
+                  label="Handoff Message"
+                  fullWidth
+                  multiline
+                  minRows={2}
+                  value={metaConfig.metaHandoffMessage}
+                  onChange={(e) => handleMetaConfigChange('metaHandoffMessage', e.target.value)}
+                  disabled={!metaConfig.metaApiEnabled || !metaConfig.metaForwardReplies}
+                  helperText="Use {name} for the customer name. Sent from Meta when first message is received."
+                  InputProps={{ sx: { borderRadius: '12px' } }}
+                />
+
+                <TextField
+                  label="Auto-Reply Message"
+                  fullWidth
+                  multiline
+                  minRows={2}
+                  value={metaConfig.metaAutoReplyMessage || ''}
+                  onChange={(e) => handleMetaConfigChange('metaAutoReplyMessage', e.target.value)}
+                  disabled={!metaConfig.metaApiEnabled || !metaConfig.metaForwardReplies}
+                  helperText="Use {name} for the customer name. Sent from your logged-in WhatsApp (WAHA) as the first reply."
+                  InputProps={{ sx: { borderRadius: '12px' } }}
+                />
+
+                <Alert
+                  severity={whatsappStatus.authenticated ? 'success' : 'warning'}
+                  icon={<ForwardIcon fontSize="inherit" />}
+                  sx={{ borderRadius: '12px' }}
+                >
+                  {whatsappStatus.authenticated
+                    ? 'WhatsApp Login (QR session) is connected — handoff messages will be sent from your QR-scanned number.'
+                    : 'WhatsApp Login (QR session) is not connected yet. Go to the "WhatsApp Login" tab and scan the QR code or use a pairing code first.'}
+                </Alert>
+              </Stack>
+            </CardContent>
+          </Card>
+
+          {/* Meta API Configuration Form */}
+          <Grid container spacing={3.5}>
+            {/* Basic Credentials */}
+            <Grid item xs={12} md={6}>
+              <Card elevation={0} sx={{ borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', bgcolor: '#ffffff', height: '100%' }}>
+                <CardContent sx={{ p: 4 }}>
+                  <Stack direction="row" spacing={2} sx={{ alignItems: 'center', mb: 3 }}>
+                    <Box sx={{ width: 40, height: 40, borderRadius: '10px', bgcolor: '#DBEAFE', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <CloudIcon sx={{ color: '#2563EB', fontSize: 20 }} />
+                    </Box>
+                    <Box>
+                      <Typography variant="h6" sx={{ fontWeight: 800, color: '#1e293b' }}>
+                        Basic Credentials
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Enter your Meta App credentials and WhatsApp Business Account details
+                      </Typography>
+                    </Box>
+                  </Stack>
+
+                  <Stack spacing={2.5}>
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={metaConfig.metaApiEnabled}
+                          onChange={(e) => handleMetaConfigChange('metaApiEnabled', e.target.checked)}
+                          color="success"
+                        />
+                      }
+                      label="Enable Meta API for bulk messaging"
+                    />
+
+                    <TextField
+                      label="Meta App ID"
+                      fullWidth
+                      value={metaConfig.metaAppId}
+                      onChange={(e) => handleMetaConfigChange('metaAppId', e.target.value)}
+                      placeholder="e.g. 123456789012345"
+                      disabled={!metaConfig.metaApiEnabled}
+                      InputProps={{ sx: { borderRadius: '12px' } }}
+                    />
+
+                    <TextField
+                      label="Meta App Secret"
+                      fullWidth
+                      type="password"
+                      value={metaConfig.metaAppSecret}
+                      onChange={(e) => handleMetaConfigChange('metaAppSecret', e.target.value)}
+                      placeholder="Enter your Meta App Secret"
+                      disabled={!metaConfig.metaApiEnabled}
+                      InputProps={{ sx: { borderRadius: '12px' } }}
+                    />
+
+                    <TextField
+                      label="Phone Number ID"
+                      fullWidth
+                      value={metaConfig.metaPhoneNumberId}
+                      onChange={(e) => handleMetaConfigChange('metaPhoneNumberId', e.target.value)}
+                      placeholder="e.g. 123456789012345"
+                      disabled={!metaConfig.metaApiEnabled}
+                      helperText="The WhatsApp Business phone number ID from Meta Developer Portal"
+                      InputProps={{ sx: { borderRadius: '12px' } }}
+                    />
+
+                    <TextField
+                      label="Business Account ID"
+                      fullWidth
+                      value={metaConfig.metaBusinessAccountId}
+                      onChange={(e) => handleMetaConfigChange('metaBusinessAccountId', e.target.value)}
+                      placeholder="e.g. 123456789012345"
+                      disabled={!metaConfig.metaApiEnabled}
+                      InputProps={{ sx: { borderRadius: '12px' } }}
+                    />
+                  </Stack>
                 </CardContent>
               </Card>
             </Grid>
 
-            {/* Save Button */}
-            <Grid item xs={12}>
-              <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <Button
-                  variant="contained"
-                  size="large"
-                  startIcon={<SaveIcon />}
-                  onClick={() => handleSaveShopConfig()}
-                  disabled={savingConfig}
-                  disableElevation
-                >
-                  {savingConfig ? 'Saving Knowledge Base...' : 'Save Knowledge Base'}
-                </Button>
-              </Box>
-            </Grid>
-          </Grid>
-        )}
-      </TabPanel>
+            {/* Access Token & Security */}
+            <Grid item xs={12} md={6}>
+              <Card elevation={0} sx={{ borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', bgcolor: '#ffffff', height: '100%' }}>
+                <CardContent sx={{ p: 4 }}>
+                  <Stack direction="row" spacing={2} sx={{ alignItems: 'center', mb: 3 }}>
+                    <Box sx={{ width: 40, height: 40, borderRadius: '10px', bgcolor: '#E0F2FE', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <KeyIcon sx={{ color: '#0369A1', fontSize: 20 }} />
+                    </Box>
+                    <Box>
+                      <Typography variant="h6" sx={{ fontWeight: 800, color: '#1e293b' }}>
+                        Access Token & Security
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Configure the access token and webhook verification token
+                      </Typography>
+                    </Box>
+                  </Stack>
 
-      {/* Tab 3: Catalog */}
-      <TabPanel value={activeTab} index={2}>
-        <Grid container spacing={3}>
-          {/* Add Product Form */}
-          <Grid item xs={12} md={5}>
-            <Card elevation={0} component="form" onSubmit={handleAddCatalogItem}>
-              <CardContent sx={{ p: 4 }}>
-                <Typography variant="h6" gutterBottom sx={{ fontWeight: 700 }}>
-                  Add Product Item
-                </Typography>
-                <Typography variant="body2" color="text.secondary" mb={3}>
-                  Add items to the jewelry catalog for the AI to dynamically offer and share
-                </Typography>
-
-                <Stack spacing={2.5}>
-                  <TextField
-                    label="Product Name *"
-                    fullWidth
-                    required
-                    value={newCatalog.name}
-                    onChange={(e) => setNewCatalog({ ...newCatalog, name: e.target.value })}
-                    placeholder="e.g. Kundan Gold Ring"
-                  />
-
-                  <Grid container spacing={2}>
-                    <Grid item xs={6}>
-                      <FormControl fullWidth>
-                        <InputLabel>Category</InputLabel>
-                        <Select
-                          value={newCatalog.category}
-                          label="Category"
-                          onChange={(e) => setNewCatalog({ ...newCatalog, category: e.target.value })}
-                        >
-                          <MenuItem value="Rings">Rings</MenuItem>
-                          <MenuItem value="Necklaces">Necklaces</MenuItem>
-                          <MenuItem value="Bangles">Bangles</MenuItem>
-                          <MenuItem value="Earrings">Earrings</MenuItem>
-                          <MenuItem value="Custom">Custom</MenuItem>
-                        </Select>
-                      </FormControl>
-                    </Grid>
-                    <Grid item xs={6}>
-                      <TextField
-                        label="Price (INR) *"
-                        fullWidth
-                        required
-                        type="number"
-                        value={newCatalog.price}
-                        onChange={(e) => setNewCatalog({ ...newCatalog, price: e.target.value })}
-                        placeholder="45000"
-                        InputProps={{ startAdornment: <Typography sx={{ mr: 0.5, color: 'text.secondary' }}>₹</Typography> }}
-                      />
-                    </Grid>
-                  </Grid>
-
-                  <TextField
-                    label="Keywords (comma-separated)"
-                    fullWidth
-                    value={newCatalog.keywords}
-                    onChange={(e) => setNewCatalog({ ...newCatalog, keywords: e.target.value })}
-                    placeholder="gold, bridal, kundan, traditional"
-                    helperText="Keywords used by the AI search lookup to match customer queries"
-                  />
-
-                  <TextField
-                    label="Description"
-                    fullWidth
-                    multiline
-                    rows={3}
-                    value={newCatalog.description}
-                    onChange={(e) => setNewCatalog({ ...newCatalog, description: e.target.value })}
-                    placeholder="Bespoke traditional gold ring with micro-engraving..."
-                  />
-
-                  {/* Drag and Drop File Input Area */}
-                  <Box>
-                    <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
-                      Product Image *
-                    </Typography>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      ref={fileInputRef}
-                      style={{ display: 'none' }}
-                      onChange={handleFileChange}
+                  <Stack spacing={2.5}>
+                    <TextField
+                      label="Meta Access Token"
+                      fullWidth
+                      type="password"
+                      value={metaConfig.metaAccessToken}
+                      onChange={(e) => handleMetaConfigChange('metaAccessToken', e.target.value)}
+                      placeholder="Enter your Meta permanent access token"
+                      disabled={!metaConfig.metaApiEnabled}
+                      helperText="Use a permanent system user access token from Meta Business Manager"
+                      InputProps={{ sx: { borderRadius: '12px' } }}
                     />
 
-                    {newCatalog.imagePreview ? (
-                      <Box sx={{ position: 'relative', width: '100%', height: 180, borderRadius: 2, overflow: 'hidden', border: '1px solid #e8eef7' }}>
-                        <img
-                          src={newCatalog.imagePreview}
-                          alt="Preview"
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        />
-                        <IconButton
-                          sx={{ position: 'absolute', top: 8, right: 8, bgcolor: 'rgba(0,0,0,0.6)', color: 'white', '&:hover': { bgcolor: 'rgba(0,0,0,0.8)' } }}
-                          size="small"
-                          onClick={() => {
-                            setNewCatalog(prev => ({ ...prev, imageFile: null, imagePreview: '' }));
-                            if (fileInputRef.current) fileInputRef.current.value = '';
-                          }}
-                        >
-                          <CloseIcon fontSize="small" />
-                        </IconButton>
-                      </Box>
-                    ) : (
-                      <Paper
-                        variant="outlined"
-                        onClick={() => fileInputRef.current && fileInputRef.current.click()}
-                        sx={{
-                          p: 4,
-                          textAlign: 'center',
-                          cursor: 'pointer',
-                          borderStyle: 'dashed',
-                          borderColor: 'primary.light',
-                          bgcolor: '#fafbfe',
-                          transition: 'all 0.2s',
-                          '&:hover': { borderColor: 'primary.main', bgcolor: '#f0f5fa' }
-                        }}
-                      >
-                        <CloudUploadIcon color="primary" sx={{ fontSize: 40, mb: 1 }} />
-                        <Typography variant="body2" fontWeight={600}>
-                          Click to upload product photo
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          PNG, JPG or JPEG up to 5MB
-                        </Typography>
-                      </Paper>
-                    )}
+                    <TextField
+                      label="Webhook Verify Token"
+                      fullWidth
+                      value={metaConfig.metaWebhookVerifyToken}
+                      onChange={(e) => handleMetaConfigChange('metaWebhookVerifyToken', e.target.value)}
+                      placeholder="e.g. renic_meta_verify_token_2026"
+                      disabled={!metaConfig.metaApiEnabled}
+                      helperText="A secret token for webhook verification"
+                      InputProps={{ sx: { borderRadius: '12px' } }}
+                    />
+                  </Stack>
+
+                  <Box sx={{ mt: 4, display: 'flex', gap: 2 }}>
+                    <Button
+                      variant="contained"
+                      startIcon={<SaveIcon />}
+                      onClick={handleSaveMetaConfig}
+                      disabled={savingConfig || !metaConfig.metaApiEnabled}
+                      sx={{ 
+                        borderRadius: '12px', 
+                        fontWeight: 700, 
+                        textTransform: 'none',
+                        px: 3.5,
+                        py: 1.2,
+                        bgcolor: '#2563EB',
+                        '&:hover': { bgcolor: '#1d4ed8' }
+                      }}
+                    >
+                      {savingConfig ? 'Saving...' : 'Save Meta Config'}
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      startIcon={<CloudIcon />}
+                      onClick={handleTestMetaConnection}
+                      disabled={metaTesting || !metaConfig.metaApiEnabled}
+                      sx={{ 
+                        borderRadius: '12px', 
+                        fontWeight: 700, 
+                        textTransform: 'none',
+                        px: 3.5,
+                        py: 1.2,
+                        borderWidth: 1.5,
+                        '&:hover': { borderWidth: 1.5 }
+                      }}
+                    >
+                      {metaTesting ? 'Testing...' : 'Test Connection'}
+                    </Button>
                   </Box>
 
-                  <Button
-                    type="submit"
-                    variant="contained"
-                    fullWidth
-                    size="large"
-                    disabled={savingCatalog}
-                    disableElevation
-                  >
-                    {savingCatalog ? 'Uploading Product...' : 'Add to Catalog'}
-                  </Button>
-                </Stack>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          {/* Catalog Items Grid */}
-          <Grid item xs={12} md={7}>
-            <Card elevation={0} sx={{ height: '100%' }}>
-              <CardContent sx={{ p: 4 }}>
-                <Typography variant="h6" gutterBottom sx={{ fontWeight: 700 }}>
-                  Catalog Listings
-                </Typography>
-                <Typography variant="body2" color="text.secondary" mb={4}>
-                  Stored product cards offering real-time AI image dispatching
-                </Typography>
-
-                {loadingCatalog ? (
-                  <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-                    <CircularProgress />
-                  </Box>
-                ) : catalogItems.length === 0 ? (
-                  <Paper variant="outlined" sx={{ p: 6, textAlign: 'center', bgcolor: '#fafafa', borderStyle: 'dashed' }}>
-                    <InfoIcon sx={{ fontSize: 48, color: 'text.disabled', mb: 2 }} />
-                    <Typography variant="body1" color="text.secondary" gutterBottom fontWeight={600}>
-                      No catalog items found
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Fill the form on the left to add your first jewelry item.
-                    </Typography>
-                  </Paper>
-                ) : (
-                  <Grid container spacing={2} sx={{ maxHeight: '600px', overflowY: 'auto', pr: 1 }}>
-                    {catalogItems.map((item) => (
-                      <Grid item xs={12} sm={6} key={item._id}>
-                        <Card variant="outlined" sx={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative', border: '1px solid #e8eef7' }}>
-                          <Box sx={{ height: 140, overflow: 'hidden', bgcolor: '#f0f0f0' }}>
-                            <img
-                              src={getImageUrl(item.imageUrl)}
-                              alt={item.name}
-                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                            />
-                          </Box>
-                          <CardContent sx={{ p: 2, flexGrow: 1 }}>
-                            <Typography variant="subtitle1" fontWeight={700} sx={{ lineHeight: 1.2, mb: 0.5 }}>
-                              {item.name}
-                            </Typography>
-                            <Typography variant="subtitle2" color="primary.main" fontWeight={700} sx={{ mb: 1 }}>
-                              ₹{item.price.toLocaleString('en-IN')}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary" sx={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', mb: 1.5 }}>
-                              {item.description || 'No description provided.'}
-                            </Typography>
-                            <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
-                              <Chip label={item.category} size="small" variant="outlined" />
-                              {item.keywords && item.keywords.split(',').map((kw, i) => (
-                                <Chip key={i} label={kw.trim()} size="small" sx={{ fontSize: '0.65rem' }} />
-                              ))}
-                            </Stack>
-                          </CardContent>
-                          <IconButton
-                            color="error"
-                            size="small"
-                            onClick={() => handleDeleteCatalog(item._id)}
-                            sx={{ position: 'absolute', top: 8, right: 8, bgcolor: 'rgba(255,255,255,0.85)', '&:hover': { bgcolor: 'rgba(255,255,255,1)' } }}
-                          >
-                            <DeleteIcon fontSize="small" />
-                          </IconButton>
-                        </Card>
-                      </Grid>
-                    ))}
-                  </Grid>
-                )}
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
-      </TabPanel>
-
-      {/* Tab 4: Sandbox Chat */}
-      <TabPanel value={activeTab} index={3}>
-        <Grid container spacing={3}>
-          {/* Chat Simulator */}
-          <Grid item xs={12} md={8}>
-            <Card elevation={0} sx={{ height: '620px', display: 'flex', flexDirection: 'column', border: '1px solid #e8eef7' }}>
-              {/* Simulator Header */}
-              <Box sx={{ p: 2, bgcolor: '#ffffff', borderBottom: '1px solid #e8eef7', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Stack direction="row" spacing={1.5} alignItems="center">
-                  <Avatar sx={{ bgcolor: 'primary.main' }}>
-                    <PersonIcon />
-                  </Avatar>
-                  <Box>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                      Simulator (Customer profile: {sandboxName})
-                    </Typography>
-                    <Typography variant="caption" color="success.main" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                      <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: 'success.main' }} />
-                      AI Chat Autopilot Connected
-                    </Typography>
-                  </Box>
-                </Stack>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  startIcon={<RefreshIcon />}
-                  onClick={() => {
-                    setSandboxMessages([
-                      {
-                        sender: 'ai',
-                        text: 'Namaste! Welcome to Renic Jewellers. May I know your name, please?',
-                        timestamp: new Date()
-                      }
-                    ]);
-                    setSandboxName('Customer');
-                  }}
-                >
-                  Reset Chat
-                </Button>
-              </Box>
-
-              {/* Chat Bubble List */}
-              <Box sx={{ flexGrow: 1, p: 3, overflowY: 'auto', bgcolor: '#f4f6fa', display: 'flex', flexDirection: 'column', gap: 2 }}>
-                {sandboxMessages.map((msg, index) => {
-                  const isUser = msg.sender === 'customer';
-                  return (
-                    <Box key={index} sx={{ display: 'flex', justifyContent: isUser ? 'flex-end' : 'flex-start', width: '100%' }}>
-                      <Box sx={{ maxWidth: '75%' }}>
-                        {/* Chat Message Bubble */}
-                        <Paper
-                          elevation={0}
-                          sx={{
-                            p: 2,
-                            borderRadius: isUser ? '16px 16px 2px 16px' : '16px 16px 16px 2px',
-                            bgcolor: isUser ? 'primary.main' : 'background.paper',
-                            color: isUser ? 'primary.contrastText' : 'text.primary',
-                            border: isUser ? 'none' : '1px solid #e8eef7',
-                            boxShadow: '0 2px 6px rgba(0,0,0,0.02)',
-                            overflow: 'hidden'
-                          }}
-                        >
-                          {!isUser && msg.mediaUrl && (
-                            <Box sx={{ mb: 1.5, borderRadius: 1.5, overflow: 'hidden', border: '1px solid #e8eef7', maxHeight: 180, bgcolor: '#fafafa' }}>
-                              <img
-                                src={getImageUrl(msg.mediaUrl)}
-                                alt="Shared Catalog Banner"
-                                style={{ width: '100%', maxHeight: 180, objectFit: 'contain', display: 'block' }}
-                              />
-                            </Box>
-                          )}
-                          <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
-                            {isUser ? msg.text : formatAIResponse(msg.text)}
-                          </Typography>
-                        </Paper>
-
-                        {!isUser && renderSandboxInteractive(msg)}
-
-                        {/* Interactive Category Buttons for Catalog Prompts */}
-                        {!isUser && msg.isCatalogPrompt && (
-                          <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                            <Button
-                              size="small"
-                              variant="outlined"
-                              onClick={() => handleSendSandbox('Rings')}
-                              sx={{ textTransform: 'none', borderRadius: 4, bgcolor: '#ffffff', py: 0.5, px: 1.5, fontSize: '0.75rem', fontWeight: 600, border: '1px solid #e8eef7', color: 'primary.main', '&:hover': { bgcolor: 'primary.light', color: 'primary.contrastText' } }}
-                            >
-                              Rings 💍
-                            </Button>
-                            <Button
-                              size="small"
-                              variant="outlined"
-                              onClick={() => handleSendSandbox('Necklaces')}
-                              sx={{ textTransform: 'none', borderRadius: 4, bgcolor: '#ffffff', py: 0.5, px: 1.5, fontSize: '0.75rem', fontWeight: 600, border: '1px solid #e8eef7', color: 'primary.main', '&:hover': { bgcolor: 'primary.light', color: 'primary.contrastText' } }}
-                            >
-                              Necklaces 📿
-                            </Button>
-                            <Button
-                              size="small"
-                              variant="outlined"
-                              onClick={() => handleSendSandbox('Bangles')}
-                              sx={{ textTransform: 'none', borderRadius: 4, bgcolor: '#ffffff', py: 0.5, px: 1.5, fontSize: '0.75rem', fontWeight: 600, border: '1px solid #e8eef7', color: 'primary.main', '&:hover': { bgcolor: 'primary.light', color: 'primary.contrastText' } }}
-                            >
-                              Bangles ⭕
-                            </Button>
-                            <Button
-                              size="small"
-                              variant="outlined"
-                              onClick={() => handleSendSandbox('Earrings')}
-                              sx={{ textTransform: 'none', borderRadius: 4, bgcolor: '#ffffff', py: 0.5, px: 1.5, fontSize: '0.75rem', fontWeight: 600, border: '1px solid #e8eef7', color: 'primary.main', '&:hover': { bgcolor: 'primary.light', color: 'primary.contrastText' } }}
-                            >
-                              Earrings 💎
-                            </Button>
-                          </Box>
-                        )}
-
-                        {/* Extracted Name Banner Notice */}
-                        {!isUser && msg.nameUpdated && msg.newName && (
-                          <Alert severity="info" size="small" sx={{ mt: 1, py: 0, '& .MuiAlert-message': { fontSize: '0.75rem' } }}>
-                            Extracted Name: <strong>{msg.newName}</strong>. Updated in database.
-                          </Alert>
-                        )}
-
-                        {/* Catalog Cards Attachment Preview */}
-                        {!isUser && msg.catalogMatches && msg.catalogMatches.length > 0 && (
-                          <Box sx={{ mt: 1.5, display: 'flex', flexDirection: 'column', gap: 1 }}>
-                            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, px: 0.5 }}>
-                              📎 Product Attachment:
-                            </Typography>
-                            {msg.catalogMatches.map((item, idx) => (
-                              <Card key={idx} variant="outlined" sx={{ display: 'flex', bgcolor: '#ffffff', border: '1px solid #e8eef7', borderRadius: 2, overflow: 'hidden', p: 0, height: 74 }}>
-                                <Box sx={{ width: 74, minWidth: 74, height: '100%', overflow: 'hidden' }}>
-                                  <img
-                                    src={getImageUrl(item.imageUrl)}
-                                    alt={item.name}
-                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                  />
-                                </Box>
-                                <Box sx={{ p: 1.5, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                                  <Typography variant="caption" sx={{ fontWeight: 700, display: 'block' }}>
-                                    {item.name}
-                                  </Typography>
-                                  <Typography variant="caption" color="primary.main" sx={{ fontWeight: 700 }}>
-                                    ₹{item.price.toLocaleString('en-IN')}
-                                  </Typography>
-                                </Box>
-                              </Card>
-                            ))}
-                          </Box>
-                        )}
-
-                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5, px: 1, textAlign: isUser ? 'right' : 'left' }}>
-                          {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  );
-                })}
-                {sandboxSending && (
-                  <Box sx={{ display: 'flex', justifyContent: 'flex-start', pl: 1 }}>
-                    <CircularProgress size={18} />
-                    <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>AI is thinking...</Typography>
-                  </Box>
-                )}
-                <div ref={chatEndRef} />
-              </Box>
-
-              {/* Message Input Controls */}
-              <Box sx={{ p: 2, bgcolor: '#ffffff', borderTop: '1px solid #e8eef7', display: 'flex', gap: 1 }}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  value={sandboxInput}
-                  onChange={(e) => setSandboxInput(e.target.value)}
-                  placeholder="Type a query to test (e.g. what is the 22k gold rate?)"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleSendSandbox();
-                  }}
-                  disabled={sandboxSending}
-                />
-                <Button
-                  variant="contained"
-                  onClick={() => handleSendSandbox()}
-                  disabled={sandboxSending || !sandboxInput.trim()}
-                  disableElevation
-                  sx={{ p: 1, minWidth: 48 }}
-                >
-                  <SendIcon fontSize="small" />
-                </Button>
-              </Box>
-            </Card>
-          </Grid>
-
-          {/* Test Quick Triggers */}
-          <Grid item xs={12} md={4}>
-            <Card elevation={0} sx={{ height: '620px', overflowY: 'auto' }}>
-              <CardContent sx={{ p: 4 }}>
-                <Typography variant="h6" gutterBottom sx={{ fontWeight: 700 }}>
-                  Test Simulation Triggers
-                </Typography>
-                <Typography variant="body2" color="text.secondary" mb={3}>
-                  Click any of the sample messages below to test the AI’s capability:
-                </Typography>
-
-                <Stack spacing={1.5}>
-                  <Button
-                    variant="outlined"
-                    fullWidth
-                    color="inherit"
-                    onClick={() => handleSendSandbox('Hi')}
-                    sx={{ justifyContent: 'flex-start', textAlign: 'left', py: 1.5, borderColor: '#e8eef7' }}
-                  >
-                    💬 Say "Hi" (Triggers name request)
-                  </Button>
-                  <Button
-                    variant="outlined"
-                    fullWidth
-                    color="inherit"
-                    onClick={() => handleSendSandbox('My name is Priya')}
-                    sx={{ justifyContent: 'flex-start', textAlign: 'left', py: 1.5, borderColor: '#e8eef7' }}
-                  >
-                    💬 Say "My name is Priya" (Name collection)
-                  </Button>
-                  <Button
-                    variant="outlined"
-                    fullWidth
-                    color="inherit"
-                    onClick={() => handleSendSandbox('What is the 22K gold rate today?')}
-                    sx={{ justifyContent: 'flex-start', textAlign: 'left', py: 1.5, borderColor: '#e8eef7' }}
-                  >
-                    💬 Ask: "What is the 22K gold rate today?"
-                  </Button>
-                  <Button
-                    variant="outlined"
-                    fullWidth
-                    color="inherit"
-                    onClick={() => handleSendSandbox('Show me rings and tell me the price')}
-                    sx={{ justifyContent: 'flex-start', textAlign: 'left', py: 1.5, borderColor: '#e8eef7' }}
-                  >
-                    💬 Ask: "Show me rings and tell me the price"
-                  </Button>
-                  <Button
-                    variant="outlined"
-                    fullWidth
-                    color="inherit"
-                    onClick={() => handleSendSandbox('I want to custom book an appointment')}
-                    sx={{ justifyContent: 'flex-start', textAlign: 'left', py: 1.5, borderColor: '#e8eef7' }}
-                  >
-                    💬 Ask: "I want to custom book an appointment"
-                  </Button>
-                  <Button
-                    variant="outlined"
-                    fullWidth
-                    color="inherit"
-                    onClick={() => handleSendSandbox('Do you have a refund policy?')}
-                    sx={{ justifyContent: 'flex-start', textAlign: 'left', py: 1.5, borderColor: '#e8eef7' }}
-                  >
-                    💬 Ask: "Do you have a refund policy?"
-                  </Button>
-                </Stack>
-
-                <Alert severity="warning" sx={{ mt: 4, '& .MuiAlert-message': { fontSize: '0.8rem' } }}>
-                  Rates and catalog items will match the live database values configured in the <strong>Knowledge Base</strong> and <strong>Jewelry Catalog</strong> tabs.
-                </Alert>
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
-      </TabPanel>
-
-      {/* Tab 5: Knowledge Documents */}
-      <TabPanel value={activeTab} index={4}>
-        <Grid container spacing={3}>
-          {/* Uploader Section */}
-          <Grid item xs={12} md={5}>
-            <Card elevation={0} sx={{ border: '1px solid #e8eef7' }}>
-              <CardContent sx={{ p: 4 }}>
-                <Typography variant="h6" gutterBottom sx={{ fontWeight: 700 }}>
-                  Upload Knowledge Source
-                </Typography>
-                <Typography variant="body2" color="text.secondary" mb={3}>
-                  Upload store catalogs, FAQs, return policies, or price lists (.pdf, .txt, .csv) so the AI chatbot can answer custom customer queries dynamically.
-                </Typography>
-
-                {/* Drag and Drop Zone */}
-                <Box
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                  }}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-                      handleUploadDoc(e.dataTransfer.files[0]);
-                    }
-                  }}
-                  sx={{
-                    border: '2px dashed',
-                    borderColor: uploadingDoc ? 'primary.main' : '#cfd8dc',
-                    borderRadius: 3,
-                    p: 4,
-                    textAlign: 'center',
-                    bgcolor: '#fafbfc',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease-in-out',
-                    '&:hover': {
-                      borderColor: 'primary.main',
-                      bgcolor: '#f5f7fa',
-                    },
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    minHeight: 180
-                  }}
-                  component="label"
-                >
-                  <input
-                    type="file"
-                    accept=".pdf,.txt,.csv"
-                    style={{ display: 'none' }}
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files[0]) {
-                        handleUploadDoc(e.target.files[0]);
-                      }
-                    }}
-                    disabled={uploadingDoc}
-                  />
-                  {uploadingDoc ? (
-                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                      <CircularProgress size={36} />
-                      <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
-                        Ingesting & Processing File...
-                      </Typography>
-                    </Box>
-                  ) : (
-                    <>
-                      <CloudUploadIcon color="primary" sx={{ fontSize: 48, mb: 1.5, opacity: 0.8 }} />
-                      <Typography variant="subtitle2" sx={{ fontWeight: 700 }} gutterBottom>
-                        Drag & drop file here
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
-                        Supports PDF, TXT, or CSV (max 5MB)
-                      </Typography>
-                      <Button variant="outlined" size="small" sx={{ textTransform: 'none', borderRadius: 2 }} disabled={uploadingDoc}>
-                        Browse Files
-                      </Button>
-                    </>
+                  {metaTestResult && (
+                    <Alert
+                      severity={metaTestResult.success ? 'success' : 'error'}
+                      sx={{ mt: 3, borderRadius: '12px' }}
+                    >
+                      {metaTestResult.message}
+                    </Alert>
                   )}
-                </Box>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            </Grid>
           </Grid>
-
-          {/* Ingested Documents List Grid */}
-          <Grid item xs={12} md={7}>
-            <Card elevation={0} sx={{ border: '1px solid #e8eef7', minHeight: 330 }}>
-              <CardContent sx={{ p: 4 }}>
-                <Typography variant="h6" gutterBottom sx={{ fontWeight: 700 }}>
-                  Ingested Knowledge Base ({knowledgeDocs.length})
-                </Typography>
-                <Typography variant="body2" color="text.secondary" mb={3}>
-                  The following files have been parsed and their text is searchable by the AI RAG engine.
-                </Typography>
-
-                {loadingDocs ? (
-                  <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
-                    <CircularProgress size={30} />
-                  </Box>
-                ) : knowledgeDocs.length === 0 ? (
-                  <Box sx={{ textAlign: 'center', py: 8, bgcolor: '#fafbfc', borderRadius: 3, border: '1px solid #e8eef7' }}>
-                    <InfoIcon sx={{ fontSize: 40, color: 'text.disabled', mb: 1, opacity: 0.6 }} />
-                    <Typography variant="subtitle2" sx={{ fontWeight: 600 }} color="text.secondary">
-                      No documents uploaded yet
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Your uploaded documents will appear here.
-                    </Typography>
-                  </Box>
-                ) : (
-                  <Grid container spacing={2}>
-                    {knowledgeDocs.map((doc) => {
-                      const uploadDate = new Date(doc.createdAt).toLocaleDateString(undefined, {
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      });
-                      let docColor = '#1565c0'; // blue for pdf
-                      if (doc.fileType === 'txt') docColor = '#2e7d32'; // green
-                      if (doc.fileType === 'csv') docColor = '#ef6c00'; // orange
-
-                      return (
-                        <Grid item xs={12} key={doc._id}>
-                          <Card variant="outlined" sx={{ borderRadius: 2.5, borderColor: '#e8eef7', bgcolor: '#ffffff', '&:hover': { boxShadow: '0 4px 12px rgba(0,0,0,0.02)' } }}>
-                            <Box sx={{ p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                              <Stack direction="row" spacing={2} alignItems="center" sx={{ flexGrow: 1, minWidth: 0 }}>
-                                <Avatar sx={{ bgcolor: docColor, width: 42, height: 42, fontSize: '0.75rem', fontWeight: 800 }}>
-                                  {doc.fileType.toUpperCase()}
-                                </Avatar>
-                                <Box sx={{ minWidth: 0 }}>
-                                  <Typography variant="subtitle2" sx={{ fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                    {doc.fileName}
-                                  </Typography>
-                                  <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.5 }}>
-                                    <Chip label={doc.status} color="success" size="small" sx={{ height: 18, fontSize: '0.65rem', fontWeight: 700 }} />
-                                    <Typography variant="caption" color="text.secondary">
-                                      Uploaded {uploadDate}
-                                    </Typography>
-                                  </Stack>
-                                </Box>
-                              </Stack>
-                              <IconButton onClick={() => handleDeleteDoc(doc._id)} color="error" size="small">
-                                <DeleteIcon fontSize="small" />
-                              </IconButton>
-                            </Box>
-                          </Card>
-                        </Grid>
-                      );
-                    })}
-                  </Grid>
-                )}
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
-      </TabPanel>
-
-      {/* Tab 6: Active Session & Local Storage Details */}
-      <TabPanel value={activeTab} index={5}>
-        <Grid container spacing={3}>
-          <Grid item xs={12} md={8}>
-            <Card elevation={0}>
-              <CardContent sx={{ p: 4 }}>
-                <Typography variant="h6" gutterBottom sx={{ fontWeight: 700 }}>
-                  🔑 Active Session & Credentials
-                </Typography>
-                <Typography variant="body2" color="text.secondary" mb={4}>
-                  The following active session login details are stored in your local browser storage.
-                </Typography>
-
-                <Box sx={{ border: '1px solid #e0e0e0', borderRadius: 2, overflow: 'hidden' }}>
-                  {/* Header */}
-                  <Box sx={{ display: 'grid', gridTemplateColumns: '150px 1fr', gap: 2, p: 2, bgcolor: '#f8fafc', borderBottom: '1px solid #e0e0e0' }}>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Storage Key</Typography>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Stored Value</Typography>
-                  </Box>
-
-                  {/* Token Row */}
-                  <Box sx={{ display: 'grid', gridTemplateColumns: '150px 1fr', gap: 2, p: 2, borderBottom: '1px solid #e0e0e0', alignItems: 'center' }}>
-                    <Typography variant="body2" sx={{ fontWeight: 600, color: 'primary.main' }}>token</Typography>
-                    <Typography variant="caption" sx={{ wordBreak: 'break-all', fontFamily: 'monospace', color: '#666' }}>
-                      {localStorage.getItem('token') || 'No active token'}
-                    </Typography>
-                  </Box>
-
-                  {/* User Profile Row */}
-                  <Box sx={{ display: 'grid', gridTemplateColumns: '150px 1fr', gap: 2, p: 2, alignItems: 'flex-start' }}>
-                    <Typography variant="body2" sx={{ fontWeight: 600, color: 'primary.main' }}>user</Typography>
-                    <Box sx={{ width: '100%', overflow: 'hidden' }}>
-                      {localStorage.getItem('user') ? (
-                        <Box component="pre" sx={{ 
-                          m: 0, 
-                          p: 1.5, 
-                          bgcolor: '#f1f5f9', 
-                          borderRadius: 1, 
-                          fontSize: '0.8rem', 
-                          fontFamily: 'monospace',
-                          overflowX: 'auto',
-                          whiteSpace: 'pre-wrap',
-                          wordBreak: 'break-all'
-                        }}>
-                          {JSON.stringify(JSON.parse(localStorage.getItem('user')), null, 2)}
-                        </Box>
-                      ) : (
-                        <Typography variant="body2" color="text.secondary">No active user details</Typography>
-                      )}
-                    </Box>
-                  </Box>
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
-      </TabPanel>
+        </Box>
+      )}
 
       <CustomSnackbar
         open={snackbar.open}

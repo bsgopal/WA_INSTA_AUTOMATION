@@ -9,9 +9,6 @@ import {
   TextField,
   Box,
   Typography,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
   CircularProgress,
   Grid,
   Chip,
@@ -20,19 +17,9 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Autocomplete,
-  Checkbox,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow
+  Autocomplete
 } from '@mui/material';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import SaveIcon from '@mui/icons-material/Save';
-import SearchIcon from '@mui/icons-material/Search';
-import ClearIcon from '@mui/icons-material/Clear';
 import apiClient from '../../../api/client';
 
 /**
@@ -235,9 +222,9 @@ const EditCampaignForm = React.memo(({
 }) => {
   const [templates, setTemplates] = useState([]);
   const [templatesLoading, setTemplatesLoading] = useState(false);
-  const [allCustomers, setAllCustomers] = useState([]);
-  const [loadingCustomers, setLoadingCustomers] = useState(false);
-  const [customerSearch, setCustomerSearch] = useState('');
+  const [metaTemplates, setMetaTemplates] = useState([]);
+  const [metaTemplatesLoading, setMetaTemplatesLoading] = useState(false);
+  const [templateSynced, setTemplateSynced] = useState(false);
 
   const buildFormData = (campaignData) => {
     const data = campaignData || {};
@@ -248,23 +235,22 @@ const EditCampaignForm = React.memo(({
       type: data.type || 'PROMOTIONAL',
       channels: data.channels || [],
       messageTemplate: data.messageTemplate?._id || data.messageTemplate || '',
+      metaTemplateName: data.metaTemplateName || '',
+      metaTemplateLanguage: data.metaTemplateLanguage || 'en_US',
       messageType: data.messageType || 'TEXT',
       messageContent: data.messageContent || '',
       buttonLabel: data.buttonLabel || '',
       buttonUrl: data.buttonUrl || '',
-      targetSegment: data.targetAudience?.segments?.[0] || 'ALL',
       mediaType: data.mediaType || 'none',
       mediaUrl: data.mediaUrl || '',
       mediaPreviewData: data.mediaPreviewData || '',
       mediaMimeType: data.mediaMimeType || '',
       mediaFileName: data.mediaFileName || '',
-      scheduledAt: data.scheduledAt || '',
-      customFilter: data.targetAudience?.customFilter || { targetedCustomerIds: [] }
+      scheduledAt: data.scheduledAt || ''
     };
   };
 
   const [formData, setFormData] = useState(buildFormData(campaign));
-  const [expandedSection, setExpandedSection] = useState('basic-info');
 
   // Fetch templates and customers when dialog is opened
   useEffect(() => {
@@ -281,111 +267,46 @@ const EditCampaignForm = React.memo(({
           setTemplatesLoading(false);
         }
       };
-      const fetchAllCustomers = async () => {
+      const fetchMetaTemplates = async () => {
         try {
-          setLoadingCustomers(true);
-          const response = await apiClient.get('/customers?limit=1000');
-          setAllCustomers(response.data.customers || []);
-        } catch (err) {
-          console.error('Error fetching customers:', err);
-          setAllCustomers([]);
+          setMetaTemplatesLoading(true);
+          const response = await apiClient.get('/templates/meta');
+          setMetaTemplates(response.data || []);
+        } catch (error) {
+          console.error('Error fetching Meta templates:', error);
+          setMetaTemplates([]);
         } finally {
-          setLoadingCustomers(false);
+          setMetaTemplatesLoading(false);
         }
       };
       fetchTemplates();
-      fetchAllCustomers();
+      fetchMetaTemplates();
       setFormData(buildFormData(campaign));
-      setCustomerSearch('');
+      setTemplateSynced(false);
     }
   }, [campaign, open]);
 
-  // Safe extraction of targeted customer IDs from customFilter
-  const targetedCustomerIds = useMemo(() => {
-    return (formData.customFilter && typeof formData.customFilter === 'object')
-      ? (formData.customFilter.targetedCustomerIds || [])
-      : [];
-  }, [formData.customFilter]);
+  const selectedTemplate = templates.find((t) => t._id === formData.messageTemplate) || null;
 
-  // Handle single customer selection
-  const handleSelectCustomer = (customerId) => {
-    let nextIds = [...targetedCustomerIds];
-    if (nextIds.includes(customerId)) {
-      nextIds = nextIds.filter(id => id !== customerId);
-    } else {
-      nextIds.push(customerId);
+  useEffect(() => {
+    if (!templateSynced && open && selectedTemplate) {
+      setFormData((prevState) => {
+        const shouldSyncContent = prevState.messageContent === campaign.messageContent || !prevState.messageContent;
+        return {
+          ...prevState,
+          messageContent: shouldSyncContent ? selectedTemplate.content || prevState.messageContent : prevState.messageContent,
+          mediaType: selectedTemplate.mediaType || prevState.mediaType,
+          mediaUrl: selectedTemplate.mediaUrl || prevState.mediaUrl,
+          mediaPreviewData: selectedTemplate.mediaPreviewData || prevState.mediaPreviewData,
+          mediaMimeType: selectedTemplate.mediaMimeType || prevState.mediaMimeType,
+          mediaFileName: selectedTemplate.mediaFileName || prevState.mediaFileName
+        };
+      });
+      setTemplateSynced(true);
     }
-    setFormData({
-      ...formData,
-      customFilter: {
-        ...(typeof formData.customFilter === 'object' ? formData.customFilter : {}),
-        targetedCustomerIds: nextIds
-      }
-    });
-  };
-
-  // Filter customers for display table
-  const filteredCustomers = useMemo(() => {
-    let list = allCustomers;
-    if (formData.targetSegment && formData.targetSegment !== 'ALL') {
-      list = list.filter(c => c.rfmSegment === formData.targetSegment);
-    }
-    if (customerSearch.trim()) {
-      const q = customerSearch.toLowerCase();
-      list = list.filter(c => 
-        `${c.firstName} ${c.lastName || ''}`.toLowerCase().includes(q) ||
-        (c.whatsappNumber && c.whatsappNumber.includes(q)) ||
-        (c.phone && c.phone.includes(q))
-      );
-    }
-    return list;
-  }, [allCustomers, formData.targetSegment, customerSearch]);
-
-  const isAllFilteredSelected = useMemo(() => {
-    if (filteredCustomers.length === 0) return false;
-    return filteredCustomers.every(c => targetedCustomerIds.includes(c._id));
-  }, [filteredCustomers, targetedCustomerIds]);
-
-  const isSomeFilteredSelected = useMemo(() => {
-    if (filteredCustomers.length === 0) return false;
-    const selectedFilteredCount = filteredCustomers.filter(c => targetedCustomerIds.includes(c._id)).length;
-    return selectedFilteredCount > 0 && selectedFilteredCount < filteredCustomers.length;
-  }, [filteredCustomers, targetedCustomerIds]);
-
-  const handleSelectAllToggle = (e) => {
-    const checked = e.target.checked;
-    let nextIds = [...targetedCustomerIds];
-    if (checked) {
-      const filteredIds = filteredCustomers.map(c => c._id);
-      nextIds = [...new Set([...nextIds, ...filteredIds])];
-    } else {
-      const filteredIds = filteredCustomers.map(c => c._id);
-      nextIds = nextIds.filter(id => !filteredIds.includes(id));
-    }
-    setFormData({
-      ...formData,
-      customFilter: {
-        ...(typeof formData.customFilter === 'object' ? formData.customFilter : {}),
-        targetedCustomerIds: nextIds
-      }
-    });
-  };
-
-  const handleClearSelection = () => {
-    setFormData({
-      ...formData,
-      customFilter: {
-        ...(typeof formData.customFilter === 'object' ? formData.customFilter : {}),
-        targetedCustomerIds: []
-      }
-    });
-  };
+  }, [selectedTemplate, templateSynced, open, campaign]);
 
   if (!campaign) return null;
-
-  const handleSectionChange = (panel) => (event, isExpanded) => {
-    setExpandedSection(isExpanded ? panel : '');
-  };
 
   const handleSave = () => {
     onSave(formData);
@@ -398,10 +319,8 @@ const EditCampaignForm = React.memo(({
   const isRunning = campaign.status === 'RUNNING';
 
   const messageTypes = [
-    { value: 'TEXT', label: 'Text Only' },
-    { value: 'MEDIA', label: 'Media Message' },
-    { value: 'TEMPLATE', label: 'Template' },
-    { value: 'QUICK_REPLY', label: 'Quick Reply' }
+    { value: 'TEXT', label: 'Text' },
+    { value: 'MEDIA', label: 'Image' }
   ];
 
   return (
@@ -429,459 +348,181 @@ const EditCampaignForm = React.memo(({
 
       <DialogContent sx={{ p: 3 }}>
         <Grid container spacing={4} alignItems="flex-start">
-          {/* Edit Fields Column */}
           <Grid item xs={12} md={7.5}>
-            <Stack spacing={1.5}>
-              {/* Basic Info Section */}
-              <Accordion
-                expanded={expandedSection === 'basic-info'}
-                onChange={handleSectionChange('basic-info')}
-                sx={{
-                  '&.Mui-expanded': {
-                    margin: 0
-                  }
+            <Stack spacing={3}>
+              <TextField
+                label="Campaign Name"
+                fullWidth
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                disabled={isRunning || loading}
+                size="small"
+              />
+
+              <Autocomplete
+                fullWidth
+                options={metaTemplates}
+                getOptionLabel={(option) => option.name || ''}
+                value={metaTemplates.find((t) => t.name === formData.metaTemplateName) || null}
+                onChange={(event, newValue) => {
+                  setFormData({
+                    ...formData,
+                    metaTemplateName: newValue?.name || '',
+                    metaTemplateLanguage: newValue?.language || 'en_US'
+                  });
                 }}
-              >
-                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                  <Typography sx={{ fontWeight: 600, fontSize: '14px' }}>
-                    Basic Information
-                  </Typography>
-                </AccordionSummary>
-                <AccordionDetails sx={{ borderTop: '1px solid #E5E7EB', pt: 2 }}>
-                  <Stack spacing={2}>
+                loading={metaTemplatesLoading}
+                disabled={isRunning || loading || metaTemplatesLoading}
+                renderInput={(params) => {
+                  const inputProps = params.InputProps || {};
+                  return (
                     <TextField
-                      label="Campaign Name"
-                      fullWidth
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      disabled={isRunning || loading}
+                      {...params}
+                      label="Meta Template"
+                      variant="outlined"
+                      helperText="Choose the Meta WhatsApp template to send"
+                      InputProps={{
+                        ...inputProps,
+                        endAdornment: (
+                          <>
+                            {metaTemplatesLoading ? <CircularProgress color="inherit" size={20} /> : null}
+                            {inputProps.endAdornment}
+                          </>
+                        )
+                      }}
                       size="small"
                     />
+                  );
+                }}
+              />
+
+              <Autocomplete
+                fullWidth
+                options={templates}
+                getOptionLabel={(option) => option.name || ''}
+                value={templates.find((t) => t._id === formData.messageTemplate) || null}
+                onChange={(event, newValue) => {
+                  const hasTemplateMedia = !!(newValue && (newValue.mediaPreviewData || newValue.mediaUrl));
+                  setFormData({
+                    ...formData,
+                    messageTemplate: newValue ? newValue._id : '',
+                    messageContent: newValue ? newValue.content : formData.messageContent,
+                    ...(hasTemplateMedia
+                      ? {
+                          mediaType: newValue.mediaType || 'image',
+                          mediaUrl: newValue.mediaUrl || '',
+                          mediaPreviewData: newValue.mediaPreviewData || '',
+                          mediaMimeType: newValue.mediaMimeType || '',
+                          mediaFileName: newValue.mediaFileName || (newValue.name ? `${newValue.name}.jpg` : 'template-media')
+                        }
+                      : {})
+                  });
+                }}
+                loading={templatesLoading}
+                disabled={isRunning || loading || templatesLoading}
+                renderInput={(params) => {
+                  const inputProps = params.InputProps || {};
+                  return (
                     <TextField
-                      label="Campaign Topic"
-                      fullWidth
-                      value={formData.topic}
-                      onChange={(e) => setFormData({ ...formData, topic: e.target.value })}
-                      disabled={isRunning || loading}
+                      {...params}
+                      label="App Template"
+                      variant="outlined"
+                      helperText="Choose the local template format for this campaign"
+                      InputProps={{
+                        ...inputProps,
+                        endAdornment: (
+                          <>
+                            {templatesLoading ? <CircularProgress color="inherit" size={20} /> : null}
+                            {inputProps.endAdornment}
+                          </>
+                        )
+                      }}
                       size="small"
                     />
-                    <TextField
-                      label="Description"
-                      fullWidth
-                      multiline
-                      rows={3}
-                      value={formData.description}
-                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                      disabled={isRunning || loading}
-                      size="small"
-                    />
-                  </Stack>
-                </AccordionDetails>
-              </Accordion>
-
-              {/* Message Details & Template Section */}
-              <Accordion
-                expanded={expandedSection === 'message'}
-                onChange={handleSectionChange('message')}
-                sx={{
-                  '&.Mui-expanded': {
-                    margin: 0
-                  }
+                  );
                 }}
-              >
-                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                  <Typography sx={{ fontWeight: 600, fontSize: '14px' }}>
-                    Message Content & Template
+              />
+
+              <FormControl fullWidth size="small">
+                <InputLabel>Template Type</InputLabel>
+                <Select
+                  label="Template Type"
+                  value={formData.messageType || 'TEXT'}
+                  onChange={(e) => setFormData({ ...formData, messageType: e.target.value })}
+                  disabled={isRunning || loading}
+                >
+                  {messageTypes.map((type) => (
+                    <MenuItem key={type.value} value={type.value}>
+                      {type.label}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+
+              {selectedTemplate && (
+                <Box sx={{ p: 2, borderRadius: '12px', bgcolor: '#FFFFFF', border: '1px solid #E5E7EB' }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, color: '#111827' }}>
+                    Selected App Template Preview
                   </Typography>
-                </AccordionSummary>
-                <AccordionDetails sx={{ borderTop: '1px solid #E5E7EB', pt: 2 }}>
-                  <Stack spacing={2.5}>
-                    <FormControl fullWidth size="small">
-                      <InputLabel>Message Type</InputLabel>
-                      <Select
-                        label="Message Type"
-                        value={formData.messageType}
-                        onChange={(e) => setFormData({ ...formData, messageType: e.target.value })}
-                        disabled={isRunning || loading}
-                      >
-                        {messageTypes.map((type) => (
-                          <MenuItem key={type.value} value={type.value}>
-                            {type.label}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-
-                    {formData.messageType === 'TEMPLATE' && (
-                      <Autocomplete
-                        fullWidth
-                        size="small"
-                        options={templates}
-                        getOptionLabel={(option) => option.name || ''}
-                        value={templates.find((t) => t._id === formData.messageTemplate) || null}
-                        onChange={(event, newValue) => {
-                          setFormData({
-                            ...formData,
-                            messageTemplate: newValue ? newValue._id : '',
-                            messageContent: newValue ? newValue.content : formData.messageContent
-                          });
-                        }}
-                        disabled={isRunning || loading || templatesLoading}
-                        loading={templatesLoading}
-                        renderInput={(params) => {
-                          const hasSlotProps = !!params.slotProps?.input;
-                          return (
-                            <TextField
-                              {...params}
-                              label="Select Template"
-                              variant="outlined"
-                              slotProps={hasSlotProps ? {
-                                ...params.slotProps,
-                                input: {
-                                  ...params.slotProps.input,
-                                  endAdornment: (
-                                    <React.Fragment>
-                                      {templatesLoading ? <CircularProgress color="inherit" size={20} /> : null}
-                                      {params.slotProps.input.endAdornment}
-                                    </React.Fragment>
-                                  )
-                                }
-                              } : undefined}
-                              InputProps={!hasSlotProps ? {
-                                ...params.InputProps,
-                                endAdornment: (
-                                  <React.Fragment>
-                                    {templatesLoading ? <CircularProgress color="inherit" size={20} /> : null}
-                                    {params.InputProps?.endAdornment}
-                                  </React.Fragment>
-                                )
-                              } : undefined}
-                            />
-                          );
-                        }}
-                      />
-                    )}
-
-                    {/* Dynamic Template preview card inside edit accordion */}
-                    {(() => {
-                      const selectedTemplate = templates.find((t) => t._id === formData.messageTemplate);
-                      if (!selectedTemplate || formData.messageType !== 'TEMPLATE') return null;
-
-                      const getVariables = (text) => {
-                        if (!text) return [];
-                        const matches = text.match(/{{([^}]+)}}/g);
-                        if (!matches) return [];
-                        return [...new Set(matches.map(m => m.replace(/[{}]/g, '').trim()))];
-                      };
-                      const vars = selectedTemplate.variables?.map(v => typeof v === 'string' ? v : v.name) || getVariables(selectedTemplate.content);
-
-                      return (
-                        <Paper sx={{ p: 2, bgcolor: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: '8px' }}>
-                          <Box sx={{ display: 'flex', justifySelf: 'space-between', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                            <Typography variant="caption" sx={{ fontWeight: 700, color: '#6B7280', display: 'block', letterSpacing: '0.05em' }}>
-                              TEMPLATE DETAILS
-                            </Typography>
-                            {selectedTemplate.category && (
-                              <Chip label={selectedTemplate.category} size="small" variant="outlined" sx={{ fontSize: '10px', height: '18px' }} />
-                            )}
-                          </Box>
-                          <Typography variant="body2" sx={{ color: '#1F2937', mb: 1.5, whiteSpace: 'pre-wrap', lineHeight: 1.4 }}>
-                            {selectedTemplate.content}
-                          </Typography>
-                          {vars.length > 0 && (
-                            <Box>
-                              <Typography variant="caption" sx={{ fontWeight: 600, color: '#4B5563', display: 'block', mb: 0.5 }}>
-                                Variables:
-                              </Typography>
-                              <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-                                {vars.map((param, idx) => (
-                                  <Chip key={idx} label={`{{${param}}}`} size="small" sx={{ fontSize: '11px', height: '22px' }} />
-                                ))}
-                              </Box>
-                            </Box>
-                          )}
-                        </Paper>
-                      );
-                    })()}
-
-                    <TextField
-                      label="Message Content"
-                      fullWidth
-                      multiline
-                      rows={4}
-                      value={formData.messageContent}
-                      onChange={(e) => setFormData({ ...formData, messageContent: e.target.value })}
-                      disabled={isRunning || loading}
-                      size="small"
-                      helperText="Supports dynamic variables with {{variable_name}} format"
-                    />
-
-                    <TextField
-                      label="Button Label (Optional)"
-                      fullWidth
-                      value={formData.buttonLabel}
-                      onChange={(e) => setFormData({ ...formData, buttonLabel: e.target.value })}
-                      disabled={isRunning || loading}
-                      size="small"
-                      placeholder="e.g., View Offer"
-                    />
-
-                    {formData.buttonLabel && (
-                      <TextField
-                        label="Button URL"
-                        fullWidth
-                        value={formData.buttonUrl}
-                        onChange={(e) => setFormData({ ...formData, buttonUrl: e.target.value })}
-                        disabled={isRunning || loading}
-                        size="small"
-                        placeholder="https://example.com"
-                      />
-                    )}
-                  </Stack>
-                </AccordionDetails>
-              </Accordion>
-
-              {/* Audience Section */}
-              <Accordion
-                expanded={expandedSection === 'audience'}
-                onChange={handleSectionChange('audience')}
-                sx={{
-                  '&.Mui-expanded': {
-                    margin: 0
-                  }
-                }}
-              >
-                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                  <Typography sx={{ fontWeight: 600, fontSize: '14px' }}>
-                    Target Audience
+                  <Typography variant="body2" sx={{ color: '#4B5563', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
+                    {selectedTemplate.content || 'No preview available for this template.'}
                   </Typography>
-                </AccordionSummary>
-                <AccordionDetails sx={{ borderTop: '1px solid #E5E7EB', pt: 2 }}>
-                  <Stack spacing={2}>
-                    <FormControl fullWidth size="small">
-                      <InputLabel>Target Segment</InputLabel>
-                      <Select
-                        label="Target Segment"
-                        value={formData.targetSegment || 'ALL'}
-                        onChange={(e) => setFormData({ ...formData, targetSegment: e.target.value })}
-                        disabled={isRunning || loading}
-                      >
-                        {[{ value: 'ALL', label: 'All Customers' },
-                          { value: 'VIP', label: 'VIP Customers' },
-                          { value: 'LOYAL', label: 'Loyal Customers' },
-                          { value: 'NEW', label: 'New Customers' },
-                          { value: 'AT_RISK', label: 'At Risk' },
-                          { value: 'LOST', label: 'Lost Customers' }].map((segment) => (
-                          <MenuItem key={segment.value} value={segment.value}>
-                            {segment.label}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
+                </Box>
+              )}
 
-                    {/* Customer Selection Table */}
-                    <Box>
-                      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#1F2937' }}>
-                          Audience Select ({filteredCustomers.length} filtered)
-                        </Typography>
-                        {targetedCustomerIds.length > 0 && (
-                          <Button
-                            size="small"
-                            variant="text"
-                            startIcon={<ClearIcon />}
-                            onClick={handleClearSelection}
-                            disabled={isRunning || loading}
-                            sx={{ textTransform: 'none', color: '#EF4444', fontWeight: 600 }}
-                          >
-                            Clear Selection ({targetedCustomerIds.length})
-                          </Button>
-                        )}
-                      </Stack>
+              <TextField
+                label="Message Content"
+                fullWidth
+                multiline
+                rows={5}
+                value={formData.messageContent}
+                onChange={(e) => setFormData({ ...formData, messageContent: e.target.value })}
+                disabled={isRunning || loading}
+                size="small"
+                helperText="This content will be sent dynamically through Meta using the selected template."
+              />
 
-                      <TextField
-                        size="small"
-                        fullWidth
-                        value={customerSearch}
-                        onChange={(e) => setCustomerSearch(e.target.value)}
-                        placeholder="Search customers inside list..."
-                        disabled={isRunning || loading}
-                        sx={{ mb: 1.5 }}
-                        InputProps={{
-                          startAdornment: <SearchIcon sx={{ color: '#9CA3AF', mr: 1, fontSize: '20px' }} />
-                        }}
-                      />
+              {formData.messageType === 'MEDIA' && (
+                <TextField
+                  label="Media URL"
+                  fullWidth
+                  value={formData.mediaUrl}
+                  onChange={(e) => setFormData({ ...formData, mediaUrl: e.target.value })}
+                  disabled={isRunning || loading}
+                  size="small"
+                  placeholder="https://example.com/image.jpg"
+                  helperText="Provide an image URL if this campaign sends media."
+                />
+              )}
 
-                      {loadingCustomers ? (
-                        <Box sx={{ py: 4, display: 'flex', justifyContent: 'center' }}>
-                          <CircularProgress size={24} />
-                        </Box>
-                      ) : (
-                        <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 220, borderRadius: '8px' }}>
-                          <Table size="small" stickyHeader>
-                            <TableHead>
-                              <TableRow>
-                                <TableCell padding="checkbox" sx={{ bgcolor: '#F9FAFB' }}>
-                                  <Checkbox
-                                    indeterminate={isSomeFilteredSelected}
-                                    checked={isAllFilteredSelected}
-                                    onChange={handleSelectAllToggle}
-                                    disabled={isRunning || loading}
-                                    size="small"
-                                  />
-                                </TableCell>
-                                <TableCell sx={{ bgcolor: '#F9FAFB', fontWeight: 600, fontSize: '12px' }}>Name</TableCell>
-                                <TableCell sx={{ bgcolor: '#F9FAFB', fontWeight: 600, fontSize: '12px' }}>Phone / Destination</TableCell>
-                                <TableCell sx={{ bgcolor: '#F9FAFB', fontWeight: 600, fontSize: '12px' }}>Segment</TableCell>
-                              </TableRow>
-                            </TableHead>
-                            <TableBody>
-                              {filteredCustomers.length === 0 ? (
-                                <TableRow>
-                                  <TableCell colSpan={4} align="center" sx={{ py: 3 }}>
-                                    <Typography variant="caption" color="textSecondary">
-                                      No customers match segment/search filter.
-                                    </Typography>
-                                  </TableCell>
-                                </TableRow>
-                              ) : (
-                                filteredCustomers.map((c) => {
-                                  const isSelected = targetedCustomerIds.includes(c._id);
-                                  return (
-                                    <TableRow
-                                      key={c._id}
-                                      hover
-                                      selected={isSelected}
-                                      onClick={() => {
-                                        if (isRunning || loading) return;
-                                        handleSelectCustomer(c._id);
-                                      }}
-                                      sx={{ cursor: 'pointer' }}
-                                    >
-                                      <TableCell padding="checkbox" onClick={(e) => e.stopPropagation()}>
-                                        <Checkbox
-                                          checked={isSelected}
-                                          onChange={() => handleSelectCustomer(c._id)}
-                                          disabled={isRunning || loading}
-                                          size="small"
-                                        />
-                                      </TableCell>
-                                      <TableCell sx={{ fontSize: '12px', fontWeight: 550 }}>
-                                        {c.firstName} {c.lastName || ''}
-                                      </TableCell>
-                                      <TableCell sx={{ fontSize: '12px', color: '#4B5563' }}>
-                                        {c.whatsappNumber || c.phone || '-'}
-                                      </TableCell>
-                                      <TableCell>
-                                        {c.rfmSegment ? (
-                                          <Chip
-                                            label={c.rfmSegment}
-                                            size="small"
-                                            sx={{
-                                              fontSize: '9px',
-                                              height: '18px',
-                                              bgcolor: c.rfmSegment === 'VIP' ? '#FEF3C7' : '#F3F4F6',
-                                              color: c.rfmSegment === 'VIP' ? '#D97706' : '#374151',
-                                              fontWeight: 700
-                                            }}
-                                          />
-                                        ) : '-'}
-                                      </TableCell>
-                                    </TableRow>
-                                  );
-                                })
-                              )}
-                            </TableBody>
-                          </Table>
-                        </TableContainer>
-                      )}
-                    </Box>
-                  </Stack>
-                </AccordionDetails>
-              </Accordion>
+              <TextField
+                label="Button Label (Optional)"
+                fullWidth
+                value={formData.buttonLabel}
+                onChange={(e) => setFormData({ ...formData, buttonLabel: e.target.value })}
+                disabled={isRunning || loading}
+                size="small"
+                placeholder="e.g. View Offer"
+              />
 
-              {/* Media Section */}
-              <Accordion
-                expanded={expandedSection === 'media'}
-                onChange={handleSectionChange('media')}
-                sx={{
-                  '&.Mui-expanded': {
-                    margin: 0
-                  }
-                }}
-              >
-                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                  <Typography sx={{ fontWeight: 600, fontSize: '14px' }}>
-                    Media Attachments
-                  </Typography>
-                </AccordionSummary>
-                <AccordionDetails sx={{ borderTop: '1px solid #E5E7EB', pt: 2 }}>
-                  <Stack spacing={2}>
-                    <FormControl fullWidth size="small">
-                      <InputLabel>Media Type</InputLabel>
-                      <Select
-                        label="Media Type"
-                        value={formData.mediaType}
-                        onChange={(e) => setFormData({ ...formData, mediaType: e.target.value })}
-                        disabled={isRunning || loading}
-                      >
-                        <MenuItem value="none">None</MenuItem>
-                        <MenuItem value="image">Image</MenuItem>
-                        <MenuItem value="video">Video</MenuItem>
-                        <MenuItem value="document">Document</MenuItem>
-                      </Select>
-                    </FormControl>
-                    {formData.mediaType !== 'none' && (
-                      <TextField
-                        label="Media URL"
-                        fullWidth
-                        value={formData.mediaUrl}
-                        onChange={(e) => setFormData({ ...formData, mediaUrl: e.target.value })}
-                        disabled={isRunning || loading}
-                        size="small"
-                        placeholder="https://example.com/media"
-                      />
-                    )}
-                  </Stack>
-                </AccordionDetails>
-              </Accordion>
-
-              {/* Schedule Section */}
-              <Accordion
-                expanded={expandedSection === 'schedule'}
-                onChange={handleSectionChange('schedule')}
-                sx={{
-                  '&.Mui-expanded': {
-                    margin: 0
-                  }
-                }}
-              >
-                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                  <Typography sx={{ fontWeight: 600, fontSize: '14px' }}>
-                    Schedule
-                  </Typography>
-                </AccordionSummary>
-                <AccordionDetails sx={{ borderTop: '1px solid #E5E7EB', pt: 2 }}>
-                  <TextField
-                    label="Scheduled At"
-                    type="datetime-local"
-                    fullWidth
-                    value={formData.scheduledAt ? formData.scheduledAt.slice(0, 16) : ''}
-                    onChange={(e) => setFormData({ ...formData, scheduledAt: e.target.value })}
-                    disabled={isRunning || loading}
-                    size="small"
-                    InputLabelProps={{ shrink: true }}
-                  />
-                </AccordionDetails>
-              </Accordion>
+              {formData.buttonLabel && (
+                <TextField
+                  label="Button URL"
+                  fullWidth
+                  value={formData.buttonUrl}
+                  onChange={(e) => setFormData({ ...formData, buttonUrl: e.target.value })}
+                  disabled={isRunning || loading}
+                  size="small"
+                  placeholder="https://example.com"
+                />
+              )}
             </Stack>
           </Grid>
 
-          {/* Simulated Mobile Device Preview */}
           <Grid item xs={12} md={4.5} sx={{ display: { xs: 'none', md: 'block' } }}>
             <Box sx={{ position: 'sticky', top: '10px' }}>
               <Typography variant="subtitle2" sx={{ textAlign: 'center', mb: 1.5, fontWeight: 700, color: '#4B5563' }}>
-                Live Message Preview
+                Live WhatsApp Preview
               </Typography>
               <MobilePreview data={formData} />
             </Box>

@@ -59,7 +59,16 @@ class SchedulerService {
 
           // Only send to opted-in customers
           if (campaign.channels.includes('whatsapp')) {
-            query['optedIn.whatsapp'] = true;
+            if (!query.$and) {
+              query.$and = [];
+            }
+            query.$and.push({
+              $or: [
+                { 'optedIn.whatsapp': true },
+                { optedIn: { $exists: false } },
+                { optedIn: null }
+              ]
+            });
           }
 
           const customers = await Customer.find(query);

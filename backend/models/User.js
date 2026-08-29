@@ -36,7 +36,7 @@ const UserSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['ADMIN', 'MANAGER', 'USER'],
+    enum: ['PLATFORM_OWNER', 'ADMIN', 'AI', 'MANAGER', 'USER'],
     default: 'USER'
   },
   isActive: {
@@ -78,6 +78,13 @@ const UserSchema = new mongoose.Schema({
   resetPasswordExpire: {
     type: Date
   },
+  loginOtp: {
+    type: String,
+    select: false
+  },
+  loginOtpExpire: {
+    type: Date
+  },
   createdAt: {
     type: Date,
     default: Date.now
@@ -93,6 +100,10 @@ UserSchema.pre('save', async function(next) {
   if (!this.isModified('password')) return next();
   
   try {
+    // If the password is already a bcrypt hash, skip hashing it
+    if (this.password.startsWith('$2a$') || this.password.startsWith('$2b$')) {
+      return next();
+    }
     const salt = await bcryptjs.genSalt(10);
     this.password = await bcryptjs.hash(this.password, salt);
     next();

@@ -32,7 +32,6 @@ const extractMessageIdFromResponse = (responseData) => {
 };
 
 const buildReadableListFallback = (message, listConfig = {}) => {
-  const title = String(listConfig.title || 'Options').trim();
   const sections = Array.isArray(listConfig.sections) ? listConfig.sections : [];
 
   const lines = [];
@@ -42,43 +41,36 @@ const buildReadableListFallback = (message, listConfig = {}) => {
     lines.push('');
   }
 
-  if (title) {
-    lines.push(title);
-    lines.push('');
-  }
-
   let globalRowIndex = 0;
   sections.forEach((section, sectionIndex) => {
-    const sectionTitle = String(section?.title || 'Options').trim();
+    const sectionTitle = String(section?.title || '').trim();
     if (sectionTitle) {
-      lines.push(sectionTitle);
+      lines.push(`📁 ${sectionTitle}`);
     }
 
-    (section?.rows || []).forEach((row, rowIndex) => {
+    (section?.rows || []).forEach((row) => {
       const rowTitle = String(row?.title || row?.label || 'Option').trim();
       const rowDescription = String(row?.description || '').trim();
       if (!rowTitle) return;
       
-      // Use numbered format with bold: *number. Title* - Description
       const rowNum = globalRowIndex + 1;
-      const numberedTitle = `*${rowNum}. ${rowTitle}*`;
-      let rowText = numberedTitle + (rowDescription ? ` - ${rowDescription}` : "");
-      
-      if (row.actionUrl) {
-        rowText += `\n   🔗 ${row.actionUrl}`;
+      let rowText = `${rowNum}. ${rowTitle}`;
+      if (rowDescription) {
+        rowText += ` — ${rowDescription}`;
       }
-      if (row.image) {
-        rowText += `\n   🖼️ Image: ${row.image}`;
+      if (row.price) {
+        rowText += ` (${row.price})`;
       }
       
       lines.push(rowText);
       globalRowIndex++;
     });
-
-    if (sectionIndex < sections.length - 1) {
-      lines.push('');
-    }
   });
+
+  if (globalRowIndex > 0) {
+    lines.push('');
+    lines.push('_Reply with the number to select_');
+  }
 
   return lines.join('\n').trim();
 };
@@ -97,29 +89,29 @@ const wahaClient = axios.create({
  */
 const initialize = async () => {
   try {
-    console.log('ðŸ”„ Initializing WAHA service...');
-    console.log(`ðŸ“ WAHA API URL: ${WAHA_API_URL}`);
-    console.log(`ðŸ“± Session Name: ${SESSION_NAME}`);
+    console.log('🔄 Initializing WAHA service...');
+    console.log(`📍 WAHA API URL: ${WAHA_API_URL}`);
+    console.log(`📱 Session Name: ${SESSION_NAME}`);
 
     // Try to get session status first
     try {
       const sessionStatus = await wahaClient.get(`/sessions/${SESSION_NAME}`);
-      console.log(`âœ… WAHA session already exists: ${SESSION_NAME}`);
-      console.log(`ðŸ“± Status: ${sessionStatus.data.status}`);
-      console.log(`ðŸ” Authenticated: ${sessionStatus.data.status === 'WORKING'}`);
+      console.log(`✅ WAHA session already exists: ${SESSION_NAME}`);
+      console.log(`📱 Status: ${sessionStatus.data.status}`);
+      console.log(`🔐 Authenticated: ${sessionStatus.data.status === 'WORKING'}`);
       
       // Auto-start if stopped or failed
       if (sessionStatus.data.status === 'STOPPED' || sessionStatus.data.status === 'FAILED') {
         if (sessionStatus.data.status === 'FAILED') {
           try {
-            console.log(`ðŸ”„ Session is FAILED. Stopping session ${SESSION_NAME} first to reset...`);
+            console.log(`🔄 Session is FAILED. Stopping session ${SESSION_NAME} first to reset...`);
             await wahaClient.post(`/sessions/${SESSION_NAME}/stop`);
             await new Promise(resolve => setTimeout(resolve, 2000));
           } catch (stopErr) {
-            console.warn(`âš ï¸ Failed to stop FAILED session: ${stopErr.message}`);
+            console.warn(`⚠️ Failed to stop FAILED session: ${stopErr.message}`);
           }
         }
-        console.log(`ðŸ”„ Session is ${sessionStatus.data.status}. Starting session: ${SESSION_NAME}...`);
+        console.log(`🔄 Session is ${sessionStatus.data.status}. Starting session: ${SESSION_NAME}...`);
         await wahaClient.post(`/sessions/${SESSION_NAME}/start`);
       }
       
@@ -136,15 +128,15 @@ const initialize = async () => {
     } catch (statusError) {
       // Session doesn't exist, try to create it
       if (statusError.response?.status === 404) {
-        console.log(`ðŸ“² Creating new WAHA session: ${SESSION_NAME}`);
+        console.log(`📲 Creating new WAHA session: ${SESSION_NAME}`);
         
         try {
           const createResponse = await wahaClient.post('/sessions', {
             name: SESSION_NAME
           });
 
-          console.log('âœ… WAHA session created');
-          console.log('ðŸ“¸ Scan the QR code to authenticate WhatsApp');
+          console.log('✅ WAHA session created');
+          console.log('📸 Scan the QR code to authenticate WhatsApp');
           
           return {
             success: true,
@@ -155,7 +147,7 @@ const initialize = async () => {
         } catch (createError) {
           // If creation fails with "already exists", session was created between checks
           if (createError.response?.status === 422 && createError.response?.data?.message?.includes('already exists')) {
-            console.log(`âœ… WAHA session exists (created by another process): ${SESSION_NAME}`);
+            console.log(`✅ WAHA session exists (created by another process): ${SESSION_NAME}`);
             await setupWebhook();
             
             return {
@@ -171,9 +163,9 @@ const initialize = async () => {
       }
     }
   } catch (error) {
-    console.error('âŒ WAHA Initialization Error:', error.message);
+    console.error('❌ WAHA Initialization Error:', error.message);
     if (error.response?.data) {
-      console.error('ðŸ“‹ Error Details:', error.response.data);
+      console.error('📋 Error Details:', error.response.data);
     }
     return {
       success: false,
@@ -188,7 +180,7 @@ const initialize = async () => {
  */
 const setupWebhook = async () => {
   try {
-    console.log('ðŸ”— Setting up WAHA webhook...');
+    console.log('🔗 Setting up WAHA webhook...');
 
     const webhookConfig = {
       name: SESSION_NAME,
@@ -199,25 +191,56 @@ const setupWebhook = async () => {
     // Register webhook
     await wahaClient.post('/webhooks', webhookConfig);
 
-    console.log(`âœ… Webhook registered: ${WEBHOOK_URL}`);
+    console.log(`✅ Webhook registered: ${WEBHOOK_URL}`);
     return { success: true };
   } catch (error) {
     if (error.response?.status === 404) {
-      console.log('â„¹ï¸ Webhook API registration returned 404. Relying on pre-configured webhook environment variables.');
+      console.log('ℹ️ Webhook API registration returned 404. Relying on pre-configured webhook environment variables.');
       return { success: true, message: 'Using environment variables' };
     }
-    console.error('âŒ Webhook Setup Error:', error.message);
+    console.error('❌ Webhook Setup Error:', error.message);
     return { success: false, error: error.message };
   }
 };
 
 /**
  * Get session QR code
+ * Status-aware: only requests the QR once the session is actually in SCAN_QR_CODE state,
+ * otherwise returns a clear error instead of hanging until timeout.
  */
 const getQRCode = async () => {
   try {
+    const sessionStatus = await getSessionStatus();
+    if (!sessionStatus.success) {
+      return { success: false, error: `Cannot reach WAHA (${sessionStatus.error}). Is the Docker container running?` };
+    }
+
+    if (sessionStatus.authenticated) {
+      return { success: false, error: 'Session is already connected.', authenticated: true };
+    }
+
+    if (sessionStatus.status === 'STARTING' || sessionStatus.status === 'STOPPING') {
+      return {
+        success: false,
+        error: 'WhatsApp session is starting up, please wait a few seconds and try again.',
+        status: sessionStatus.status,
+        retryAfter: 5000
+      };
+    }
+
+    if (sessionStatus.status === 'STOPPED' || sessionStatus.status === 'FAILED') {
+      console.log(`Session is ${sessionStatus.status}. Starting session ${SESSION_NAME} for QR scan...`);
+      try {
+        await wahaClient.post(`/sessions/${SESSION_NAME}/start`);
+      } catch (startErr) {
+        console.warn(`Failed to start session before QR: ${startErr.message}`);
+      }
+      await new Promise(resolve => setTimeout(resolve, 3000));
+    }
+
     const response = await wahaClient.get(`/${SESSION_NAME}/auth/qr`, {
-      responseType: 'arraybuffer'
+      responseType: 'arraybuffer',
+      timeout: 60000
     });
     const base64Qr = Buffer.from(response.data, 'binary').toString('base64');
     return {
@@ -225,7 +248,7 @@ const getQRCode = async () => {
       qrCode: `data:image/png;base64,${base64Qr}`
     };
   } catch (error) {
-    console.error('âŒ QR Code Error:', error.message);
+    console.error('❌ QR Code Error:', error.message);
     return {
       success: false,
       error: error.message
@@ -242,7 +265,7 @@ const getSessionStatus = async () => {
     
     // Auto-start if stopped
     if (response.data.status === 'STOPPED') {
-      console.log(`ðŸ”„ Session is STOPPED during status check. Starting session: ${SESSION_NAME}...`);
+      console.log(`🔄 Session is STOPPED during status check. Starting session: ${SESSION_NAME}...`);
       await wahaClient.post(`/sessions/${SESSION_NAME}/start`);
       // Fetch status again
       const reResponse = await wahaClient.get(`/sessions/${SESSION_NAME}`);
@@ -256,10 +279,10 @@ const getSessionStatus = async () => {
 
     // Auto-logout if FAILED to cleanly reset and prompt for fresh QR code
     if (response.data.status === 'FAILED') {
-      console.log(`âš ï¸ Session is FAILED. Logging out session ${SESSION_NAME} to reset stale credentials...`);
+      console.log(`⚠️ Session is FAILED. Logging out session ${SESSION_NAME} to reset stale credentials...`);
       try {
         await wahaClient.post(`/sessions/${SESSION_NAME}/logout`);
-        console.log(`âœ… Stale session logged out successfully.`);
+        console.log(`✅ Stale session logged out successfully.`);
         // Fetch status again to get the fresh status (usually SCAN_QR_CODE)
         const reResponse = await wahaClient.get(`/sessions/${SESSION_NAME}`);
         return {
@@ -269,7 +292,7 @@ const getSessionStatus = async () => {
           phoneNumber: reResponse.data.me?.id || null
         };
       } catch (logoutErr) {
-        console.error(`âŒ Failed to log out failed session: ${logoutErr.message}`);
+        console.error(`❌ Failed to log out failed session: ${logoutErr.message}`);
       }
     }
 
@@ -280,7 +303,7 @@ const getSessionStatus = async () => {
       phoneNumber: response.data.me?.id || null
     };
   } catch (error) {
-    console.error('âŒ Session Status Error:', error.message);
+    console.error('❌ Session Status Error:', error.message);
     return {
       success: false,
       error: error.message
@@ -300,6 +323,11 @@ const formatPhoneNumber = (phone) => {
     return cleaned;
   }
   cleaned = cleaned.replace(/\D/g, '');
+
+  // Strip a leading "0" national prefix (e.g. 09345578103 -> 9345578103)
+  if (cleaned.length === 11 && cleaned.startsWith('0')) {
+    cleaned = cleaned.substring(1);
+  }
 
   // Add country code if not present (any exactly 10-digit Indian number requires prepended country code)
   if (cleaned.length === 10) {
@@ -381,7 +409,7 @@ const sendMessage = async (to, message, options = {}) => {
           caption: message
         });
       } catch (err) {
-        console.warn(`âš ï¸ WAHAService: /sendFile failed in card-button send:`, err.message);
+        console.warn(`⚠️ WAHAService: /sendFile failed in card-button send:`, err.message);
       }
       const wahaButtons = options.buttons.map(b => ({
         id: b.value,
@@ -409,16 +437,18 @@ const sendMessage = async (to, message, options = {}) => {
       try {
         response = await wahaClient.post('/sendButtons', payload);
       } catch (err) {
-        console.warn(`⚠️ WAHAService: /sendButtons failed. Falling back to plain text formatting.`);
-        let fallbackText = message;
+        console.warn(`⚠️ WAHAService: /sendButtons failed. Falling back to numbered text format.`);
+        let fallbackText = message + '\n';
         options.buttons.forEach((b, idx) => {
+          const num = idx + 1;
           if (b.type === 'URL' || b.actionType === 'URL' || b.value?.startsWith('http')) {
-            fallbackText += `\n\n🔗 *${b.label || 'Link'}*: ${b.value}`;
+            fallbackText += `\n${num}. 🔗 ${b.label}`;
+            if (!message.includes(b.value)) fallbackText += `\n   ${b.value}`;
           } else {
-            const emojiNum = ['1️⃣', '2️⃣', '3️⃣'][idx] || '🔸';
-            fallbackText += `\n\n${emojiNum} *${b.label}* _(Reply "${b.value}")_`;
+            fallbackText += `\n${num}. ${b.label}`;
           }
         });
+        fallbackText += '\n\n_Reply with the number to select_';
         response = await wahaClient.post('/sendText', {
           session: SESSION_NAME,
           chatId: formattedPhone,
@@ -428,116 +458,126 @@ const sendMessage = async (to, message, options = {}) => {
     }
     // 3. Handle file media
     else if (mediaDataUrl || options.mediaUrl) {
-      // WAHA has specific endpoints for different media types
-      // Try type-specific endpoint first, then fallback to /sendFile
+      const mediaType = options.mediaType || 'image';
+      let targetUrl = options.mediaUrl;
       
-      if (!options.mediaUrl) {
-        console.warn(`⚠️  WAHAService: No HTTP URL available, skipping file send and sending text-only message`);
-        const fallbackText = message + `\n\n📎 [${options.mediaFileName || 'File'} attached but could not be sent]`;
-        response = await wahaClient.post('/sendText', {
-          session: SESSION_NAME,
-          chatId: formattedPhone,
-          text: fallbackText
-        });
-      } else {
-        const mediaType = options.mediaType || 'image';
-        console.log(`📤 WAHAService: Attempting to send ${mediaType} media via HTTP URL to ${formattedPhone}`, {
-          mediaType,
-          mediaFileName: options.mediaFileName,
-          url: options.mediaUrl.substring(0, 100)
-        });
+      // Translate localhost/127.0.0.1 to host.docker.internal so Docker container can resolve it
+      if (targetUrl && (targetUrl.includes('localhost') || targetUrl.includes('127.0.0.1'))) {
+        targetUrl = targetUrl.replace('localhost', 'host.docker.internal').replace('127.0.0.1', 'host.docker.internal');
+        console.log(`🔄 WAHAService: Local URL detected, translated to: ${targetUrl}`);
+      }
 
-        // Determine endpoint based on media type
-        let endpoint = '/sendFile'; // Default fallback
-        if (mediaType === 'image') {
-          endpoint = '/sendImage';
-        } else if (mediaType === 'video') {
-          endpoint = '/sendVideo';
-        } else if (mediaType === 'document' || mediaType === 'pdf') {
-          endpoint = '/sendDocument';
-        } else if (mediaType === 'audio') {
-          endpoint = '/sendAudio';
-        }
+      console.log(`📤 WAHAService: Preparing ${mediaType} media send for ${formattedPhone}`, {
+        hasBase64: !!mediaDataUrl,
+        hasUrl: !!targetUrl,
+        mediaFileName: options.mediaFileName
+      });
 
-        const payload = {
-          session: SESSION_NAME,
-          chatId: formattedPhone,
-          url: options.mediaUrl,
-          caption: message
-        };
+      // Construct file payload according to WAHA schema (using "file" object)
+      const filePayload = mediaDataUrl
+        ? {
+            mimetype: options.mediaMimeType || mediaDataUrl.match(/^data:(.*?);base64,/)?.[1] || 'application/octet-stream',
+            filename: options.mediaFileName || 'campaign-media',
+            data: mediaDataUrl.split(',')[1]
+          }
+        : {
+            mimetype: options.mediaMimeType || (mediaType === 'image' ? 'image/jpeg' : mediaType === 'video' ? 'video/mp4' : 'application/octet-stream'),
+            filename: options.mediaFileName || 'campaign-media',
+            url: targetUrl
+          };
 
-        let mediaAttemptFailed = false;
-        let lastError = null;
+      const payload = {
+        session: SESSION_NAME,
+        chatId: formattedPhone,
+        file: filePayload,
+        caption: message
+      };
 
-        // Try type-specific endpoint
-        try {
-          console.log(`🔄 WAHAService: Trying endpoint ${endpoint}...`);
-          response = await wahaClient.post(endpoint, payload);
-          console.log(`✅ WAHAService: ${endpoint} success response:`, response.data);
-        } catch (typeSpecificErr) {
-          mediaAttemptFailed = true;
-          lastError = typeSpecificErr;
-          const errStatus = typeSpecificErr.response?.status;
-          const errMsg = typeSpecificErr.response?.data?.description || typeSpecificErr.message;
-          
-          console.warn(`⚠️  WAHAService: ${endpoint} failed (${errStatus}): ${errMsg}`);
+      // Determine endpoint based on media type
+      let endpoint = '/sendFile'; // Default fallback
+      if (mediaType === 'image') {
+        endpoint = '/sendImage';
+      } else if (mediaType === 'video') {
+        endpoint = '/sendVideo';
+      } else if (mediaType === 'document' || mediaType === 'pdf') {
+        endpoint = '/sendDocument';
+      } else if (mediaType === 'audio') {
+        endpoint = '/sendAudio';
+      }
 
-          // If type-specific endpoint failed, try generic /sendFile
-          if (endpoint !== '/sendFile') {
-            try {
-              console.log(`🔄 WAHAService: Falling back to /sendFile endpoint...`);
-              response = await wahaClient.post('/sendFile', payload);
-              console.log(`✅ WAHAService: /sendFile fallback success:`, response.data);
-              mediaAttemptFailed = false; // Reset since fallback succeeded
-            } catch (fileSendErr) {
-              lastError = fileSendErr;
-              const fileErrStatus = fileSendErr.response?.status;
-              const fileErrMsg = fileSendErr.response?.data?.description || fileSendErr.message;
-              console.error(`❌ WAHAService: /sendFile also failed (${fileErrStatus}):`, fileErrMsg);
-            }
+      let mediaAttemptFailed = false;
+      let lastError = null;
+
+      // Try type-specific endpoint
+      try {
+        console.log(`🔄 WAHAService: Trying endpoint ${endpoint}...`);
+        response = await wahaClient.post(endpoint, payload);
+        console.log(`✅ WAHAService: ${endpoint} success response:`, response.data);
+      } catch (typeSpecificErr) {
+        mediaAttemptFailed = true;
+        lastError = typeSpecificErr;
+        const errStatus = typeSpecificErr.response?.status;
+        const errMsg = typeSpecificErr.response?.data?.description || typeSpecificErr.response?.data?.message || typeSpecificErr.message;
+        
+        console.warn(`⚠️  WAHAService: ${endpoint} failed (${errStatus}): ${errMsg}`);
+
+        // If type-specific endpoint failed, try generic /sendFile
+        if (endpoint !== '/sendFile') {
+          try {
+            console.log(`🔄 WAHAService: Falling back to /sendFile endpoint...`);
+            response = await wahaClient.post('/sendFile', payload);
+            console.log(`✅ WAHAService: /sendFile fallback success:`, response.data);
+            mediaAttemptFailed = false; // Reset since fallback succeeded
+          } catch (fileSendErr) {
+            lastError = fileSendErr;
+            const fileErrStatus = fileSendErr.response?.status;
+            const fileErrMsg = fileSendErr.response?.data?.description || fileSendErr.response?.data?.message || fileSendErr.message;
+            console.error(`❌ WAHAService: /sendFile also failed (${fileErrStatus}):`, fileErrMsg);
           }
         }
+      }
 
-        // If media send completely failed, check if it's a Plus version issue
-        if (mediaAttemptFailed && lastError) {
-          const errStatus = lastError.response?.status;
-          const errData = lastError.response?.data || {};
-          const errMsg = errData.description || errData.message || lastError.message || '';
+      // If media send completely failed, check if it's a Plus version issue or any other recoverable error
+      if (mediaAttemptFailed && lastError) {
+        const errStatus = lastError.response?.status;
+        const errData = lastError.response?.data || {};
+        const errMsg = errData.description || errData.message || lastError.message || '';
+        
+        console.log(`🔍 WAHAService: Error details:`, {
+          status: errStatus,
+          description: errData.description,
+          message: errData.message,
+          fullMsg: errMsg,
+          isPlusRequired: errMsg.includes('Plus version') || errMsg.includes('NOWEB')
+        });
+        
+        if (errStatus === 422 && (errMsg.includes('Plus version') || errMsg.includes('NOWEB') || errMsg.includes('available only'))) {
+          console.warn(`⚠️  WAHAService: WAHA Plus version required for media. Falling back to link-in-text method.`);
           
-          console.log(`🔍 WAHAService: Error details:`, {
-            status: errStatus,
-            description: errData.description,
-            message: errData.message,
-            fullMsg: errMsg,
-            isPlusRequired: errMsg.includes('Plus version') || errMsg.includes('NOWEB')
-          });
+          // Send message with media link as text instead
+          const mediaEmoji = mediaType === 'image' ? '🖼️' 
+                           : mediaType === 'video' ? '🎥'
+                           : mediaType === 'audio' ? '🎵'
+                           : '📎';
           
-          if (errStatus === 422 && (errMsg.includes('Plus version') || errMsg.includes('NOWEB') || errMsg.includes('available only'))) {
-            console.warn(`⚠️  WAHAService: WAHA Plus version required for media. Falling back to link-in-text method.`);
-            
-            // Send message with media link as text instead
-            const mediaEmoji = mediaType === 'image' ? '🖼️' 
-                             : mediaType === 'video' ? '🎥'
-                             : mediaType === 'audio' ? '🎵'
-                             : '📎';
-            
-            const linkText = `${message}\n\n${mediaEmoji} ${options.mediaFileName || 'Media'}: ${options.mediaUrl}`;
-            
-            try {
-              response = await wahaClient.post('/sendText', {
-                session: SESSION_NAME,
-                chatId: formattedPhone,
-                text: linkText
-              });
-              console.log(`✅ WAHAService: Sent message with media link as fallback`);
-            } catch (linkErr) {
-              console.error(`❌ WAHAService: Even text fallback failed:`, linkErr.message);
-              throw linkErr;
-            }
-          } else {
-            // Some other error, re-throw it
-            throw lastError;
+          const linkText = targetUrl 
+            ? `${message}\n\n${mediaEmoji} ${options.mediaFileName || 'Media'}: ${targetUrl}`
+            : `${message}\n\n${mediaEmoji} [${options.mediaFileName || 'Media'} attached but could not be sent]`;
+          
+          try {
+            response = await wahaClient.post('/sendText', {
+              session: SESSION_NAME,
+              chatId: formattedPhone,
+              text: linkText
+            });
+            console.log(`✅ WAHAService: Sent message with media link as fallback`);
+          } catch (linkErr) {
+            console.error(`❌ WAHAService: Even text fallback failed:`, linkErr.message);
+            throw linkErr;
           }
+        } else {
+          // Some other error, re-throw it
+          throw lastError;
         }
       }
     } 
@@ -572,9 +612,9 @@ const sendMessage = async (to, message, options = {}) => {
       to: formattedPhone
     };
   } catch (error) {
-    console.error('âŒ WAHA Send Error:', error.message);
+    console.error('❌ WAHA Send Error:', error.message);
     if (error.response?.data) {
-      console.error('ðŸ“‹ Error details:', error.response.data);
+      console.error('📋 Error details:', error.response.data);
     }
     return {
       success: false,
@@ -666,7 +706,7 @@ const handleIncomingMessage = async (data) => {
       error: 'Unknown event type'
     };
   } catch (error) {
-    console.error('âŒ WAHA Webhook Error:', error.message);
+    console.error('❌ WAHA Webhook Error:', error.message);
     return {
       success: false,
       error: error.message
@@ -683,17 +723,21 @@ const handleStatusUpdate = async (data) => {
     const statusPayload = eventData || payload || {};
 
     if (event === 'message.status' || event === 'message.ack') {
-      const { id, status, ack, ackName } = statusPayload;
+      const { id, status, ack, ackName, errorInfo } = statusPayload;
       const normalizedStatus = event === 'message.ack'
         ? mapWAHAAckStatus(ackName || ack)
         : mapWAHAStatus(status);
+
+      // Load the previous status first so campaign counters only increment on real transitions
+      const existingMessage = await Message.findOne({ externalMessageId: extractStringId(id) }).lean();
+      const previousStatus = existingMessage?.status;
 
       const message = await Message.findOneAndUpdate(
         { externalMessageId: extractStringId(id) },
         {
           status: normalizedStatus,
           failureReason: normalizedStatus === 'FAILED'
-            ? `WAHA ${event}: ${ackName || ack || status || 'unknown'}`
+            ? (errorInfo || `WAHA ${event}: ${ackName || ack || status || 'unknown'}`)
             : undefined,
           updatedAt: new Date()
         },
@@ -711,7 +755,16 @@ const handleStatusUpdate = async (data) => {
           }
         );
       } catch (syncErr) {
-        console.warn('âš ï¸ ConversationMessage status sync warning:', syncErr.message);
+        console.warn('ConversationMessage status sync warning:', syncErr.message);
+      }
+
+      // Bump campaign performance counters on genuine transitions
+      if (existingMessage && existingMessage.campaignId) {
+        try {
+          await updateCampaignStatusCounters(existingMessage.campaignId, previousStatus, normalizedStatus);
+        } catch (campErr) {
+          console.warn('[WAHA] Campaign counter update error:', campErr.message);
+        }
       }
 
       return {
@@ -723,7 +776,7 @@ const handleStatusUpdate = async (data) => {
 
     return { success: false };
   } catch (error) {
-    console.error('âŒ Status Update Error:', error.message);
+    console.error('❌ Status Update Error:', error.message);
     return { success: false, error: error.message };
   }
 };
@@ -734,6 +787,7 @@ const handleStatusUpdate = async (data) => {
 const mapWAHAStatus = (wahaStatus) => {
   const statusMap = {
     'PENDING': 'PENDING',
+    'QUEUED': 'QUEUED',
     'SENT': 'SENT',
     'DELIVERED': 'DELIVERED',
     'READ': 'READ',
@@ -741,7 +795,12 @@ const mapWAHAStatus = (wahaStatus) => {
     'ERROR': 'FAILED'
   };
 
-  return statusMap[wahaStatus] || 'PENDING';
+  // Status webhooks can arrive with plain names OR raw ACK values
+  // (e.g. forwarded ackName "DEVICE"/"SERVER" or numeric ack 1/2/3).
+  const normalized = typeof wahaStatus === 'string' ? wahaStatus.toUpperCase() : wahaStatus;
+
+  if (statusMap[normalized]) return statusMap[normalized];
+  return mapWAHAAckStatus(normalized);
 };
 
 const mapWAHAAckStatus = (ackValue) => {
@@ -784,7 +843,7 @@ const getMessageStatus = async (externalMessageId) => {
       updatedAt: message.updatedAt
     };
   } catch (error) {
-    console.error('âŒ Fetch Status Error:', error.message);
+    console.error('❌ Fetch Status Error:', error.message);
     return {
       success: false,
       error: error.message
@@ -822,7 +881,7 @@ const retryFailedMessages = async (messageIds) => {
 
     return results;
   } catch (error) {
-    console.error('âŒ Retry Error:', error.message);
+    console.error('❌ Retry Error:', error.message);
     return [];
   }
 };
@@ -831,6 +890,48 @@ const retryFailedMessages = async (messageIds) => {
  * Delay helper
  */
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+/**
+ * Bump a campaign's performance counters based on message status transitions.
+ * Only increments when the status actually changes (e.g. SENT -> DELIVERED -> READ),
+ * so counters stay accurate even if duplicate status webhooks arrive.
+ */
+const updateCampaignStatusCounters = async (campaignId, previousStatus, newStatus) => {
+  if (!campaignId || !previousStatus || !newStatus || previousStatus === newStatus) return;
+
+  const Campaign = require('../models/Campaign');
+  const update = {};
+
+  if (newStatus === 'DELIVERED' && !['DELIVERED', 'READ'].includes(previousStatus)) {
+    update.totalDelivered = 1;
+  }
+  if (newStatus === 'READ' && previousStatus !== 'READ') {
+    update.totalRead = 1;
+  }
+  // A message that was already accepted (SENT) later reported as FAILED
+  if (newStatus === 'FAILED' && ['SENT', 'DELIVERED', 'READ'].includes(previousStatus)) {
+    update.totalFailed = 1;
+  }
+
+  if (Object.keys(update).length === 0) return;
+
+  await Campaign.updateOne(
+    { _id: campaignId },
+    {
+      $inc: update,
+      $set: { updatedAt: new Date() }
+    }
+  );
+
+  // Recompute delivery rate from the authoritative (now-incremented) counters
+  const camp = await Campaign.findOne({ _id: campaignId }).select('totalSent totalDelivered').lean();
+  if (camp) {
+    await Campaign.updateOne(
+      { _id: campaignId },
+      { deliveryRate: camp.totalSent > 0 ? Math.round(camp.totalDelivered / camp.totalSent * 100 * 100) / 100 : 0 }
+    );
+  }
+};
 
 /**
  * Get all sessions
@@ -843,7 +944,7 @@ const getSessions = async () => {
       sessions: response.data
     };
   } catch (error) {
-    console.error('âŒ Get Sessions Error:', error.message);
+    console.error('❌ Get Sessions Error:', error.message);
     return {
       success: false,
       error: error.message
@@ -857,10 +958,25 @@ const getSessions = async () => {
 const logout = async () => {
   try {
     await wahaClient.post(`/sessions/${SESSION_NAME}/logout`);
-    console.log(`âœ… Session ${SESSION_NAME} logged out`);
+    console.log(`✅ Session ${SESSION_NAME} logged out`);
     return { success: true };
   } catch (error) {
-    console.error('âŒ Logout Error:', error.message);
+    console.error('❌ Logout Error:', error.message);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
+ * Restart a stuck or starting session (breaks STARTING/registering loops)
+ */
+const restartSession = async () => {
+  try {
+    console.log(`🔄 Restarting session ${SESSION_NAME}...`);
+    await wahaClient.post(`/sessions/${SESSION_NAME}/restart`);
+    await new Promise(resolve => setTimeout(resolve, 4000));
+    return { success: true };
+  } catch (error) {
+    console.error('❌ Restart Session Error:', error.message);
     return { success: false, error: error.message };
   }
 };
@@ -883,9 +999,9 @@ const requestPairingCode = async (phoneNumber) => {
       code: response.data.code
     };
   } catch (error) {
-    console.error('âŒ Request Pairing Code Error:', error.message);
+    console.error('❌ Request Pairing Code Error:', error.message);
     if (error.response?.data) {
-      console.error('ðŸ“‹ Error details:', error.response.data);
+      console.error('📋 Error details:', error.response.data);
     }
     return {
       success: false,
@@ -909,8 +1025,10 @@ module.exports = {
   retryFailedMessages,
   getSessions,
   logout,
+  restartSession,
   formatPhoneNumber,
   mapWAHAStatus,
+  updateCampaignStatusCounters,
   WAHA_API_URL,
   SESSION_NAME
 };

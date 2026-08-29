@@ -14,11 +14,13 @@ import {
 import useAuthStore from '../../store/authStore';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../../api/client';
+import logo from '../../assets/logo.jpeg';
 
 export default function Login() {
   const [mobile, setMobile] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [loading, setLoading] = useState(false);
   
   // License Activation state
@@ -27,6 +29,12 @@ export default function Login() {
   const [licenseLoading, setLicenseLoading] = useState(false);
   const [licenseError, setLicenseError] = useState('');
   const [licenseSuccess, setLicenseSuccess] = useState('');
+  const [extractedDetails, setExtractedDetails] = useState(null);
+  const [extracting, setExtracting] = useState(false);
+  const [licenseOtpDialog, setLicenseOtpDialog] = useState(false);
+  const [licenseOtp, setLicenseOtp] = useState('');
+  const [licenseOtpLoading, setLicenseOtpLoading] = useState(false);
+  const [licenseOtpError, setLicenseOtpError] = useState('');
 
   // Forgot Password state
   const [openForgotDialog, setOpenForgotDialog] = useState(false);
@@ -42,6 +50,7 @@ export default function Login() {
   const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
+    setSuccessMessage('');
     
     if (!mobile || !password) {
       setError('Please enter both mobile number and password');
@@ -51,12 +60,44 @@ export default function Login() {
     try {
       setLoading(true);
       const response = await apiClient.post('/auth/login', { phone: mobile, password });
+
+      if (response.data?.requiresOtp) {
+        // Admin login requires OTP verification
+        setError('');
+        setLoginOtpEmail(response.data?.email || '');
+        setOpenLoginOtpDialog(true);
+        return;
+      }
+
       login(response.data.user, response.data.token);
       navigate('/');
     } catch (err) {
       setError(err.response?.data?.message || 'Login failed. Please check your credentials.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleExtractLicense = async () => {
+    setLicenseError('');
+    setLicenseSuccess('');
+    setExtractedDetails(null);
+
+    if (!licenseKey.trim()) {
+      setLicenseError('Please enter a license key');
+      return;
+    }
+
+    try {
+      setExtracting(true);
+      const response = await apiClient.post('/auth/license/extract', { key: licenseKey });
+      if (response.data?.success) {
+        setExtractedDetails(response.data.details);
+      }
+    } catch (err) {
+      setLicenseError(err.response?.data?.error || 'Failed to extract license details. Please verify your key.');
+    } finally {
+      setExtracting(false);
     }
   };
 
@@ -72,19 +113,70 @@ export default function Login() {
 
     try {
       setLicenseLoading(true);
-      const response = await apiClient.post('/auth/license/activate', { key: licenseKey });
+      // Use OTP flow: request server to send OTP for this license
+      const response = await apiClient.post('/auth/license/send-otp', { key: licenseKey });
       if (response.data?.success) {
-        setLicenseSuccess('License activated and login created successfully!');
-        // Automatically log user in
-        setTimeout(() => {
-          login(response.data.user, response.data.token);
-          navigate('/');
-        }, 1500);
+        setLicenseSuccess('OTP sent to license owner email (or logged to server). Please enter OTP to verify.');
+        setLicenseOtpDialog(true);
       }
     } catch (err) {
-      setLicenseError(err.response?.data?.error || 'Failed to activate license. Please verify your key.');
+      setLicenseError(err.response?.data?.error || 'Failed to request license OTP. Please verify your key.');
     } finally {
       setLicenseLoading(false);
+    }
+  };
+
+  const handleVerifyLicenseOtp = async () => {
+    setLicenseOtpError('');
+    if (!licenseOtp.trim()) {
+      setLicenseOtpError('Please enter the OTP');
+      return;
+    }
+    try {
+      setLicenseOtpLoading(true);
+      const res = await apiClient.post('/auth/license/verify-otp', { key: licenseKey, otp: licenseOtp.trim() });
+      if (res.data?.success) {
+        setLicenseOtpDialog(false);
+        setOpenLicenseDialog(false);
+        setLicenseSuccess('');
+        setExtractedDetails(null);
+        setLicenseKey('');
+        setLicenseOtp('');
+        setError('');
+        setSuccessMessage('License activated successfully! Please login with your credentials.');
+      }
+    } catch (err) {
+      setLicenseOtpError(err.response?.data?.error || 'OTP verification failed');
+    } finally {
+      setLicenseOtpLoading(false);
+    }
+  };
+
+  // Login OTP dialog state and handlers
+  const [openLoginOtpDialog, setOpenLoginOtpDialog] = useState(false);
+  const [loginOtp, setLoginOtp] = useState('');
+  const [loginOtpLoading, setLoginOtpLoading] = useState(false);
+  const [loginOtpError, setLoginOtpError] = useState('');
+  const [loginOtpEmail, setLoginOtpEmail] = useState('');
+
+  const handleVerifyLoginOtp = async (emailForOtp) => {
+    setLoginOtpError('');
+    if (!loginOtp.trim()) {
+      setLoginOtpError('Please enter the OTP');
+      return;
+    }
+    try {
+      setLoginOtpLoading(true);
+      const res = await apiClient.post('/auth/verify-login-otp', { email: emailForOtp || '', otp: loginOtp.trim() });
+      if (res.data?.success && res.data.token) {
+        login(res.data.user, res.data.token);
+        setOpenLoginOtpDialog(false);
+        navigate('/');
+      }
+    } catch (err) {
+      setLoginOtpError(err.response?.data?.error || 'OTP verification failed');
+    } finally {
+      setLoginOtpLoading(false);
     }
   };
 
@@ -134,14 +226,14 @@ export default function Login() {
           border: '1px solid #dadce0',
           backgroundColor: '#ffffff',
           width: '100%',
-          maxWidth: 820,
+          maxWidth: '100%',
           minHeight: 520,
           boxShadow: '0 4px 20px rgba(0,0,0,0.05)'
         }}
       >
         {/* Left Panel: Branding & Gradient (Blue Panel) */}
         <Box sx={{ 
-          width: { xs: 'none', md: 360 }, 
+          width: { xs: 'none', md: '50%' }, 
           display: { xs: 'none', md: 'flex' }, 
           flexDirection: 'column',
           background: 'linear-gradient(180deg, #1e88e5 0%, #1565c0 100%)',
@@ -149,38 +241,53 @@ export default function Login() {
           p: 4
         }}>
           {/* Logo */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 6 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 2, mb: 4 }}>
             <Box sx={{ 
-              bgcolor: 'rgba(255, 255, 255, 0.2)', 
-              p: 1, 
-              borderRadius: 2, 
+              bgcolor: '#ffffff', 
+              p: 1.5, 
+              borderRadius: 3, 
               display: 'flex', 
               alignItems: 'center', 
-              justifyContent: 'center' 
+              justifyContent: 'center',
+              boxShadow: '0 8px 16px rgba(0,0,0,0.1)'
             }}>
-              <BotIcon sx={{ fontSize: 28, color: '#ffffff' }} />
+              <img src={logo} alt="Company Logo" style={{ width: '80px', height: '80px', objectFit: 'contain', borderRadius: '12px' }} />
             </Box>
-            <Typography variant="h6" sx={{ fontWeight: 700, color: '#ffffff', letterSpacing: '-0.5px' }}>
-              Renic AI
-            </Typography>
+            <Box>
+              <Typography variant="h5" sx={{ fontWeight: 800, color: '#ffffff', letterSpacing: '-0.5px' }}>
+                Renic Technology
+              </Typography>
+              <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.7)', fontWeight: 600 }}>
+                Enterprise SaaS Solutions
+              </Typography>
+            </Box>
           </Box>
 
           {/* Description */}
-          <Typography variant="h5" sx={{ fontWeight: 500, lineHeight: 1.4, mb: 'auto', pr: 2 }}>
-            Your intelligent CRM platform for smarter customer relationships
+          <Typography variant="body2" sx={{ fontWeight: 500, lineHeight: 1.6, mb: 'auto', textAlign: 'center', color: 'rgba(255, 255, 255, 0.9)', px: 1 }}>
+            Unified WhatsApp & Instagram automation, lead management, and intelligent billing for your business growth.
           </Typography>
 
-          {/* Pagination indicator dots */}
-          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-            <Box sx={{ width: 28, height: 6, borderRadius: 3, bgcolor: '#ffffff' }} />
-            <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: 'rgba(255, 255, 255, 0.4)' }} />
-            <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: 'rgba(255, 255, 255, 0.4)' }} />
+          {/* Company Details */}
+          <Box sx={{ mt: 3, p: 2, borderRadius: 2, bgcolor: 'rgba(255, 255, 255, 0.1)', border: '1px solid rgba(255,255,255,0.1)' }}>
+            <Typography variant="caption" sx={{ display: 'block', fontWeight: 600, color: 'rgba(255,255,255,0.8)', mb: 0.5 }}>
+              📞 Contact Support:
+            </Typography>
+            <Typography variant="caption" sx={{ display: 'block', color: '#ffffff', mb: 1 }}>
+              support@renicsoft.com
+            </Typography>
+            <Typography variant="caption" sx={{ display: 'block', fontWeight: 600, color: 'rgba(255,255,255,0.8)', mb: 0.5 }}>
+              🌐 Website:
+            </Typography>
+            <Typography variant="caption" sx={{ display: 'block', color: '#ffffff' }}>
+              www.renicsoft.com
+            </Typography>
           </Box>
         </Box>
 
         {/* Right Panel: Sign In Form */}
         <Box sx={{ 
-          flexGrow: 1, 
+          width: { xs: '100%', md: '50%' }, 
           p: { xs: 4, sm: 5 }, 
           display: 'flex', 
           flexDirection: 'column',
@@ -203,6 +310,12 @@ export default function Login() {
           {error && (
             <Alert severity="error" sx={{ width: '100%', mb: 3, borderRadius: 2 }}>
               {error}
+            </Alert>
+          )}
+          
+          {successMessage && (
+            <Alert severity="success" sx={{ width: '100%', mb: 3, borderRadius: 2 }}>
+              {successMessage}
             </Alert>
           )}
           
@@ -326,6 +439,8 @@ export default function Login() {
                 setLicenseError('');
                 setLicenseSuccess('');
                 setLicenseKey('');
+                setExtractedDetails(null);
+                setExtracting(false);
                 setOpenLicenseDialog(true);
               }}
               sx={{ textTransform: 'none', fontWeight: 600, fontSize: '0.9rem', p: 0, color: '#1a73e8' }}
@@ -342,8 +457,8 @@ export default function Login() {
       {/* License Activation Dialog */}
       <Dialog 
         open={openLicenseDialog} 
-        onClose={() => !licenseLoading && setOpenLicenseDialog(false)}
-        maxWidth="xs"
+        onClose={() => !licenseLoading && !extracting && setOpenLicenseDialog(false)}
+        maxWidth="sm"
         fullWidth
         PaperProps={{ sx: { borderRadius: 3, p: 1 } }}
       >
@@ -351,32 +466,169 @@ export default function Login() {
         <form onSubmit={handleActivateLicense}>
           <DialogContent>
             <Typography variant="body2" color="text.secondary" mb={2}>
-              Paste your license key to register and create your initial admin account.
+              Paste your license key to extract details and register your admin account.
             </Typography>
             {licenseError && <Alert severity="error" sx={{ mb: 2, borderRadius: 1.5 }}>{licenseError}</Alert>}
             {licenseSuccess && <Alert severity="success" sx={{ mb: 2, borderRadius: 1.5 }}>{licenseSuccess}</Alert>}
-            <TextField
-              label="License Key"
-              fullWidth
-              required
-              placeholder="e.g., RENIC-LIC-XXXXX-XXXXX"
-              value={licenseKey}
-              onChange={(e) => setLicenseKey(e.target.value)}
-              disabled={licenseLoading || !!licenseSuccess}
-              size="small"
-              autoFocus
-              InputProps={{ sx: { borderRadius: 1.5 } }}
-            />
+            
+            <Box sx={{ display: 'flex', gap: 1, mb: 3 }}>
+              <TextField
+                label="License Key"
+                fullWidth
+                required
+                placeholder="e.g., iv:ciphertext"
+                value={licenseKey}
+                onChange={(e) => {
+                  setLicenseKey(e.target.value);
+                  if (extractedDetails) setExtractedDetails(null);
+                }}
+                disabled={licenseLoading || !!licenseSuccess || extracting}
+                size="small"
+                autoFocus
+                InputProps={{ sx: { borderRadius: 1.5 } }}
+              />
+              <Button 
+                variant="outlined" 
+                onClick={handleExtractLicense}
+                disabled={licenseLoading || !!licenseSuccess || extracting || !licenseKey.trim()}
+                sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 1.5 }}
+              >
+                {extracting ? 'Verifying...' : 'Verify'}
+              </Button>
+            </Box>
+
+            {extractedDetails && (
+              <Box sx={{ 
+                bgcolor: 'action.hover', 
+                borderRadius: 2, 
+                p: 2.5, 
+                border: '1px solid', 
+                borderColor: 'divider',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 1.5
+              }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'primary.main', mb: 0.5 }}>
+                  📋 Extracted License Information
+                </Typography>
+                
+                <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+                  <Box>
+                    <Typography variant="caption" color="text.secondary" display="block">Company / Business Name</Typography>
+                    <Typography variant="body2" fontWeight={600}>{extractedDetails.name}</Typography>
+                  </Box>
+                  <Box>
+                    <Typography variant="caption" color="text.secondary" display="block">Owner Name</Typography>
+                    <Typography variant="body2" fontWeight={600}>{extractedDetails.firstName} {extractedDetails.lastName}</Typography>
+                  </Box>
+                  <Box>
+                    <Typography variant="caption" color="text.secondary" display="block">Owner Email</Typography>
+                    <Typography variant="body2" fontWeight={600}>{extractedDetails.email}</Typography>
+                  </Box>
+                  <Box>
+                    <Typography variant="caption" color="text.secondary" display="block">Owner Phone</Typography>
+                    <Typography variant="body2" fontWeight={600}>{extractedDetails.phone}</Typography>
+                  </Box>
+                  <Box>
+                    <Typography variant="caption" color="text.secondary" display="block">Subscription Plan</Typography>
+                    <Typography variant="body2" fontWeight={600} sx={{ textTransform: 'uppercase', color: 'success.main' }}>
+                      {extractedDetails.planTier}
+                    </Typography>
+                  </Box>
+                  <Box>
+                    <Typography variant="caption" color="text.secondary" display="block">Expiry Date</Typography>
+                    <Typography variant="body2" fontWeight={600}>
+                      {extractedDetails.licenseEnd ? new Date(extractedDetails.licenseEnd).toLocaleDateString() : 'N/A'}
+                    </Typography>
+                  </Box>
+                </Box>
+                {extractedDetails.daysRemaining !== undefined && !extractedDetails.expired && (
+                  <Box sx={{ mt: 1, borderRadius: 1.5, p: 1.5, bgcolor: extractedDetails.expiringSoon ? 'warning.light' : 'success.light', color: extractedDetails.expiringSoon ? 'warning.dark' : 'success.dark' }}>
+                    <Typography variant="caption" fontWeight={700}>
+                      {extractedDetails.expiringSoon
+                        ? `⚠️ License expires in ${extractedDetails.daysRemaining} day${extractedDetails.daysRemaining === 1 ? '' : 's'} (${new Date(extractedDetails.licenseEnd).toLocaleDateString()}). Please renew before it expires.`
+                        : `✅ License valid for ${extractedDetails.daysRemaining} more days (expires ${new Date(extractedDetails.licenseEnd).toLocaleDateString()}).`}
+                    </Typography>
+                  </Box>
+                )}
+                {extractedDetails.expired && (
+                  <Alert severity="error" sx={{ mt: 1, borderRadius: 1.5 }}>
+                    This license has expired. Please contact Renic Technology to renew it.
+                  </Alert>
+                )}
+                {extractedDetails.isUsed && (
+                  <Alert severity="warning" sx={{ mt: 1, borderRadius: 1.5 }}>
+                    This license key has already been activated.
+                  </Alert>
+                )}
+              </Box>
+            )}
           </DialogContent>
           <DialogActions sx={{ px: 3, pb: 2 }}>
-            <Button onClick={() => setOpenLicenseDialog(false)} disabled={licenseLoading} sx={{ textTransform: 'none', fontWeight: 600 }}>
+            <Button onClick={() => setOpenLicenseDialog(false)} disabled={licenseLoading || extracting} sx={{ textTransform: 'none', fontWeight: 600 }}>
               Cancel
             </Button>
-            <Button type="submit" variant="contained" disabled={licenseLoading || !!licenseSuccess} disableElevation sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 5 }}>
-              {licenseLoading ? 'Activating...' : 'Activate'}
+            <Button 
+              type="submit" 
+              variant="contained" 
+              disabled={licenseLoading || !!licenseSuccess || extracting || !extractedDetails || extractedDetails.isUsed} 
+              disableElevation 
+              sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 5, px: 3 }}
+            >
+              {licenseLoading ? 'Activating...' : 'Activate & Create Account'}
             </Button>
           </DialogActions>
         </form>
+      </Dialog>
+
+      {/* License OTP Dialog */}
+      <Dialog open={licenseOtpDialog} onClose={() => !licenseOtpLoading && setLicenseOtpDialog(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Enter License OTP</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" mb={2}>An OTP was sent to the license owner's email. Enter it below to verify and create the admin account.</Typography>
+          {licenseOtpError && <Alert severity="error" sx={{ mb: 2 }}>{licenseOtpError}</Alert>}
+          <TextField
+            label="OTP"
+            fullWidth
+            value={licenseOtp}
+            onChange={(e) => setLicenseOtp(e.target.value)}
+            size="small"
+            autoFocus
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setLicenseOtpDialog(false)} disabled={licenseOtpLoading}>Cancel</Button>
+          <Button onClick={handleVerifyLicenseOtp} disabled={licenseOtpLoading} variant="contained">{licenseOtpLoading ? 'Verifying...' : 'Verify OTP'}</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Login OTP Dialog (Admin) */}
+      <Dialog open={openLoginOtpDialog} onClose={() => !loginOtpLoading && setOpenLoginOtpDialog(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Admin Login OTP</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" mb={2}>An OTP was sent to your registered email. Enter it below to complete login.</Typography>
+          {loginOtpError && <Alert severity="error" sx={{ mb: 2 }}>{loginOtpError}</Alert>}
+          <TextField
+            label="Registered Email"
+            fullWidth
+            value={loginOtpEmail}
+            size="small"
+            disabled
+            sx={{ mb: 1 }}
+          />
+          <TextField
+            label="OTP"
+            fullWidth
+            value={loginOtp}
+            onChange={(e) => setLoginOtp(e.target.value)}
+            size="small"
+            autoFocus
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenLoginOtpDialog(false)} disabled={loginOtpLoading}>Cancel</Button>
+          <Button onClick={() => handleVerifyLoginOtp(loginOtpEmail)} disabled={loginOtpLoading} variant="contained">{loginOtpLoading ? 'Verifying...' : 'Verify OTP'}</Button>
+        </DialogActions>
       </Dialog>
 
       {/* Forgot Password Dialog */}

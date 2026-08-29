@@ -36,7 +36,8 @@ import apiClient from '../../../../api/client';
 const AudienceStep = React.memo(({
   data = {},
   onChange = () => {},
-  errors = {}
+  errors = {},
+  isDraft = false
 }) => {
   const [estimatedReach, setEstimatedReach] = useState(0);
   const [loadingEstimate, setLoadingEstimate] = useState(false);
@@ -215,6 +216,17 @@ const AudienceStep = React.memo(({
         Define who should receive this campaign by selecting segment or individual customers.
       </Typography>
 
+      {/* Draft mode info banner */}
+      {isDraft && (
+        <Paper sx={{ p: 2, bgcolor: '#FFFBEB', border: '1px solid #FCD34D', borderRadius: '8px' }}>
+          <Typography variant="body2" sx={{ color: '#92400E', fontWeight: 600 }}>
+            📋 Draft Mode — Customer Selection at Send Time
+          </Typography>
+          <Typography variant="caption" sx={{ color: '#78350F', display: 'block', mt: 0.5 }}>
+            You are saving as a draft. Just pick a segment below — you will select specific customers when you manually send this campaign later.
+          </Typography>
+        </Paper>
+      )}
       <FormControl fullWidth size="small" required>
         <InputLabel>Target Segment</InputLabel>
         <Select
@@ -255,7 +267,8 @@ const AudienceStep = React.memo(({
         )}
       </Paper>
 
-      {/* Customer Listing with Selection */}
+      {/* Customer table — hidden for draft campaigns */}
+      {!isDraft && (
       <Box>
         <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
           <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#1F2937' }}>
@@ -365,7 +378,7 @@ const AudienceStep = React.memo(({
           </TableContainer>
         )}
       </Box>
-
+      )}
       {/* Languages */}
       <Box>
         <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5, display: 'flex', alignItems: 'center', gap: 0.5 }}>

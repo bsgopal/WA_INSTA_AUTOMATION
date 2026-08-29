@@ -213,7 +213,8 @@ const executeSendMessage = async (step, customer, context) => {
           {
             mediaUrl,
             buttons,
-            list
+            list,
+            forceMeta: true
           }
         );
       } else if (channel === 'instagram') {

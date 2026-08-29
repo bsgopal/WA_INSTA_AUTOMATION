@@ -30,6 +30,10 @@ frontend/dist/
 frontend/dist-ssr/
 backend/dist/
 backend/build/
+dist-electron/
+frontend/dist-electron/
+frontend/backend-stage/
+WA_Automation.exe
 
 # Runtime uploads and generated media
 backend/uploads/

@@ -25,6 +25,18 @@ const shopConfigSchema = new mongoose.Schema({
   anthropicModel: { type: String, default: 'claude-3-haiku-20240307' },
   geminiApiKey: { type: String, default: '' },
   geminiModel: { type: String, default: 'gemini-1.5-flash' },
+  metaApiEnabled: { type: Boolean, default: false },
+  metaAppId: { type: String, default: '' },
+  metaAppSecret: { type: String, default: '' },
+  metaPhoneNumberId: { type: String, default: '' },
+  metaAccessToken: { type: String, default: '' },
+  metaWebhookVerifyToken: { type: String, default: '' },
+  metaBusinessAccountId: { type: String, default: '' },
+  metaDisplayPhoneNumber: { type: String, default: '' },
+  metaVerifiedName: { type: String, default: '' },
+  metaForwardReplies: { type: Boolean, default: false },
+  metaHandoffMessage: { type: String, default: 'Hi {name}! You replied to our promotional number. Our support team will now continue this chat with you on this number. How can we help you?' },
+  metaAutoReplyMessage: { type: String, default: 'Hi {name}, how can I help you?' },
   faqs: [faqSchema]
 }, { timestamps: true });
 

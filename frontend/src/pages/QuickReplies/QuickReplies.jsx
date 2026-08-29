@@ -137,20 +137,23 @@ export default function QuickReplies() {
 
   return (
     <Box sx={{ width: '100%', flexGrow: 1 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-        <Box>
-          <Typography variant="h4" gutterBottom>
-            Quick Replies
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Create and manage quick response templates for common customer inquiries
-          </Typography>
-        </Box>
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', mb: 3 }}>
         <Button
           variant="contained"
           startIcon={<AddIcon />}
+          size="small"
           onClick={() => handleOpenDialog()}
           disableElevation
+          sx={{
+            textTransform: 'none',
+            fontWeight: 500,
+            fontSize: '0.8125rem',
+            whiteSpace: 'nowrap',
+            px: 1.25,
+            py: 0.5,
+            height: '28px',
+            borderRadius: '4px'
+          }}
         >
           New Quick Reply
         </Button>

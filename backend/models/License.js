@@ -37,6 +37,23 @@ const LicenseSchema = new mongoose.Schema({
     type: String,
     default: 'ADMIN'
   },
+  planTier: {
+    type: String,
+    default: 'basic'
+  },
+  licenseStart: {
+    type: Date,
+    default: Date.now
+  },
+  licenseEnd: {
+    type: Date
+  },
+  otpHash: {
+    type: String
+  },
+  otpExpire: {
+    type: Date
+  },
   isUsed: {
     type: Boolean,
     default: false

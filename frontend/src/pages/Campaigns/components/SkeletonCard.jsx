@@ -1,76 +1,51 @@
 import React from 'react';
 import { Card, CardContent, Box, Stack, Skeleton } from '@mui/material';
 
-/**
- * SkeletonCard Component
- * Displays a loading skeleton for campaign cards
- * Shows animated placeholder while data is loading
- */
 const SkeletonCard = React.memo(() => {
   return (
     <Card
       sx={{
-        height: '100%',
+        height: 288,
+        width: '100%',
         display: 'flex',
         flexDirection: 'column',
         position: 'relative',
-        border: '1px solid #E5E7EB',
+        borderRadius: '6px',
+        overflow: 'hidden',
+        border: '1px solid #D9D9D9',
         animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite'
       }}
     >
-      {/* Status Badge Placeholder - Top Right */}
-      <Box sx={{
-        position: 'absolute',
-        top: 12,
-        right: 12,
-        zIndex: 1
-      }}>
-        <Skeleton variant="rounded" width={80} height={24} />
-      </Box>
+      {/* Media header */}
+      <Skeleton variant="rectangular" height={92} width="100%" />
 
-      {/* Main Content */}
-      <CardContent sx={{ flexGrow: 1, pb: 2 }}>
-        {/* Title */}
-        <Stack spacing={0.5} mb={2.5}>
-          <Skeleton variant="text" width="80%" height={24} />
-          <Skeleton variant="text" width="40%" height={16} />
+      <CardContent sx={{ flexGrow: 1, px: 2.5, pt: 2.5, pb: 1.25 }}>
+        <Stack spacing={1}>
+          <Skeleton variant="text" width="75%" height={22} />
+          <Skeleton variant="text" width="95%" height={16} />
+          <Skeleton variant="text" width="60%" height={16} />
+          <Stack direction="row" spacing={2} sx={{ mt: 0.5 }}>
+            <Skeleton variant="text" width="30%" height={26} />
+            <Skeleton variant="text" width="30%" height={26} />
+            <Skeleton variant="text" width="30%" height={26} />
+          </Stack>
         </Stack>
-
-        {/* Metrics */}
-        <Stack spacing={1.5} mb={2.5}>
-          <Skeleton variant="rectangular" height={6} />
-          <Skeleton variant="rectangular" height={6} />
-          <Skeleton variant="rectangular" height={6} />
-        </Stack>
-
-        {/* Last Update */}
-        <Skeleton variant="text" width="30%" height={12} />
       </CardContent>
 
-      {/* Action Buttons */}
-      <Box
-        sx={{
-          px: 2,
-          pb: 2,
-          borderTop: '1px solid #E5E7EB',
-          pt: 2,
-          display: 'flex',
-          gap: 1
-        }}
-      >
-        <Skeleton variant="rectangular" height={32} sx={{ flex: 1 }} />
-        <Skeleton variant="rectangular" height={32} sx={{ flex: 1 }} />
-        <Skeleton variant="circular" width={40} height={40} />
+      {/* Footer actions */}
+      <Box sx={{ px: 1.25, py: 1, display: 'flex', gap: 1 }}>
+        <Skeleton variant="rounded" height={32} sx={{ flex: 1, borderRadius: '4px' }} />
+        <Box sx={{ display: 'flex', gap: 0.5 }}>
+          <Skeleton variant="circular" width={32} height={32} />
+          <Skeleton variant="circular" width={32} height={32} />
+          <Skeleton variant="circular" width={32} height={32} />
+        </Box>
       </Box>
 
       <style>{`
         @keyframes pulse {
-          0%, 100% {
-            opacity: 1;
-          }
-          50% {
-            opacity: 0.5;
-          }
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.55; }
         }
       `}</style>
     </Card>

@@ -3,7 +3,7 @@ import {
   Typography, Box, Paper, Button, Grid, Card, CardContent, CardActions,
   IconButton, Dialog, DialogTitle, DialogContent, DialogActions,
   TextField, MenuItem, Chip, Stack, Divider, FormControl, InputLabel,
-  Select, CircularProgress, Alert, Tooltip
+  Select, CircularProgress, Alert, Tooltip, Checkbox
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
@@ -44,9 +44,17 @@ export default function Templates() {
     category: 'CUSTOM',
     linkedMessageId: null,
     linkedAction: null,
-    csvTemplates: []
+    csvTemplates: [],
+    mediaUrl: '',
+    mediaType: '',
+    mediaPreviewData: '',
+    mediaMimeType: '',
+    mediaFileName: ''
   });
+  const [mediaUploading, setMediaUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [selectedTemplateIds, setSelectedTemplateIds] = useState([]);
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: '',
@@ -302,9 +310,73 @@ export default function Templates() {
       category: 'CUSTOM',
       linkedMessageId: null,
       linkedAction: null,
-      csvTemplates: []
+      csvTemplates: [],
+      mediaUrl: '',
+      mediaType: '',
+      mediaPreviewData: '',
+      mediaMimeType: '',
+      mediaFileName: ''
     });
     setOpenDialog(true);
+  };
+
+  const handleTemplateMediaUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const formDataObj = new FormData();
+    formDataObj.append('file', file);
+
+    try {
+      setMediaUploading(true);
+      const response = await apiClient.post('/templates/media/upload', formDataObj, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      const media = {
+        mediaUrl: response.data.mediaUrl,
+        mediaType: response.data.mediaType,
+        mediaPreviewData: response.data.mediaPreviewData,
+        mediaMimeType: response.data.mediaMimeType,
+        mediaFileName: response.data.mediaFileName
+      };
+
+      if (editingTemplate) {
+        setEditingTemplate({ ...editingTemplate, ...media, type: 'IMAGE' });
+      } else {
+        setFormData(prev => ({ ...prev, ...media, type: 'IMAGE' }));
+      }
+
+      setSnackbar({ open: true, message: 'Image attached to template successfully!', severity: 'success' });
+    } catch (error) {
+      console.error('Template media upload error:', error);
+      setSnackbar({ open: true, message: error.response?.data?.error || 'Failed to upload image', severity: 'error' });
+    } finally {
+      setMediaUploading(false);
+      if (e.target) e.target.value = '';
+    }
+  };
+
+  const handleRemoveTemplateMedia = () => {
+    if (editingTemplate) {
+      setEditingTemplate({
+        ...editingTemplate,
+        mediaUrl: '',
+        mediaType: '',
+        mediaPreviewData: '',
+        mediaMimeType: '',
+        mediaFileName: ''
+      });
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        mediaUrl: '',
+        mediaType: '',
+        mediaPreviewData: '',
+        mediaMimeType: '',
+        mediaFileName: ''
+      }));
+    }
   };
 
   const handleDeleteTemplate = async () => {
@@ -329,6 +401,52 @@ export default function Templates() {
     }
   };
 
+  // Bulk delete handler
+  const handleBulkDelete = async () => {
+    if (selectedTemplateIds.length === 0) return;
+    try {
+      setSubmitting(true);
+      let deleted = 0;
+      let failed = 0;
+      for (const id of selectedTemplateIds) {
+        try {
+          await apiClient.delete(`/templates/${id}`);
+          deleted++;
+        } catch {
+          failed++;
+        }
+      }
+      setSnackbar({
+        open: true,
+        message: `Deleted ${deleted} template${deleted !== 1 ? 's' : ''}${failed > 0 ? `, ${failed} failed` : ''}`,
+        severity: failed > 0 ? 'warning' : 'success'
+      });
+      setSelectedTemplateIds([]);
+      setBulkDeleteConfirm(false);
+      fetchTemplates();
+    } catch (error) {
+      console.error('Bulk delete error:', error);
+      setSnackbar({ open: true, message: 'Bulk delete failed', severity: 'error' });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Multi-select toggle handlers
+  const handleToggleSelectTemplate = (id) => {
+    setSelectedTemplateIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAllTemplates = (e) => {
+    if (e.target.checked) {
+      setSelectedTemplateIds(templates.map(t => t._id));
+    } else {
+      setSelectedTemplateIds([]);
+    }
+  };
+
   const handleEditTemplate = (idx) => {
     const template = formData.csvTemplates[idx];
     setEditingTemplate({
@@ -338,24 +456,67 @@ export default function Templates() {
     setEditingTemplateIdx(idx);
   };
 
-  const handleSaveEditedTemplate = () => {
-    if (editingTemplateIdx !== null && editingTemplate) {
+  // Opens the edit dialog for a saved DB template
+  const handleEditDbTemplate = (template) => {
+    setEditingTemplate({
+      _id: template._id,
+      name: template.name,
+      content: template.content || '',
+      category: template.category || 'CUSTOM',
+      type: template.type || 'TEXT',
+      keywords: template.keywords || '',
+      blocks: template.messageBlocks || [],
+      mediaUrl: template.mediaUrl || '',
+      mediaType: template.mediaType || '',
+      mediaPreviewData: template.mediaPreviewData || '',
+      mediaMimeType: template.mediaMimeType || '',
+      mediaFileName: template.mediaFileName || ''
+    });
+    setEditingTemplateIdx(null); // null = DB template, not CSV preview
+  };
+
+  const handleSaveEditedTemplate = async () => {
+    if (!editingTemplate) return;
+
+    // If the template has an _id it is a DB template – save via API
+    if (editingTemplate._id) {
+      try {
+        setSubmitting(true);
+        await apiClient.put(`/templates/${editingTemplate._id}`, {
+          name: editingTemplate.name,
+          content: editingTemplate.content,
+          category: editingTemplate.category,
+          type: editingTemplate.type,
+          keywords: editingTemplate.keywords || '',
+          mediaUrl: editingTemplate.mediaUrl || '',
+          mediaType: editingTemplate.mediaType || '',
+          mediaPreviewData: editingTemplate.mediaPreviewData || '',
+          mediaMimeType: editingTemplate.mediaMimeType || '',
+          mediaFileName: editingTemplate.mediaFileName || ''
+        });
+        setSnackbar({ open: true, message: 'Template updated successfully!', severity: 'success' });
+        setEditingTemplate(null);
+        fetchTemplates();
+      } catch (error) {
+        console.error('Failed to update template:', error);
+        setSnackbar({ open: true, message: error.response?.data?.error || 'Failed to update template', severity: 'error' });
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
+
+    // Otherwise it is a CSV-preview template – update local state only
+    if (editingTemplateIdx !== null) {
       const updatedTemplates = [...formData.csvTemplates];
       updatedTemplates[editingTemplateIdx] = {
         ...editingTemplate,
         messageBlocks: editingTemplate.blocks
       };
-      setFormData(prev => ({
-        ...prev,
-        csvTemplates: updatedTemplates
-      }));
+      setFormData(prev => ({ ...prev, csvTemplates: updatedTemplates }));
       setEditingTemplate(null);
       setEditingTemplateIdx(null);
-      setSnackbar({
-        open: true,
-        message: 'Template updated!',
-        severity: 'success'
-      });
+      setSnackbar({ open: true, message: 'Template updated!', severity: 'success' });
     }
   };
 
@@ -417,16 +578,8 @@ export default function Templates() {
 
   return (
     <Box sx={{ width: '100%', flexGrow: 1 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-        <Box>
-          <Typography variant="h4" gutterBottom>
-            Message Templates
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Create and manage reusable message templates
-          </Typography>
-        </Box>
-        <Stack direction="row" spacing={1.5}>
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', mb: 3 }}>
+        <Stack direction="row" spacing={1.5} alignItems="center">
           <Button
             variant="outlined"
             color="info"
@@ -494,6 +647,46 @@ export default function Templates() {
               </Select>
             </FormControl>
 
+            {/* 2b. Image Attachment when type is IMAGE */}
+            {formData.type === 'IMAGE' && (
+              <Box sx={{ border: '1px dashed #CBD5E1', borderRadius: 2, p: 2 }}>
+                <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
+                  Attach Image (will be sent along with the message)
+                </Typography>
+                {formData.mediaPreviewData ? (
+                  <Stack spacing={1} alignItems="flex-start">
+                    <Box component="img"
+                      src={formData.mediaPreviewData}
+                      alt="Template image preview"
+                      sx={{ maxWidth: '100%', maxHeight: 180, borderRadius: 1, border: '1px solid #E5E7EB' }}
+                    />
+                    <Typography variant="caption" sx={{ color: '#6B7280' }}>
+                      {formData.mediaFileName}
+                    </Typography>
+                    <Button size="small" color="error" onClick={handleRemoveTemplateMedia}>
+                      Remove Image
+                    </Button>
+                  </Stack>
+                ) : (
+                  <Button
+                    variant="outlined"
+                    component="label"
+                    startIcon={<UploadIcon />}
+                    disabled={mediaUploading}
+                    size="small"
+                  >
+                    {mediaUploading ? 'Uploading...' : 'Choose Image'}
+                    <input
+                      hidden
+                      type="file"
+                      accept="image/*"
+                      onChange={handleTemplateMediaUpload}
+                    />
+                  </Button>
+                )}
+              </Box>
+            )}
+
             {/* 3. Category */}
             <FormControl fullWidth size="small">
               <InputLabel>3. Category</InputLabel>
@@ -556,7 +749,12 @@ export default function Templates() {
                   type: formData.type,
                   content: formData.content,
                   category: formData.category,
-                  keywords: formData.keywords || ''
+                  keywords: formData.keywords || '',
+                  mediaUrl: formData.mediaUrl || '',
+                  mediaType: formData.mediaType || '',
+                  mediaPreviewData: formData.mediaPreviewData || '',
+                  mediaMimeType: formData.mediaMimeType || '',
+                  mediaFileName: formData.mediaFileName || ''
                 };
 
                 if (editingId) {
@@ -583,7 +781,12 @@ export default function Templates() {
                   category: 'CUSTOM',
                   linkedMessageId: null,
                   linkedAction: null,
-                  csvTemplates: []
+                  csvTemplates: [],
+                  mediaUrl: '',
+                  mediaType: '',
+                  mediaPreviewData: '',
+                  mediaMimeType: '',
+                  mediaFileName: ''
                 });
                 setEditingId(null);
                 fetchTemplates();
@@ -699,12 +902,48 @@ export default function Templates() {
           </Paper>
         ) : (
           <Box component={Paper} sx={{ mb: 3 }} elevation={0} border="1px solid #e0e0e0">
+            {/* Bulk action bar */}
+            {selectedTemplateIds.length > 0 && (
+              <Box sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                p: 1.5,
+                px: 2,
+                bgcolor: '#FEF2F2',
+                borderBottom: '1px solid #FECACA'
+              }}>
+                <Typography variant="body2" sx={{ fontWeight: 600, color: '#DC2626' }}>
+                  {selectedTemplateIds.length} template{selectedTemplateIds.length !== 1 ? 's' : ''} selected
+                </Typography>
+                <Stack direction="row" spacing={1}>
+                  <Button
+                    size="small"
+                    onClick={() => setSelectedTemplateIds([])}
+                    sx={{ textTransform: 'none', fontWeight: 600 }}
+                  >
+                    Clear
+                  </Button>
+                  <Button
+                    size="small"
+                    variant="contained"
+                    color="error"
+                    startIcon={<DeleteIcon />}
+                    onClick={() => setBulkDeleteConfirm(true)}
+                    sx={{ textTransform: 'none', fontWeight: 600 }}
+                    disableElevation
+                  >
+                    Delete Selected
+                  </Button>
+                </Stack>
+              </Box>
+            )}
             <Box sx={{ overflowX: 'auto' }}>
               <Box sx={{ display: 'flex', flexDirection: 'column', minWidth: 800 }}>
                 {/* Header Row */}
                 <Box sx={{ 
                   display: 'grid', 
-                  gridTemplateColumns: '60px 1fr 120px 150px 150px',
+                  gridTemplateColumns: '48px 60px 1fr 120px 150px 150px',
                   gap: 2,
                   p: 2,
                   backgroundColor: '#1976d2',
@@ -713,6 +952,15 @@ export default function Templates() {
                   width: '100%',
                   boxSizing: 'border-box'
                 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    <Checkbox
+                      size="small"
+                      checked={templates.length > 0 && selectedTemplateIds.length === templates.length}
+                      indeterminate={selectedTemplateIds.length > 0 && selectedTemplateIds.length < templates.length}
+                      onChange={handleSelectAllTemplates}
+                      sx={{ color: '#fff', '&.Mui-checked': { color: '#fff' }, '&.MuiCheckbox-indeterminate': { color: '#fff' } }}
+                    />
+                  </Box>
                   <Box sx={{ fontWeight: 'bold', fontSize: '0.9rem' }}>#</Box>
                   <Box sx={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Template Name & Content</Box>
                   <Box sx={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Type</Box>
@@ -724,16 +972,26 @@ export default function Templates() {
                 {templates.map((template, idx) => (
                   <Box key={template._id} sx={{ 
                     display: 'grid', 
-                    gridTemplateColumns: '60px 1fr 120px 150px 150px',
+                    gridTemplateColumns: '48px 60px 1fr 120px 150px 150px',
                     gap: 2,
                     p: 2,
                     borderBottom: '1px solid #e0e0e0',
                     alignItems: 'center',
-                    backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f9fafb',
+                    backgroundColor: selectedTemplateIds.includes(template._id)
+                      ? '#EFF6FF'
+                      : idx % 2 === 0 ? '#ffffff' : '#f9fafb',
                     width: '100%',
                     boxSizing: 'border-box',
-                    '&:hover': { backgroundColor: '#f1f5f9' },
+                    '&:hover': { backgroundColor: selectedTemplateIds.includes(template._id) ? '#DBEAFE' : '#f1f5f9' },
                   }}>
+                    {/* Checkbox */}
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <Checkbox
+                        size="small"
+                        checked={selectedTemplateIds.includes(template._id)}
+                        onChange={() => handleToggleSelectTemplate(template._id)}
+                      />
+                    </Box>
                     {/* Index */}
                     <Box sx={{ fontWeight: 'bold', color: '#1976d2' }}>{idx + 1}</Box>
 
@@ -780,20 +1038,7 @@ export default function Templates() {
                         <IconButton 
                           size="small" 
                           color="primary"
-                          onClick={() => {
-                            setEditingId(template._id);
-                            setFormData({
-                              name: template.name,
-                              type: template.type,
-                              content: template.content,
-                              category: template.category,
-                              keywords: template.keywords || '',
-                              linkedMessageId: null,
-                              linkedAction: null,
-                              csvTemplates: []
-                            });
-                            setOpenDialog(true);
-                          }}
+                          onClick={() => handleEditDbTemplate(template)}
                         >
                           <EditIcon fontSize="small" />
                         </IconButton>
@@ -908,31 +1153,120 @@ export default function Templates() {
       {/* Edit Template Dialog */}
       <Dialog open={editingTemplate !== null} onClose={() => setEditingTemplate(null)} maxWidth="md" fullWidth>
         <DialogTitle sx={{ fontWeight: 600 }}>
-          Edit Template - {editingTemplate?.name}
+          {editingTemplate?._id ? `Edit Template — ${editingTemplate?.name}` : `Preview Edit — ${editingTemplate?.name}`}
         </DialogTitle>
         <DialogContent>
           {editingTemplate && (
             <Stack spacing={3} mt={2}>
+              {/* Template Name */}
               <TextField
                 label="Template Name"
                 fullWidth
                 value={editingTemplate.name}
                 onChange={(e) => setEditingTemplate({ ...editingTemplate, name: e.target.value })}
+                size="small"
               />
 
-              <FormControl fullWidth>
+              {/* Category */}
+              <FormControl fullWidth size="small">
                 <InputLabel>Category</InputLabel>
                 <Select
-                  value={editingTemplate.category}
+                  value={editingTemplate.category || 'CUSTOM'}
                   label="Category"
                   onChange={(e) => setEditingTemplate({ ...editingTemplate, category: e.target.value })}
                 >
-                  {['WELCOME', 'ORDER_CONFIRMATION', 'PRODUCT_RECOMMENDATION', 'DISCOUNT_OFFER', 'FEEDBACK_REQUEST', 'CUSTOM'].map((cat) => (
+                  {categoryOptions.map((cat) => (
                     <MenuItem key={cat} value={cat}>{cat.replace(/_/g, ' ')}</MenuItem>
                   ))}
                 </Select>
               </FormControl>
 
+              {/* Type (only for DB templates) */}
+              {editingTemplate._id && (
+                <FormControl fullWidth size="small">
+                  <InputLabel>Template Type</InputLabel>
+                  <Select
+                    value={editingTemplate.type || 'TEXT'}
+                    label="Template Type"
+                    onChange={(e) => setEditingTemplate({ ...editingTemplate, type: e.target.value })}
+                  >
+                    <MenuItem value="TEXT">📝 Text Only</MenuItem>
+                    <MenuItem value="IMAGE">🖼️ With Image</MenuItem>
+                    <MenuItem value="INTERACTIVE">🔘 With Buttons</MenuItem>
+                  </Select>
+                </FormControl>
+              )}
+
+              {/* Image Attachment for IMAGE type templates */}
+              {editingTemplate._id && (
+                <Box sx={{ border: '1px dashed #CBD5E1', borderRadius: 2, p: 2 }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
+                    Attach Image (will be sent along with the message)
+                  </Typography>
+                  {editingTemplate.mediaPreviewData ? (
+                    <Stack spacing={1} alignItems="flex-start">
+                      <Box component="img"
+                        src={editingTemplate.mediaPreviewData}
+                        alt="Template image preview"
+                        sx={{ maxWidth: '100%', maxHeight: 180, borderRadius: 1, border: '1px solid #E5E7EB' }}
+                      />
+                      <Typography variant="caption" sx={{ color: '#6B7280' }}>
+                        {editingTemplate.mediaFileName}
+                      </Typography>
+                      <Button size="small" color="error" onClick={handleRemoveTemplateMedia}>
+                        Remove Image
+                      </Button>
+                    </Stack>
+                  ) : (
+                    <Button
+                      variant="outlined"
+                      component="label"
+                      startIcon={<UploadIcon />}
+                      disabled={mediaUploading}
+                      size="small"
+                    >
+                      {mediaUploading ? 'Uploading...' : 'Choose Image'}
+                      <input
+                        hidden
+                        type="file"
+                        accept="image/*"
+                        onChange={handleTemplateMediaUpload}
+                      />
+                    </Button>
+                  )}
+                </Box>
+              )}
+
+              {/* Content — primary field for DB templates */}
+              {editingTemplate._id && (
+                <TextField
+                  label="Message Content"
+                  fullWidth
+                  multiline
+                  rows={5}
+                  value={editingTemplate.content || ''}
+                  onChange={(e) => setEditingTemplate({ ...editingTemplate, content: e.target.value })}
+                  placeholder="Type your message here... Use {{customer_name}}, {{gold_rate_22k}}, etc."
+                  helperText="Supports dynamic variables with {{variable_name}} format"
+                  size="small"
+                />
+              )}
+
+              {/* Keywords */}
+              {editingTemplate._id && (
+                <TextField
+                  label="Keywords (Optional)"
+                  fullWidth
+                  value={editingTemplate.keywords || ''}
+                  onChange={(e) => setEditingTemplate({ ...editingTemplate, keywords: e.target.value })}
+                  placeholder="e.g., rates, price, quote (comma-separated)"
+                  helperText="Keywords to trigger this template"
+                  size="small"
+                />
+              )}
+
+              {/* Message Blocks — only for CSV preview templates */}
+              {!editingTemplate._id && (
               <Box>
                 <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 2 }}>
                   Message Blocks
@@ -1027,61 +1361,75 @@ export default function Templates() {
                   Add Button Block
                 </Button>
               </Box>
+              )}
             </Stack>
           )}
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setEditingTemplate(null)}>Cancel</Button>
+          <Button onClick={() => setEditingTemplate(null)} disabled={submitting}>Cancel</Button>
           <Button
             variant="contained"
             disableElevation
             onClick={handleSaveEditedTemplate}
+            disabled={submitting}
           >
-            Save Changes
+            {submitting ? 'Saving...' : 'Save Changes'}
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* Confirmation Snackbar with Action */}
-      {snackbar.open && snackbar.action === 'confirm_delete' && (
-        <Box
-          sx={{
-            position: 'fixed',
-            bottom: 20,
-            left: 20,
-            right: 20,
-            backgroundColor: '#fff3cd',
-            borderLeft: '4px solid #ff9800',
-            borderRadius: 1,
-            p: 2,
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-            zIndex: 10000
-          }}
-        >
-          <Typography variant="body2" sx={{ flex: 1, color: '#000' }}>
-            {snackbar.message}
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteConfirmId !== null} onClose={() => setDeleteConfirmId(null)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700, color: '#DC2626' }}>
+          Delete Template
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ color: '#374151' }}>
+            Are you sure you want to delete this template? This action cannot be undone.
           </Typography>
-          <Stack direction="row" spacing={1}>
-            <Button
-              size="small"
-              onClick={() => setSnackbar({ ...snackbar, open: false })}
-            >
-              Cancel
-            </Button>
-            <Button
-              size="small"
-              variant="contained"
-              color="error"
-              onClick={handleSnackbarAction}
-            >
-              Delete
-            </Button>
-          </Stack>
-        </Box>
-      )}
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setDeleteConfirmId(null)} sx={{ textTransform: 'none' }}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={handleDeleteTemplate}
+            sx={{ textTransform: 'none', fontWeight: 600 }}
+            disableElevation
+          >
+            Delete Template
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Bulk Delete Confirmation Dialog */}
+      <Dialog open={bulkDeleteConfirm} onClose={() => setBulkDeleteConfirm(false)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700, color: '#DC2626' }}>
+          Delete {selectedTemplateIds.length} Template{selectedTemplateIds.length !== 1 ? 's' : ''}
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ color: '#374151' }}>
+            Are you sure you want to delete <strong>{selectedTemplateIds.length}</strong> selected template{selectedTemplateIds.length !== 1 ? 's' : ''}? This action cannot be undone.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setBulkDeleteConfirm(false)} disabled={submitting} sx={{ textTransform: 'none' }}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={handleBulkDelete}
+            disabled={submitting}
+            sx={{ textTransform: 'none', fontWeight: 600 }}
+            disableElevation
+          >
+            {submitting ? 'Deleting...' : `Delete ${selectedTemplateIds.length} Template${selectedTemplateIds.length !== 1 ? 's' : ''}`}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Help / Guidelines Dialog */}
       <Dialog open={openHelpDialog} onClose={() => setOpenHelpDialog(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 2, bgcolor: '#fff' } }}>
@@ -1124,6 +1472,14 @@ export default function Templates() {
           <Button onClick={() => setOpenHelpDialog(false)} variant="contained" color="primary" disableElevation>Got it</Button>
         </DialogActions>
       </Dialog>
+
+      {/* Snackbar Notifications */}
+      <CustomSnackbar
+        open={snackbar.open}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        message={snackbar.message}
+        severity={snackbar.severity}
+      />
     </Box>
   );
 }

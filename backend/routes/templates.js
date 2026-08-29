@@ -1,15 +1,81 @@
 // renic-automation-backend/routes/templates.js
 const express = require('express');
 const router = express.Router();
+const fs = require('fs');
+const path = require('path');
 const Template = require('../models/Template');
 const GeminiService = require('../services/GeminiService');
 const VariableInterpolationService = require('../services/VariableInterpolationService');
+const MetaService = require('../services/MetaService');
 const { body, validationResult } = require('express-validator');
 const multer = require('multer');
 
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 }
+});
+
+const templateUploadsDir = path.join(__dirname, '..', 'uploads', 'templates');
+if (!fs.existsSync(templateUploadsDir)) {
+  fs.mkdirSync(templateUploadsDir, { recursive: true });
+}
+
+const templateMediaStorage = multer.diskStorage({
+  destination: (_, __, cb) => cb(null, templateUploadsDir),
+  filename: (_, file, cb) => {
+    const ext = path.extname(file.originalname || '').toLowerCase();
+    const safeBase = path.basename(file.originalname || 'template-media', ext)
+      .replace(/[^a-zA-Z0-9-_]/g, '_')
+      .slice(0, 40);
+    cb(null, `${Date.now()}-${safeBase}${ext}`);
+  }
+});
+
+const templateMediaUpload = multer({
+  storage: templateMediaStorage,
+  limits: { fileSize: 15 * 1024 * 1024 },
+  fileFilter: (_, file, cb) => {
+    const isImage = file.mimetype.startsWith('image/');
+    const isVideo = file.mimetype.startsWith('video/');
+    if (isImage || isVideo || file.mimetype === 'application/pdf') {
+      return cb(null, true);
+    }
+    cb(new Error('Unsupported file type. Please upload an image, video, or PDF file.'));
+  }
+});
+
+// ============ UPLOAD TEMPLATE MEDIA ============
+router.post('/media/upload', templateMediaUpload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'Media file is required' });
+    }
+
+    const mediaType = req.file.mimetype === 'application/pdf'
+      ? 'document'
+      : req.file.mimetype.startsWith('video/')
+        ? 'video'
+        : 'image';
+
+    const uploadedBuffer = fs.readFileSync(req.file.path);
+    const base64Data = uploadedBuffer.toString('base64');
+    const dataUrl = `data:${req.file.mimetype};base64,${base64Data}`;
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const relativeUrl = `/uploads/templates/${req.file.filename}`;
+
+    res.json({
+      success: true,
+      mediaType,
+      mediaUrl: `${baseUrl}${relativeUrl}`,
+      mediaPreviewData: dataUrl,
+      mediaMimeType: req.file.mimetype,
+      mediaFileName: req.file.originalname,
+      originalName: req.file.originalname
+    });
+  } catch (error) {
+    console.error('Template Media Upload Error:', error);
+    res.status(500).json({ error: 'Failed to upload template media' });
+  }
 });
 
 const VALID_CATEGORIES = [
@@ -362,11 +428,23 @@ router.post('/ai/optimize', [
 // ============ CRUD ============
 router.get('/', async (req, res) => {
   try {
-    const templates = await Template.find({ userId: req.userId || req.user._id }).sort({ createdAt: -1 });
+    const userId = req.userId || req.user._id;
+    const templates = await Template.find({ userId }).sort({ createdAt: -1 });
     res.json(templates);
   } catch (error) {
     console.error('Get Templates Error:', error);
     res.status(500).json({ error: 'Failed to fetch templates' });
+  }
+});
+
+router.get('/meta', async (req, res) => {
+  try {
+    const userId = req.userId || req.user._id;
+    const templates = await MetaService.listWhatsAppTemplates(userId);
+    res.json(templates);
+  } catch (error) {
+    console.error('Get Meta Templates Error:', error);
+    res.status(500).json({ error: 'Failed to fetch Meta templates' });
   }
 });
 
@@ -388,7 +466,12 @@ router.post('/', [
       description: req.body.description || '',
       type: normalizeTemplateType(req.body.type),
       format: req.body.format || 'TEXT',
-      messageBlocks: req.body.messageBlocks || []
+      messageBlocks: req.body.messageBlocks || [],
+      mediaUrl: req.body.mediaUrl || '',
+      mediaType: req.body.mediaType || (normalizeTemplateType(req.body.type) === 'IMAGE' ? 'image' : ''),
+      mediaPreviewData: req.body.mediaPreviewData || '',
+      mediaMimeType: req.body.mediaMimeType || '',
+      mediaFileName: req.body.mediaFileName || ''
     });
 
     await template.save();

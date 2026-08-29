@@ -118,16 +118,8 @@ export default function Analytics() {
 
   return (
     <Box sx={{ width: '100%', flexGrow: 1 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-        <Box>
-          <Typography variant="h4" gutterBottom>
-            Analytics
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Track your campaign performance and customer engagement
-          </Typography>
-        </Box>
-        <Stack direction="row" spacing={2}>
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', mb: 3 }}>
+        <Stack direction="row" spacing={1.5} alignItems="center">
           <FormControl size="small" sx={{ minWidth: 150 }}>
             <InputLabel>Time Range</InputLabel>
             <Select

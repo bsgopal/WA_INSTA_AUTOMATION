@@ -31,6 +31,7 @@ import apiClient from '../../api/client';
 import CustomSnackbar from '../../components/Snackbar';
 import SmartTextEditor from '../../components/SmartTextEditor';
 import AIProviderStatus from '../../components/AIProviderStatus';
+import SapDmProcessDesigner from '../../components/SAPDM/SapDmProcessDesigner';
 
 export default function ResponseRules() {
   const [rules, setRules] = useState([]);
@@ -245,7 +246,7 @@ export default function ResponseRules() {
     const t = String(row?.actionType || 'CUSTOM').toUpperCase();
     const v = row?.actionValue || row?.rowId || row?.title || '';
     if (t === 'URL' && v) { window.open(v, '_blank', 'noopener,noreferrer'); return; }
-    if (t === 'CATALOG') { if (v && /^https?:\/\//i.test(v)) window.open(v, '_blank', 'noopener,noreferrer'); else window.location.href = '/catalog'; return; }
+    if (t === 'CATALOG') { if (v && /^https?:\/\//i.test(v)) window.open(v, '_blank', 'noopener,noreferrer'); else window.location.hash = '#/catalog'; return; }
     showSnackbar(`${fmtAction(t)}: ${row?.title || v}`, 'info');
   };
 
@@ -836,24 +837,34 @@ export default function ResponseRules() {
   return (
     <Box sx={{ width: '100%', flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
       {/* Page header */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-        <Box>
-          <Typography variant="h4" sx={{ fontWeight: 700, letterSpacing: '-0.5px' }} gutterBottom>
-            AI Response Rules Builder
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Configure dynamic rules and design interactive layout templates using visual drag-and-drop
-          </Typography>
-        </Box>
-        <Stack direction="row" spacing={1.5}>
-          <Button variant="outlined" color="info" onClick={() => setOpenHelpDialog(true)}>
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', mb: 3 }}>
+        <Stack direction="row" spacing={1.5} alignItems="center">
+          <Button
+            variant="outlined"
+            color="info"
+            size="small"
+            onClick={() => setOpenHelpDialog(true)}
+            sx={{ textTransform: 'none', fontWeight: 500, fontSize: '0.8125rem', height: '28px', borderRadius: '4px' }}
+          >
             Help / Guidelines
           </Button>
-          <Button variant="outlined" startIcon={<AutoAwesomeIcon />}
-            onClick={() => { setOpenAICopilot(true); if (!openDrawer) handleOpenAddDrawer(); }}>
+          <Button
+            variant="outlined"
+            startIcon={<AutoAwesomeIcon />}
+            size="small"
+            onClick={() => { setOpenAICopilot(true); if (!openDrawer) handleOpenAddDrawer(); }}
+            sx={{ textTransform: 'none', fontWeight: 500, fontSize: '0.8125rem', height: '28px', borderRadius: '4px' }}
+          >
             AI Assistant
           </Button>
-          <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpenAddDrawer} disableElevation>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            size="small"
+            onClick={handleOpenAddDrawer}
+            disableElevation
+            sx={{ textTransform: 'none', fontWeight: 500, fontSize: '0.8125rem', height: '28px', borderRadius: '4px' }}
+          >
             Create Rule
           </Button>
         </Stack>
@@ -1516,379 +1527,56 @@ export default function ResponseRules() {
         </DialogContent>
       </Dialog>
 
-      {/* ── Visual Builder Drawer ── */}
+      {/* ── Visual Builder Drawer (SAP DM Process Designer) ── */}
       <Drawer anchor="right" open={openDrawer} onClose={handleCloseDrawerWithCheck}
-        PaperProps={{ sx: { width: '95vw', maxWidth: '1600px', p: 0, overflow: 'hidden', background: '#ffffff !important' } }}>
-        <Box sx={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'row', overflow: 'hidden' }}>
+        PaperProps={{ sx: { width: '95vw', maxWidth: '1650px', p: 0, overflow: 'hidden', background: '#0F172A !important' } }}>
+        <SapDmProcessDesigner
+          initialData={{
+            name: ruleName,
+            status: isActive ? 'ACTIVE' : 'PAUSED',
+            triggerType,
+            triggerValue,
+            actionType,
+            responseMessage: blocks[0]?.config?.text || blocks[0]?.config?.message || ''
+          }}
+          onSave={async (dmData) => {
+            setRuleName(dmData.name);
+            setIsActive(dmData.status === 'ACTIVE');
+            if (dmData.triggerType) setTriggerType(dmData.triggerType);
+            if (dmData.triggerValue) setTriggerValue(dmData.triggerValue);
+            
+            // Auto map nodes into blocks structure for backwards compatibility
+            const mappedBlocks = (dmData.nodes || []).filter(n => n.category === 'responses').map(n => ({
+              type: n.type === 'QUICK_REPLY' ? 'BUTTONS' : 'TEXT',
+              config: n.config
+            }));
 
-          {/* Left: Palette */}
-          <Box sx={{ width: '320px', height: '100%', display: 'flex', flexDirection: 'column', borderRight: '1px solid #e0e0e0', bgcolor: '#f5f5f5' }}>
-            <Box sx={{ p: 2.5, borderBottom: '1px solid #e0e0e0' }}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#1a1a1a' }}>Component Palette</Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>Drag blocks onto the canvas</Typography>
-            </Box>
-            <Tabs value={paletteTab} onChange={(_, v) => setPaletteTab(v)} variant="fullWidth"
-              sx={{ borderBottom: '1px solid #e0e0e0', '& .MuiTab-root': { color: '#666', fontWeight: 600 }, '& .Mui-selected': { color: '#1976d2 !important' }, '& .MuiTabs-indicator': { backgroundColor: '#1976d2' } }}>
-              <Tab label="Widgets" />
-              <Tab label="Templates" />
-            </Tabs>
-            <Box sx={{ flex: 1, p: 2, overflowY: 'auto' }}>
-              {paletteTab === 0 ? (
-                <Stack spacing={1.5}>
-                  {[
-                    { type: 'TEXT', label: '💬 Text Block', desc: 'Plain text with emoji support' },
-                    { type: 'CARD', label: '🖼️ Media Card', desc: 'Image, header and action buttons' },
-                    { type: 'BUTTONS', label: '🔘 Action Buttons', desc: 'Up to 3 quick action options' },
-                    { type: 'LIST', label: '📋 Option List', desc: 'Select menu list options' },
-                    { type: 'RELATED_QUESTIONS', label: '❓ Related FAQs', desc: 'Recommended query suggestions' }
-                  ].map(item => (
-                    <Card key={item.type} variant="outlined" draggable onDragStart={(e) => handleDragStartPalette(e, item.type)}
-                      sx={{ cursor: 'grab', background: '#fff !important', borderColor: '#d0d0d0 !important', '&:hover': { borderColor: '#1976d2 !important', background: '#f0f7ff !important' } }}>
-                      <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#1a1a1a' }}>{item.label}</Typography>
-                        <Typography variant="body2" sx={{ color: '#666', fontSize: '0.85rem', mt: 0.5 }}>{item.desc}</Typography>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </Stack>
-              ) : (
-                <Stack spacing={1.5}>
-                  {templates.length === 0
-                    ? <Typography variant="body2" color="text.secondary" sx={{ p: 2, textAlign: 'center' }}>No templates found.</Typography>
-                    : templates.map(t => (
-                      <Card key={t._id} variant="outlined" draggable onDragStart={(e) => handleDragStartPalette(e, 'TEMPLATE_IMPORT', { text: t.content, id: t._id })}
-                        sx={{ cursor: 'grab', background: '#fff !important', borderColor: '#d0d0d0 !important', '&:hover': { borderColor: '#4caf50 !important', background: '#f1f8f4 !important' } }}>
-                        <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-                          <Typography variant="subtitle2" sx={{ fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#1a1a1a' }}>📄 {t.name}</Typography>
-                          <Typography variant="body2" sx={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', color: '#666', fontSize: '0.85rem', mt: 0.5 }}>{t.content}</Typography>
-                        </CardContent>
-                      </Card>
-                    ))
-                  }
-                </Stack>
-              )}
-            </Box>
-          </Box>
+            const payload = {
+              name: dmData.name,
+              triggerType: dmData.triggerType || triggerType,
+              triggerValue: dmData.triggerValue || triggerValue,
+              actionType: dmData.actionType || actionType,
+              templateId: actionType === 'SEND_TEMPLATE' ? templateId : undefined,
+              workflowId: actionType === 'TRIGGER_WORKFLOW' ? workflowId : undefined,
+              messageBlocks: mappedBlocks.length > 0 ? mappedBlocks : blocks,
+              isActive: dmData.status === 'ACTIVE'
+            };
 
-          {/* Center: Canvas */}
-          <Box sx={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column', borderRight: '1px solid #e0e0e0', bgcolor: '#fafafa' }}>
-            {/* Canvas header */}
-            <Box sx={{ p: 2.5, borderBottom: '1px solid #e0e0e0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', bgcolor: '#fff' }}>
-              <Stack direction="row" spacing={1} alignItems="center">
-                <IconButton size="small" onClick={handleCloseDrawerWithCheck} sx={{ color: '#666' }}><ArrowBackIcon /></IconButton>
-                <Typography variant="h5" sx={{ fontWeight: 700, color: '#1a1a1a', fontSize: '1.3rem' }}>
-                  {editingRule ? 'Edit Response Rule Layout' : 'Create Response Rule Layout'}
-                </Typography>
-              </Stack>
-              <Stack direction="row" spacing={1.5} alignItems="center">
-                <Tooltip title="Undo"><span><IconButton size="small" onClick={handleUndo} disabled={!historyStack.past.length} sx={{ color: '#666' }}><UndoIcon /></IconButton></span></Tooltip>
-                <Tooltip title="Redo"><span><IconButton size="small" onClick={handleRedo} disabled={!historyStack.future.length} sx={{ color: '#666' }}><RedoIcon /></IconButton></span></Tooltip>
-                <Button variant="outlined" startIcon={<ContentCopyIcon />} onClick={handleCopyLayout} size="small">Copy JSON</Button>
-                <Button variant="outlined" startIcon={<ContentPasteIcon />} onClick={handlePasteLayout} size="small">Paste JSON</Button>
-                <Divider orientation="vertical" flexItem sx={{ my: 1 }} />
-                <Tooltip title="Preview layout">
-                  <Button variant="contained" startIcon={<PhoneAndroidIcon />} onClick={() => {
-                    setPreviewContent({
-                      name: ruleName || 'Response Rule',
-                      triggerType: triggerType,
-                      triggerValue: triggerValue,
-                      messageBlocks: blocks
-                    });
-                    setOpenPreviewDialog(true);
-                  }} size="small" sx={{ bgcolor: '#1976d2' }}>
-                    Preview
-                  </Button>
-                </Tooltip>
-              </Stack>
-            </Box>
-
-            {/* Canvas scroll area */}
-            <Box sx={{ flex: 1, p: 3, overflowY: 'auto' }}>
-              <Grid container spacing={3}>
-                {/* Config form - Numbered fields */}
-                <Grid item xs={12}>
-                  <Paper sx={{
-                    p: 4,
-                    borderRadius: 2.5,
-                    background: '#ffffff',
-                    backgroundImage: 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)',
-                    border: 'none',
-                    boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08), 0 4px 24px rgba(0, 0, 0, 0.04)',
-                    borderTop: '4px solid #1976d2',
-                    transition: 'all 0.3s ease-in-out',
-                    '&:hover': {
-                      boxShadow: '0 4px 16px rgba(0, 0, 0, 0.12), 0 6px 32px rgba(0, 0, 0, 0.06)'
-                    }
-                  }} elevation={0}>
-                    <Stack spacing={2.5} mt={0}>
-                      {/* 1. Rule Name */}
-                      <TextField
-                        fullWidth
-                        label="1. Rule Name"
-                        placeholder="e.g., Price Check Kundan Ring"
-                        value={ruleName}
-                        onChange={(e) => setRuleName(e.target.value)}
-                        helperText="Short name for this response rule"
-                        size="small"
-                        InputLabelProps={labelSx}
-                        inputProps={inputPropsSx}
-                        sx={inputSx}
-                      />
-
-                      {/* 2. Trigger Type */}
-                      <FormControl fullWidth size="small" sx={formControlSx}>
-                        <InputLabel sx={labelSx.style}>2. Trigger Type</InputLabel>
-                        <Select
-                          value={triggerType}
-                          label="2. Trigger Type"
-                          onChange={(e) => setTriggerType(e.target.value)}
-                          sx={{ color: '#1a1a1a' }}
-                        >
-                          <MenuItem value="EXACT_MATCH">Exact Match</MenuItem>
-                          <MenuItem value="KEYWORD">Keyword Includes</MenuItem>
-                          <MenuItem value="INTENT">AI Intent Category</MenuItem>
-                        </Select>
-                      </FormControl>
-
-                      {/* 3. Trigger Value */}
-                      <TextField
-                        fullWidth
-                        label="3. Trigger Value"
-                        placeholder={triggerType === 'INTENT' ? 'general_inquiry' : triggerType === 'KEYWORD' ? 'price, cost, rate' : 'exact text to match'}
-                        value={triggerValue}
-                        onChange={(e) => setTriggerValue(e.target.value)}
-                        helperText={
-                          triggerType === 'INTENT'
-                            ? 'Intent category to match (e.g., general_inquiry)'
-                            : triggerType === 'KEYWORD'
-                            ? 'Keywords to match (comma-separated)'
-                            : 'Exact text that will trigger this rule'
-                        }
-                        size="small"
-                        InputLabelProps={labelSx}
-                        inputProps={inputPropsSx}
-                        sx={inputSx}
-                      />
-
-                      {/* 4. Rule Action */}
-                      <FormControl fullWidth size="small" sx={formControlSx}>
-                        <InputLabel sx={labelSx.style}>4. Rule Action</InputLabel>
-                        <Select
-                          value={actionType}
-                          label="4. Rule Action"
-                          onChange={(e) => setActionType(e.target.value)}
-                          sx={{ color: '#1a1a1a' }}
-                        >
-                          <MenuItem value="SEND_TEXT">Send Visual Layout</MenuItem>
-                          <MenuItem value="SEND_TEMPLATE">Send Template Broadcast</MenuItem>
-                          <MenuItem value="TRIGGER_WORKFLOW">Trigger Workflow</MenuItem>
-                          <MenuItem value="HUMAN_HANDOVER">Escalate to Human</MenuItem>
-                        </Select>
-                      </FormControl>
-
-                      {/* 5. Template/Workflow Selection - Conditional */}
-                      {actionType === 'SEND_TEMPLATE' && (
-                        <Box onDragOver={(e) => e.preventDefault()} onDrop={handleDropLinkTemplate}
-                          sx={{ p: 2, border: '2px dashed #1976d2', borderRadius: 3, textAlign: 'center', bgcolor: templateId ? '#e0e0e0' : 'transparent' }}>
-                          <Typography variant="body2" sx={{ fontWeight: 600, mb: 1.5, color: '#1a1a1a' }}>5. Template Selection</Typography>
-                          <Stack direction="row" spacing={1} justifyContent="center" alignItems="center" sx={{ mb: 1.5 }}>
-                            <LinkIcon color="primary" />
-                            {templateId
-                              ? <Typography variant="body2" sx={{ fontWeight: 600 }}>Linked: {templates.find(t => t._id === templateId)?.name || 'Template'}</Typography>
-                              : <Typography variant="body2" color="#666">Drag/drop template here or select below</Typography>}
-                          </Stack>
-                          <FormControl fullWidth size="small" sx={formControlSx}>
-                            <InputLabel sx={labelSx.style}>Choose template...</InputLabel>
-                            <Select value={templateId} label="Choose template..." onChange={(e) => setTemplateId(e.target.value)} sx={{ color: '#1a1a1a' }}>
-                              <MenuItem value="" disabled>Choose template...</MenuItem>
-                              {templates.map(t => <MenuItem key={t._id} value={t._id}>{t.name}</MenuItem>)}
-                            </Select>
-                          </FormControl>
-                        </Box>
-                      )}
-
-                      {actionType === 'TRIGGER_WORKFLOW' && (
-                        <FormControl fullWidth size="small" sx={formControlSx}>
-                          <InputLabel sx={labelSx.style}>5. Workflow Selection</InputLabel>
-                          <Select value={workflowId} label="5. Workflow Selection" onChange={(e) => setWorkflowId(e.target.value)} sx={{ color: '#1a1a1a' }}>
-                            {workflows.length === 0 ? (
-                              <MenuItem disabled>No workflows available</MenuItem>
-                            ) : (
-                              workflows.map(w => <MenuItem key={w._id} value={w._id}>{w.name}</MenuItem>)
-                            )}
-                          </Select>
-                        </FormControl>
-                      )}
-
-                      {/* 6. Active Status */}
-                      <FormControlLabel
-                        control={<Switch checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />}
-                        label="6. Active Status"
-                        sx={{ color: '#666', fontWeight: 500 }}
-                      />
-                    </Stack>
-                  </Paper>
-                </Grid>
-
-                {/* Canvas drop zone */}
-                <Grid item xs={12}>
-                  <Paper onDragOver={(e) => e.preventDefault()} onDrop={(e) => handleDropOnCanvas(e)}
-                    sx={{ p: 3, borderRadius: 3, border: '2px dashed #b0b0b0 !important', minHeight: 400, background: '#f5f5f5 !important' }} elevation={0}>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 3, color: '#1a1a1a' }}>Visual Layout Canvas Workspace</Typography>
-
-                    {blocks.length === 0 ? (
-                      <Box onDragOver={(e) => e.preventDefault()} onDrop={(e) => handleDropOnCanvas(e)}
-                        sx={{ p: 6, border: '1px dashed #b0b0b0', borderRadius: 3, textAlign: 'center', background: '#fff !important' }}>
-                        <Typography variant="body2" color="text.secondary">Canvas is empty. Drag a widget from the palette.</Typography>
-                      </Box>
-                    ) : (
-                      <Stack spacing={3}>
-                        {blocks.map((block, index) => (
-                          <Card key={index} variant="outlined" draggable
-                            onDragStart={(e) => handleDragStartCanvas(e, index)}
-                            onDragOver={(e) => e.preventDefault()}
-                            onDrop={(e) => handleDropOnCanvas(e, index)}
-                            sx={{ background: '#fff !important', borderColor: '#e0e0e0 !important', borderRadius: 3 }}>
-                            {/* Block header */}
-                            <Box sx={{ bgcolor: '#e0e0e0', px: 2, py: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <Stack direction="row" spacing={1} alignItems="center">
-                                <IconButton size="small" sx={{ cursor: 'grab', color: '#666' }}><DragIndicatorIcon fontSize="small" /></IconButton>
-                                <Typography variant="caption" sx={{ fontWeight: 700, color: '#1a1a1a' }}>{index + 1}. {block.type} BLOCK</Typography>
-                              </Stack>
-                              <Stack direction="row" spacing={0.5}>
-                                <IconButton size="small" onClick={() => handleMoveBlock(index, 'up')} disabled={index === 0}><ArrowUpwardIcon fontSize="inherit" /></IconButton>
-                                <IconButton size="small" onClick={() => handleMoveBlock(index, 'down')} disabled={index === blocks.length - 1}><ArrowDownwardIcon fontSize="inherit" /></IconButton>
-                                <Tooltip title="Duplicate"><IconButton size="small" color="primary" onClick={() => handleDuplicateBlock(index)}><ContentCopyIcon fontSize="inherit" /></IconButton></Tooltip>
-                                <IconButton size="small" color="error" onClick={() => handleDeleteBlock(index)}><DeleteIcon fontSize="inherit" /></IconButton>
-                              </Stack>
-                            </Box>
-
-                            <Box sx={{ p: 3 }}>
-                              {/* TEXT */}
-                              {block.type === 'TEXT' && (
-                                <SmartTextEditor label="Message Text Content" rows={3} value={block.config?.text || ''}
-                                  onChange={(e) => handleUpdateBlockConfig(index, { text: e.target.value })}
-                                  placeholder="Enter reply message text. Use Insert Variable for dynamic fields." showPreview />
-                              )}
-
-                              {/* CARD */}
-                              {block.type === 'CARD' && (
-                                <Stack spacing={2}>
-                                  <Grid container spacing={2}>
-                                    <Grid item xs={12} sm={6}>
-                                      <TextField label="Card Title" fullWidth value={block.config?.title || ''}
-                                        onChange={(e) => handleUpdateBlockConfig(index, { title: e.target.value })}
-                                        InputLabelProps={labelSx} inputProps={inputPropsSx} sx={inputSx} />
-                                    </Grid>
-                                    <Grid item xs={12} sm={6}>
-                                      <TextField label="Image URL (Optional)" fullWidth value={block.config?.imageUrl || ''}
-                                        onChange={(e) => handleUpdateBlockConfig(index, { imageUrl: e.target.value })}
-                                        InputLabelProps={labelSx} inputProps={inputPropsSx} sx={inputSx} />
-                                    </Grid>
-                                    <Grid item xs={12}>
-                                      <TextField label="Card Description" fullWidth multiline rows={2} value={block.config?.description || ''}
-                                        onChange={(e) => handleUpdateBlockConfig(index, { description: e.target.value })}
-                                        InputLabelProps={labelSx} inputProps={inputPropsSx} sx={inputSx} />
-                                    </Grid>
-                                  </Grid>
-                                  <Divider />
-                                  <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Card Action Buttons (Max 3)</Typography>
-                                  {renderButtonEditor(block, index, 3)}
-                                </Stack>
-                              )}
-
-                              {/* BUTTONS */}
-                              {block.type === 'BUTTONS' && renderButtonEditor(block, index, 3)}
-
-                              {/* LIST — uses fixed Grid layout */}
-                              {block.type === 'LIST' && (
-                                <Stack spacing={2}>
-                                  <Grid container spacing={2}>
-                                    <Grid item xs={12} sm={6}>
-                                      <TextField label="List Drawer Title" fullWidth value={block.config?.title || ''}
-                                        onChange={(e) => handleUpdateBlockConfig(index, { title: e.target.value })}
-                                        InputLabelProps={labelSx} inputProps={inputPropsSx} sx={inputSx} />
-                                    </Grid>
-                                    <Grid item xs={12} sm={6}>
-                                      <TextField label="Button Text" fullWidth value={block.config?.buttonText || ''}
-                                        onChange={(e) => handleUpdateBlockConfig(index, { buttonText: e.target.value })}
-                                        InputLabelProps={labelSx} inputProps={inputPropsSx} sx={inputSx} />
-                                    </Grid>
-                                  </Grid>
-                                  <Typography variant="caption" color="text.secondary">Configure sections and select rows</Typography>
-
-                                  {(block.config?.sections || []).map((sec, secIdx) => (
-                                    <Paper key={secIdx} variant="outlined" sx={{ p: 2, borderRadius: 2, background: '#f9f9f9 !important', borderColor: '#e0e0e0 !important' }}>
-                                      <Stack spacing={2}>
-                                        <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
-                                          <TextField label="Section Header Title" size="small" value={sec.title || ''}
-                                            onChange={(e) => {
-                                              const ns = [...block.config.sections];
-                                              ns[secIdx] = { ...sec, title: e.target.value };
-                                              handleUpdateBlockConfig(index, { sections: ns });
-                                            }}
-                                            sx={{ flex: 1, ...inputSx }} InputLabelProps={labelSx} inputProps={inputPropsSx} />
-                                          <IconButton size="small" color="error"
-                                            onClick={() => handleUpdateBlockConfig(index, { sections: block.config.sections.filter((_, i) => i !== secIdx) })}>
-                                            <DeleteIcon fontSize="inherit" />
-                                          </IconButton>
-                                        </Stack>
-                                        {renderListRowEditor(block, index, sec, secIdx)}
-                                      </Stack>
-                                    </Paper>
-                                  ))}
-
-                                  <Button size="small" startIcon={<AddIcon />} sx={{ alignSelf: 'flex-start' }}
-                                    onClick={() => handleUpdateBlockConfig(index, {
-                                      sections: [...(block.config.sections || []), { title: 'New Section', rows: [{ title: 'Item 1', description: '', rowId: `row_${Date.now()}`, actionType: 'CUSTOM', inputType: 'TEXT' }] }]
-                                    })}>
-                                    Add List Section
-                                  </Button>
-                                </Stack>
-                              )}
-
-                              {/* RELATED_QUESTIONS */}
-                              {block.type === 'RELATED_QUESTIONS' && (
-                                <Stack spacing={2}>
-                                  <Typography variant="caption" color="text.secondary">Configure suggested question chips</Typography>
-                                  {(block.config?.questions || []).map((qn, qnIdx) => (
-                                    <Stack key={qnIdx} direction="row" spacing={2} alignItems="center">
-                                      <TextField label={`Question ${qnIdx + 1}`} fullWidth size="small" value={qn}
-                                        onChange={(e) => {
-                                          const nq = [...block.config.questions];
-                                          nq[qnIdx] = e.target.value;
-                                          handleUpdateBlockConfig(index, { questions: nq });
-                                        }}
-                                        InputLabelProps={labelSx} inputProps={inputPropsSx} sx={inputSx} />
-                                      <IconButton size="small" color="error"
-                                        onClick={() => handleUpdateBlockConfig(index, { questions: block.config.questions.filter((_, i) => i !== qnIdx) })}>
-                                        <DeleteIcon fontSize="inherit" />
-                                      </IconButton>
-                                    </Stack>
-                                  ))}
-                                  <Button size="small" startIcon={<AddIcon />} sx={{ alignSelf: 'flex-start' }}
-                                    onClick={() => handleUpdateBlockConfig(index, { questions: [...(block.config.questions || []), 'How much does customization cost?'] })}>
-                                    Add Related FAQ
-                                  </Button>
-                                </Stack>
-                              )}
-                            </Box>
-                          </Card>
-                        ))}
-                      </Stack>
-                    )}
-                  </Paper>
-                </Grid>
-              </Grid>
-            </Box>
-
-            {/* Canvas footer */}
-            <Box sx={{ p: 2.5, borderTop: '1px solid #e0e0e0', display: 'flex', justifyContent: 'flex-end', gap: 2, bgcolor: '#fff' }}>
-              <Button onClick={handleCloseDrawerWithCheck} sx={{ color: '#666' }}>Cancel</Button>
-              <Button variant="contained" startIcon={<SaveIcon />} onClick={handleSaveRule} disableElevation>Save Response Rule</Button>
-            </Box>
-          </Box>
-        </Box>
+            try {
+              if (editingRule) await apiClient.put(`/response-rules/${editingRule._id}`, payload);
+              else await apiClient.post('/response-rules', payload);
+              showSnackbar(`Rule ${editingRule ? 'updated' : 'created'} successfully!`, 'success');
+              setOpenDrawer(false);
+              fetchRules();
+            } catch (err) {
+              showSnackbar('Failed to save rule.', 'error');
+            }
+          }}
+          onClose={handleCloseDrawerWithCheck}
+          availableTemplates={templates}
+          availableWorkflows={workflows}
+          availableRules={rules}
+        />
       </Drawer>
 
       {/* AI Copilot Drawer */}

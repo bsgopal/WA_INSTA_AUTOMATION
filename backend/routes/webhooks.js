@@ -3,6 +3,7 @@ const express = require('express');
 const router = express.Router();
 const WhatsAppService = require('../services/WhatsAppService');
 const InstagramService = require('../services/InstagramService');
+const MetaService = require('../services/MetaService');
 const aiChatHandler = require('../services/aiChatHandler');
 const messageQueueService = require('../services/messageQueueService');
 
@@ -12,8 +13,14 @@ const getDefaultUserId = async () => {
   let userId = process.env.DEFAULT_USER_ID;
   if (!userId || userId === '000000000000000000000000') {
     const User = require('../models/User');
-    const defaultUser = await User.findOne({ role: 'ADMIN' });
-    userId = defaultUser ? defaultUser._id : '000000000000000000000000';
+    // Prioritize PLATFORM_OWNER since that profile holds root rule configuration authority
+    const platformOwner = await User.findOne({ role: 'PLATFORM_OWNER' });
+    if (platformOwner) {
+      userId = platformOwner._id;
+    } else {
+      const defaultUser = await User.findOne({ role: 'ADMIN' });
+      userId = defaultUser ? defaultUser._id : '000000000000000000000000';
+    }
   }
   return userId;
 };
@@ -178,9 +185,34 @@ router.post('/whatsapp', async (req, res) => {
       const userId = await getDefaultUserId();
       const externalMessageId = data.id || _data?.id?.id || _data?.key?.id || null;
 
+      // ============ VOICE MESSAGE DETECTION & TRANSCRIPTION ============
+      const rawMessageType = data.type || _data?.type || '';
+      const isVoiceMessage = hasMedia && (
+        rawMessageType === 'ptt' ||
+        rawMessageType === 'audio' ||
+        media?.mimetype?.includes('audio') ||
+        media?.url?.includes('voice') ||
+        media?.url?.includes('audio')
+      );
+
+      let messageBody = normalizedReply.body || '';
+
+      if (isVoiceMessage && media?.url) {
+        console.log('🎤 Voice message detected, transcribing via Gemini...');
+        try {
+          const TranscriptionService = require('../services/TranscriptionService');
+          const transcribed = await TranscriptionService.transcribeVoiceNote(media.url);
+          if (transcribed) {
+            messageBody = transcribed;
+          }
+        } catch (transcribeErr) {
+          console.error('❌ Voice transcription error:', transcribeErr.message);
+        }
+      }
+
       const result = await processOrQueueMessage({
         phoneNumber,
-        messageBody: normalizedReply.body || '',
+        messageBody,
         channel: 'whatsapp',
         userId,
         mediaUrl: hasMedia && media ? media.url : null,
@@ -190,7 +222,9 @@ router.post('/whatsapp', async (req, res) => {
           pushName: _data?.pushName,
           whatsappLid: originalLid,
           interactiveReply: normalizedReply.interactive,
-          rawMessageType: data.type || _data?.type || null
+          rawMessageType,
+          isVoiceMessage,
+          transcribedBody: isVoiceMessage ? messageBody : null
         }
       });
 
@@ -351,10 +385,15 @@ router.get('/health', (req, res) => {
     queueEnabled: isQueueEnabled(),
     webhooks: {
       whatsapp: 'active (WAHA)',
-      instagram: 'active'
+      instagram: 'active',
+      meta: 'active'
     },
     timestamp: new Date()
   });
 });
+
+// ============ META WHATSAPP CLOUD API WEBHOOK ============
+router.get('/meta/whatsapp', MetaService.verifyWebhook);
+router.post('/meta/whatsapp', MetaService.handleWebhook);
 
 module.exports = router;

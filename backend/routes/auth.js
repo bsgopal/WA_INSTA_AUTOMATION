@@ -4,6 +4,7 @@ const authController = require('../controllers/authController');
 const auth = require('../middlewares/auth-middleware');
 const User = require('../models/User');
 const License = require('../models/License');
+const { decryptLicense } = require('../utils/licenseCrypto');
 
 // @route   POST /api/auth/login
 // @desc    Authenticate user & get token
@@ -54,48 +55,82 @@ router.put('/me', auth, async (req, res) => {
   }
 });
 
-// @route   POST /api/auth/license/create
-// @desc    Create a new license key (Helper / Admin route)
+// @route   POST /api/auth/license/extract
+// @desc    Extract and decrypt license details from a pasted key
 // @access  Public
-router.post('/license/create', async (req, res) => {
+router.post('/license/extract', async (req, res) => {
   try {
-    const { email, firstName, lastName, phone, companyName, password, key } = req.body;
-
-    if (!email || !firstName || !lastName || !phone || !companyName || !password) {
-      return res.status(400).json({ error: 'Please provide all details for the license' });
+    const { key } = req.body;
+    if (!key) {
+      return res.status(400).json({ error: 'Please provide a license key' });
     }
 
-    // Generate random license key if not provided
-    const crypto = require('crypto');
-    const licenseKey = key || `RENIC-LIC-${crypto.randomBytes(4).toString('hex').toUpperCase()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
+    let details = {};
+    let isDbLicense = false;
+    const dbLicense = await License.findOne({ key: key.trim() });
+    
+    if (dbLicense) {
+      isDbLicense = true;
+      details = {
+        name: dbLicense.companyName,
+        email: dbLicense.email,
+        phone: dbLicense.phone,
+        firstName: dbLicense.firstName,
+        lastName: dbLicense.lastName,
+        planTier: dbLicense.planTier,
+        licenseStart: dbLicense.licenseStart,
+        licenseEnd: dbLicense.licenseEnd,
+        isUsed: dbLicense.isUsed,
+        createdAt: dbLicense.createdAt
+      };
+    } else {
+      try {
+        const decoded = decryptLicense(key.trim());
+        
+        const nameParts = (decoded.pendingOwnerName || '').trim().split(/\s+/);
+        const firstName = nameParts[0] || decoded.name || 'Admin';
+        const lastName = nameParts.slice(1).join(' ') || '.';
 
-    // Check if license key already exists
-    const existingLicense = await License.findOne({ key: licenseKey });
-    if (existingLicense) {
-      return res.status(400).json({ error: 'License key already exists' });
+        details = {
+          name: decoded.name,
+          email: decoded.pendingOwnerEmail,
+          phone: decoded.pendingOwnerMobile,
+          firstName,
+          lastName,
+          planTier: decoded.planTier || 'basic',
+          licenseStart: decoded.licenseStart,
+          licenseEnd: decoded.licenseEnd,
+          isUsed: false
+        };
+
+        // Check if locally marked as used already
+        const existingLicense = await License.findOne({ key: key.trim() });
+        if (existingLicense && existingLicense.isUsed) {
+          details.isUsed = true;
+        }
+      } catch (err) {
+        console.error('Decryption failed:', err);
+        return res.status(400).json({ error: 'Invalid or corrupted license key' });
+      }
     }
 
-    const newLicense = new License({
-      key: licenseKey,
-      email,
-      firstName,
-      lastName,
-      phone,
-      companyName,
-      password,
-      role: req.body.role || 'ADMIN'
-    });
-
-    await newLicense.save();
+    // Add expiry info used by the UI warning
+    if (details.licenseEnd) {
+      const end = new Date(details.licenseEnd);
+      const now = new Date();
+      details.daysRemaining = Math.ceil((end - now) / (1000 * 60 * 60 * 24));
+      details.expired = now > end;
+      details.expiringSoon = !details.expired && details.daysRemaining <= 15;
+    }
 
     res.json({
       success: true,
-      message: 'License key created successfully!',
-      license: newLicense
+      details,
+      isDbLicense
     });
   } catch (err) {
-    console.error('Create license error:', err);
-    res.status(500).json({ error: 'Failed to create license key' });
+    console.error('Extract license error:', err);
+    res.status(500).json({ error: 'Failed to extract license details' });
   }
 });
 
@@ -105,13 +140,58 @@ router.post('/license/create', async (req, res) => {
 router.post('/license/activate', async (req, res) => {
   try {
     const { key } = req.body;
+    // If caller explicitly wants to auto-login after activation, pass { autoLogin: true }
+    const autoLogin = Boolean(req.body.autoLogin);
     if (!key) {
       return res.status(400).json({ error: 'Please provide a license key' });
     }
 
-    const license = await License.findOne({ key: key.trim() });
+    let license = await License.findOne({ key: key.trim() });
+    
+    // If not found locally, try to decrypt it and register a new local license document
     if (!license) {
-      return res.status(404).json({ error: 'Invalid license key' });
+      try {
+        const decoded = decryptLicense(key.trim());
+        
+        // Verify expiry date
+        if (decoded.licenseEnd && new Date(decoded.licenseEnd) < new Date()) {
+          return res.status(400).json({ error: 'This license key has expired' });
+        }
+
+        const nameParts = (decoded.pendingOwnerName || '').trim().split(/\s+/);
+        const firstName = nameParts[0] || decoded.name || 'Admin';
+        const lastName = nameParts.slice(1).join(' ') || '.';
+
+        license = new License({
+          key: key.trim(),
+          email: decoded.pendingOwnerEmail,
+          firstName,
+          lastName,
+          phone: decoded.pendingOwnerMobile,
+          companyName: decoded.name,
+          password: decoded.pendingOwnerPassword, // pre-hashed bcrypt password from Renic_Soft
+          role: (decoded.role || decoded.pendingOwnerRole || 'ADMIN').toUpperCase(),
+          planTier: decoded.planTier || 'basic',
+          licenseStart: decoded.licenseStart ? new Date(decoded.licenseStart) : new Date(),
+          licenseEnd: decoded.licenseEnd ? new Date(decoded.licenseEnd) : undefined,
+          isUsed: false
+        });
+        
+        try {
+          await license.save();
+        } catch (saveErr) {
+          // If another process created the license concurrently, reload the existing one.
+          if (saveErr && saveErr.code === 11000) {
+            console.warn('License activation: duplicate key on save, fetching existing license');
+            license = await License.findOne({ key: key.trim() });
+          } else {
+            throw saveErr;
+          }
+        }
+      } catch (err) {
+        console.error('License decryption error on activation:', err);
+        return res.status(400).json({ error: 'Invalid or corrupted license key' });
+      }
     }
 
     if (license.isUsed) {
@@ -137,8 +217,8 @@ router.post('/license/activate', async (req, res) => {
       email: license.email,
       phone: license.phone,
       companyName: license.companyName,
-      password: license.password,
-      role: license.role || 'ADMIN',
+      password: license.password, // Saved directly, model handles skipping if it is already bcrypt hashed
+      role: (license.role || 'ADMIN').toUpperCase(),
       isActive: true
     });
 
@@ -148,22 +228,212 @@ router.post('/license/activate', async (req, res) => {
     license.isUsed = true;
     await license.save();
 
-    // Generate JWT token
-    const token = jwt.sign(
-      { id: newUser._id, role: newUser.role },
-      process.env.JWT_SECRET || 'fallback_secret',
-      { expiresIn: process.env.JWT_EXPIRE || '30d' }
-    );
+    // Prepare user object for response (hide password)
+    newUser.password = undefined;
 
-    res.json({
+    // If the client explicitly requested auto-login, return a JWT token.
+    if (autoLogin) {
+      const token = jwt.sign(
+        { id: newUser._id, role: newUser.role },
+        process.env.JWT_SECRET || 'fallback_secret',
+        { expiresIn: process.env.JWT_EXPIRE || '30d' }
+      );
+
+      return res.json({
+        success: true,
+        message: 'License activated and account created successfully!',
+        token,
+        user: newUser
+      });
+    }
+
+    // Default: do NOT auto-login; return created user info without token
+    return res.json({
       success: true,
-      message: 'License activated and account created successfully!',
-      token,
+      message: 'License activated and account created successfully! Please login to continue.',
       user: newUser
     });
   } catch (err) {
     console.error('Activate license error:', err);
     res.status(500).json({ error: 'Failed to activate license key' });
+  }
+});
+
+// @route   POST /api/auth/license/send-otp
+// @desc    Send OTP to license owner email/phone before activation
+// @access  Public
+router.post('/license/send-otp', async (req, res) => {
+  try {
+    const { key } = req.body;
+    if (!key) return res.status(400).json({ error: 'Please provide a license key' });
+
+    let license = await License.findOne({ key: key.trim() });
+    if (!license) {
+      try {
+        const decoded = decryptLicense(key.trim());
+        license = new License({
+          key: key.trim(),
+          email: decoded.pendingOwnerEmail,
+          firstName: (decoded.pendingOwnerName || '').split('\n')[0] || decoded.name || 'Admin',
+          lastName: '.',
+          phone: decoded.pendingOwnerMobile,
+          companyName: decoded.name,
+          password: decoded.pendingOwnerPassword || 'Password123!',
+          role: (decoded.role || decoded.pendingOwnerRole || 'ADMIN').toUpperCase(),
+          planTier: decoded.planTier || 'basic',
+          licenseStart: decoded.licenseStart ? new Date(decoded.licenseStart) : new Date(),
+          licenseEnd: decoded.licenseEnd ? new Date(decoded.licenseEnd) : undefined,
+          isUsed: false
+        });
+        await license.save();
+      } catch (err) {
+        return res.status(400).json({ error: 'Invalid or corrupted license key' });
+      }
+    }
+
+    // Generate 6-digit OTP
+    const crypto = require('crypto');
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpHash = crypto.createHash('sha256').update(otp).digest('hex');
+    license.otpHash = otpHash;
+    license.otpExpire = Date.now() + 10 * 60 * 1000; // 10 minutes
+    await license.save();
+
+    // Send OTP via email if possible
+    let emailSent = false;
+    try {
+      const nodemailer = require('nodemailer');
+      const transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST || 'smtp.mailtrap.io',
+        port: process.env.SMTP_PORT || 2525,
+        auth: { user: process.env.SMTP_USER || '', pass: process.env.SMTP_PASS || '' }
+      });
+      if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+        await transporter.sendMail({
+          from: 'no-reply@renic.ai',
+          to: license.email,
+          subject: 'Your license activation OTP',
+          text: `Your OTP for license activation is: ${otp}. It expires in 10 minutes.`
+        });
+        emailSent = true;
+      }
+    } catch (mailErr) {
+      console.warn('License OTP mail send failed:', mailErr.message);
+    }
+
+    // Fallback: log OTP to server console for testing
+    console.log(`[LICENSE OTP] Key: ${key.trim()} | OTP: ${otp} | sentToEmail: ${license.email} | emailSent: ${emailSent}`);
+
+    res.json({ success: true, message: 'OTP generated and sent', emailSent });
+  } catch (err) {
+    console.error('License send-otp error:', err.message);
+    res.status(500).json({ error: 'Failed to send OTP' });
+  }
+});
+
+// @route   POST /api/auth/license/verify-otp
+// @desc    Verify OTP and create user account for license
+// @access  Public
+router.post('/license/verify-otp', async (req, res) => {
+  try {
+    const { key, otp } = req.body;
+    if (!key || !otp) return res.status(400).json({ error: 'Please provide key and otp' });
+
+    const license = await License.findOne({ key: key.trim() });
+    if (!license) return res.status(404).json({ error: 'License not found' });
+    if (!license.otpHash || !license.otpExpire) return res.status(400).json({ error: 'No OTP generated for this license' });
+    if (Date.now() > license.otpExpire) return res.status(400).json({ error: 'OTP expired' });
+
+    const crypto = require('crypto');
+    const otpHash = crypto.createHash('sha256').update(String(otp)).digest('hex');
+    if (otpHash !== license.otpHash) return res.status(400).json({ error: 'Invalid OTP' });
+
+    // Create user if not exists
+    const existingUser = await User.findOne({ $or: [{ email: license.email }, { phone: license.phone }] });
+    if (existingUser) {
+      // mark license used and return
+      license.isUsed = true;
+      await license.save();
+      return res.json({ success: true, message: 'License verified. Please login to continue.' });
+    }
+
+    const newUser = new User({
+      firstName: license.firstName || 'Admin',
+      lastName: license.lastName || '',
+      email: license.email,
+      phone: license.phone,
+      companyName: license.companyName,
+      password: license.password,
+      role: license.role || 'ADMIN',
+      isActive: true
+    });
+
+    await newUser.save();
+    license.isUsed = true;
+    await license.save();
+
+    res.json({ success: true, message: 'License activated and account created. Please login.' });
+  } catch (err) {
+    console.error('License verify-otp error:', err.message);
+    res.status(500).json({ error: 'OTP verification failed' });
+  }
+});
+
+// @route POST /api/auth/verify-login-otp
+// @desc Verify admin login OTP and return JWT
+// @access Public
+router.post('/verify-login-otp', async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+    if (!email || !otp) return res.status(400).json({ error: 'Please provide email and otp' });
+
+    const user = await User.findOne({ email: email.toLowerCase().trim() }).select('+loginOtp +password');
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    if (!user.loginOtp || !user.loginOtpExpire) return res.status(400).json({ error: 'No login OTP generated for this user' });
+    if (Date.now() > user.loginOtpExpire) return res.status(400).json({ error: 'OTP expired' });
+
+    const crypto = require('crypto');
+    const hash = crypto.createHash('sha256').update(String(otp)).digest('hex');
+    if (hash !== user.loginOtp) return res.status(400).json({ error: 'Invalid OTP' });
+
+    // Clear otp fields
+    user.loginOtp = undefined;
+    user.loginOtpExpire = undefined;
+    await user.save();
+
+    // Generate JWT
+    const token = require('jsonwebtoken').sign(
+      { id: user._id, role: user.role },
+      process.env.JWT_SECRET || 'fallback_secret',
+      { expiresIn: process.env.JWT_EXPIRE || '30d' }
+    );
+
+    user.password = undefined;
+    res.json({ success: true, token, user });
+  } catch (err) {
+    console.error('Verify login OTP error:', err.message);
+    res.status(500).json({ error: 'Login OTP verification failed' });
+  }
+});
+
+// @route   GET /api/auth/license/status
+// @desc    Get license status for the logged-in user (for expiry warnings)
+// @access  Private
+router.get('/license/status', auth, async (req, res) => {
+  try {
+    const user = req.user;
+    const license = await License.findOne({ email: user.email.toLowerCase().trim() })
+      || await License.findOne({ phone: user.phone });
+
+    const status = require('../utils/licenseStatus').getLicenseStatus(license);
+
+    res.json({
+      success: true,
+      license: status
+    });
+  } catch (err) {
+    console.error('License status error:', err);
+    res.status(500).json({ error: 'Failed to fetch license status' });
   }
 });
 

@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Typography, Box, Paper, Grid, TextField, InputAdornment, Button,
@@ -27,11 +27,10 @@ import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import apiClient from '../../api/client';
 import CustomSnackbar from '../../components/Snackbar';
 import AIProviderStatus from '../../components/AIProviderStatus';
+import { API_ORIGIN } from '../../api/base';
 
 // Helper to resolve backend media URLs
-const backendUrl = import.meta.env.VITE_API_URL 
-  ? import.meta.env.VITE_API_URL.replace('/api', '') 
-  : 'http://localhost:5000';
+const backendUrl = API_ORIGIN;
 
 // Parser to turn raw message content or widget metadata into structured cards
 const parseMessageCard = (messageOrContent, isOutbound, isAI) => {
@@ -46,7 +45,7 @@ const parseMessageCard = (messageOrContent, isOutbound, isAI) => {
   if (widgetButtons.length > 0 || widgetList) {
     return {
       type: 'widget',
-      title: widgetList?.title || (widgetButtons.length > 0 ? 'âš¡ Interactive Reply' : 'ðŸ“‹ Interactive Reply'),
+      title: widgetList?.title || (widgetButtons.length > 0 ? '⚡ Interactive Reply' : '📋 Interactive Reply'),
       headerBg: isOutbound
         ? 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)'
         : 'linear-gradient(135deg, #78909c 0%, #546e7a 100%)',
@@ -85,12 +84,12 @@ const parseMessageCard = (messageOrContent, isOutbound, isAI) => {
     }
     
     if (currentProduct) {
-      if (trimmed.toLowerCase().includes('price:') || trimmed.toLowerCase().includes('ðŸ’° à¤•à¥€à¤®à¤¤:') || trimmed.toLowerCase().includes('ðŸ’° à®µà®¿à®²à¯ˆ:')) {
-        currentProduct.price = trimmed.replace(/^(?:price|ðŸ’° à¤•à¥€à¤®à¤¤|ðŸ’° à®µà®¿à®²à¯ˆ|Price)\s*[:ï¼š]\s*/i, '').replace(/\*/g, '').trim();
+      if (trimmed.toLowerCase().includes('price:') || trimmed.toLowerCase().includes('💰 कीमत:') || trimmed.toLowerCase().includes('💰 விலை:')) {
+        currentProduct.price = trimmed.replace(/^(?:price|💰 कीमत|💰 விலை|Price)\s*[:：]\s*/i, '').replace(/\*/g, '').trim();
       } else if (trimmed.toLowerCase().includes('image:') || trimmed.toLowerCase().includes('img:')) {
-        currentProduct.imageUrl = trimmed.replace(/^(?:image|img)\s*[:ï¼š]\s*/i, '').trim();
-      } else if (trimmed.toLowerCase().includes('view / buy:') || trimmed.toLowerCase().includes('view details:') || trimmed.toLowerCase().includes('ðŸ”— à¤µà¤¿à¤µà¤°à¤£ à¤¦à¥‡à¤–à¥‡à¤‚:') || trimmed.toLowerCase().includes('ðŸ”— à®µà®¿à®µà®°à®®à¯ à®ªà®¾à®°à¯à®•à¯à®•:')) {
-        currentProduct.productUrl = trimmed.replace(/^(?:view \/ buy|view details|ðŸ”— à¤µà¤¿à¤µà¤°à¤£ à¤¦à¥‡à¤–à¥‡à¤‚|ðŸ”— à®µà®¿à®µà®°à®®à¯ à®ªà®¾à®°à¯à®•à¯à®•|Link)\s*[:ï¼š]\s*/i, '').trim();
+        currentProduct.imageUrl = trimmed.replace(/^(?:image|img)\s*[:：]\s*/i, '').trim();
+      } else if (trimmed.toLowerCase().includes('view / buy:') || trimmed.toLowerCase().includes('view details:') || trimmed.toLowerCase().includes('🔗 विवरण देखें:') || trimmed.toLowerCase().includes('🔗 விவரம் பார்க்க:')) {
+        currentProduct.productUrl = trimmed.replace(/^(?:view \/ buy|view details|🔗 विवरण देखें|🔗 விவரம் பார்க்க|Link)\s*[:：]\s*/i, '').trim();
       }
     }
   }
@@ -104,12 +103,12 @@ const parseMessageCard = (messageOrContent, isOutbound, isAI) => {
       const trimmed = line.trim();
       const isProductLine = trimmed.match(/^\*?\d+\./) || 
                             trimmed.toLowerCase().includes('price:') || 
-                            trimmed.toLowerCase().includes('ðŸ’°') ||
+                            trimmed.toLowerCase().includes('💰') ||
                             trimmed.toLowerCase().includes('image:') || 
                             trimmed.toLowerCase().includes('link:') ||
                             trimmed.toLowerCase().includes('view / buy:') ||
                             trimmed.toLowerCase().includes('view details:') ||
-                            trimmed.toLowerCase().includes('ðŸ”—');
+                            trimmed.toLowerCase().includes('🔗');
       if (isProductLine) {
         readingHeader = false;
         continue;
@@ -155,38 +154,38 @@ const parseMessageCard = (messageOrContent, isOutbound, isAI) => {
   const bodyText = bodyLines.join('\n').trim();
 
   // Determine card category/style based on keywords
-  let title = 'ðŸ“‹ Store Update';
+  let title = '📢 Store Update';
   let headerBg = 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)';
   let icon = 'info';
 
   if (!isOutbound) {
-    title = 'ðŸ‘¤ Customer Inquiry';
+    title = '💬 Customer Inquiry';
     headerBg = 'linear-gradient(135deg, #78909c 0%, #546e7a 100%)';
     icon = 'customer';
   } else {
     const lowerContent = content.toLowerCase();
     if (lowerContent.includes('rate') || lowerContent.includes('price') || lowerContent.includes('gold') || lowerContent.includes('silver') || lowerContent.includes('platinum')) {
-      title = 'ðŸ’Ž Today\'s Live Metal Rates';
+      title = '💵 Today\'s Live Metal Rates';
       headerBg = 'linear-gradient(135deg, #fbc02d 0%, #f57f17 100%)';
       icon = 'gold';
     } else if (lowerContent.includes('delivery') || lowerContent.includes('shipping') || lowerContent.includes('track') || lowerContent.includes('pickup') || lowerContent.includes('refund')) {
-      title = lowerContent.includes('refund') ? 'ðŸ’° Refund Status' : 'ðŸšš Shipment Tracking';
+      title = lowerContent.includes('refund') ? '💰 Refund Status' : '📦 Shipment Tracking';
       headerBg = 'linear-gradient(135deg, #43a047 0%, #2e7d32 100%)';
       icon = 'delivery';
     } else if (lowerContent.includes('custom') || lowerContent.includes('design') || lowerContent.includes('make') || lowerContent.includes('bespoke')) {
-      title = 'ðŸŽ¨ Custom Jewelry Design';
+      title = '💎 Custom Jewelry Design';
       headerBg = 'linear-gradient(135deg, #8e24aa 0%, #6a1b9a 100%)';
       icon = 'custom';
     } else if (lowerContent.includes('complaint') || lowerContent.includes('sorry') || lowerContent.includes('apologize') || lowerContent.includes('issue')) {
-      title = 'âš ï¸ Support Assistance';
+title = '⚠️ Support Assistance';
       headerBg = 'linear-gradient(135deg, #e53935 0%, #c62828 100%)';
       icon = 'complaint';
     } else if (lowerContent.includes('welcome') || lowerContent.includes('namaste') || lowerContent.includes('hello')) {
-      title = 'âœ¨ Greeting & Introduction';
+      title = '👋 Greeting & Introduction';
       headerBg = 'linear-gradient(135deg, #00acc1 0%, #00838f 100%)';
       icon = 'welcome';
     } else if (isAI) {
-      title = 'ðŸ¤– Assistant Smart Response';
+      title = '🤖 Assistant Smart Response';
       headerBg = 'linear-gradient(135deg, #673ab7 0%, #512da8 100%)';
       icon = 'ai';
     }
@@ -266,8 +265,8 @@ export default function Conversations() {
   
   const [conversations, setConversations] = useState([]);
 
-  const getDisplayName = (cust) => {
-    if (!cust) return 'Unknown Customer';
+  const getDisplayName = (cust, conv) => {
+    if (!cust) return conv?.title || 'Unknown Customer';
     const firstName = (cust.firstName || '').trim();
     const lastName = (cust.lastName || '').trim();
     const phone = (cust.phone || '').trim();
@@ -286,11 +285,11 @@ export default function Conversations() {
     if (cleaned.length > 0) {
       return '+' + cleaned;
     }
-    return phone || 'Unknown Customer';
+    return phone || conv?.title || 'Unknown Customer';
   };
 
-  const getAvatarInitial = (cust) => {
-    const name = getDisplayName(cust);
+  const getAvatarInitial = (cust, conv) => {
+    const name = getDisplayName(cust, conv);
     if (name.startsWith('+')) {
       return name.replace('+', '').slice(0, 1);
     }
@@ -306,6 +305,7 @@ export default function Conversations() {
   const [newMessage, setNewMessage] = useState('');
   const [sending, setSending] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
+  const [whatsappStatus, setWhatsappStatus] = useState(null);
   const [stats, setStats] = useState({
     total: 0,
     active: 0,
@@ -314,6 +314,19 @@ export default function Conversations() {
     whatsapp: 0,
     instagram: 0
   });
+
+  const fetchWhatsappStatus = async () => {
+    try {
+      const response = await apiClient.get('/ai-chat/whatsapp/status');
+      setWhatsappStatus(response.data);
+    } catch (error) {
+      console.error('Failed to fetch WhatsApp status:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchWhatsappStatus();
+  }, []);
 
   useEffect(() => {
     fetchConversations();
@@ -491,6 +504,16 @@ export default function Conversations() {
 
     try {
       setSending(true);
+      const requestBody = {
+        content: newMessage,
+        sender: 'TEAM',
+        messageType: 'TEXT'
+      };
+
+      if (!selectedConversation.isTemporary) {
+        requestBody.platform = selectedConversation.primaryPlatform || selectedConversation.platform;
+      }
+
       if (selectedConversation.isTemporary) {
         const response = await apiClient.post('/ai-chat/send-message', {
           customerId: selectedConversation.customerId._id,
@@ -514,12 +537,7 @@ export default function Conversations() {
           }
         }
       } else {
-        const response = await apiClient.post(`/conversations/${selectedConversation._id}/messages`, {
-          content: newMessage,
-          platform: selectedConversation.primaryPlatform,
-          sender: 'TEAM',
-          messageType: 'TEXT'
-        });
+        const response = await apiClient.post(`/conversations/${selectedConversation._id}/messages`, requestBody);
 
         // Optimistically append message
         setMessages(prev => [...prev, response.data]);
@@ -534,7 +552,7 @@ export default function Conversations() {
                 content: newMessage,
                 sender: 'TEAM',
                 timestamp: new Date(),
-                platform: selectedConversation.primaryPlatform
+                platform: requestBody.platform || selectedConversation.primaryPlatform
               }
             };
           }
@@ -791,14 +809,31 @@ export default function Conversations() {
               height: '100%',
               display: 'flex',
               flexDirection: 'column',
-              borderRadius: 3,
-              border: '1px solid #e8eef7',
+              borderRadius: '8px',
+              border: '1px solid #e0e0e0',
               overflow: 'hidden',
               background: '#ffffff'
             }}
           >
+            {/* WhatsApp Profile / Connection Header */}
+            <Box sx={{ p: 1.8, px: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', bgcolor: '#f0f2f5', borderBottom: '1px solid #e0e0e0' }}>
+              <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+                <Avatar sx={{ bgcolor: '#128C7E', width: 36, height: 36 }}>
+                  <ChatIcon sx={{ fontSize: 20 }} />
+                </Avatar>
+                <Box>
+                  <Typography variant="body2" sx={{ fontWeight: 700, fontSize: '0.82rem', color: '#303030' }}>
+                    {whatsappStatus?.phoneNumber ? whatsappStatus.phoneNumber : (whatsappStatus?.status === 'META_API' ? 'Meta Business API' : 'WhatsApp (QR Mode)')}
+                  </Typography>
+                  <Typography variant="caption" sx={{ display: 'block', color: whatsappStatus?.authenticated ? '#25D366' : '#f44336', fontWeight: 700, fontSize: '0.68rem' }}>
+                    {whatsappStatus?.authenticated ? '● Active Connection' : '○ Disconnected'}
+                  </Typography>
+                </Box>
+              </Stack>
+            </Box>
+
             {/* Search and Filters Header */}
-            <Box sx={{ p: 2, borderBottom: '1px solid #e8eef7', bgcolor: '#fcfdfe' }}>
+            <Box sx={{ p: 2, borderBottom: '1px solid #e0e0e0', bgcolor: '#ffffff' }}>
               <TextField
                 placeholder="Search by name or content..."
                 size="small"
@@ -877,14 +912,14 @@ export default function Conversations() {
                         key={conv._id}
                         onClick={() => handleSelectConversation(conv)}
                         sx={{
-                          borderRadius: 2.5,
-                          mb: 1,
+                          borderRadius: 0,
+                          borderBottom: '1px solid #f2f2f2',
                           p: 1.5,
+                          px: 2,
                           transition: 'all 0.2s',
-                          border: isSelected ? '1px solid #bbdefb' : '1px solid transparent',
-                          bgcolor: isSelected ? '#e3f2fd' : 'transparent',
+                          bgcolor: isSelected ? '#efeae2' : 'transparent',
                           '&:hover': {
-                            bgcolor: isSelected ? '#e3f2fd' : '#f5f8fc'
+                            bgcolor: isSelected ? '#efeae2' : '#f5f6f6'
                           }
                         }}
                       >
@@ -909,33 +944,40 @@ export default function Conversations() {
                                   <PhoneIcon sx={{ fontSize: 10, color: brandColor }} />
                                 ) : (
                                   <CameraIcon sx={{ fontSize: 10, color: brandColor }} />
-                                )}
+                                ) }
                               </Box>
                             }
                           >
                             <Avatar sx={{ bgcolor: isWA ? '#e8f5e9' : '#fce4ec', color: brandColor, fontWeight: 700 }}>
-                              {getAvatarInitial(cust)}
+                              {getAvatarInitial(cust, conv)}
                             </Avatar>
                           </Badge>
                         </ListItemAvatar>
                         <Box sx={{ flexGrow: 1, minWidth: 0, ml: 1.5 }}>
                           <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
                             <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {getDisplayName(cust)}
+                              {getDisplayName(cust, conv)}
                             </Typography>
                             <Typography variant="caption" color="text.secondary" sx={{ flexShrink: 0, ml: 1 }}>
                               {formatTime(conv.lastMessage?.timestamp)}
                             </Typography>
                           </Stack>
                           <Stack spacing={0.5} sx={{ mt: 0.5 }}>
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                              noWrap
-                              sx={{ display: 'block', maxWidth: '200px' }}
-                            >
-                              {conv.lastMessage?.content || 'No messages yet'}
-                            </Typography>
+                            <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                                noWrap
+                                sx={{ display: 'block', maxWidth: '170px' }}
+                              >
+                                {conv.lastMessage?.content || 'No messages yet'}
+                              </Typography>
+                              {conv.businessPhoneNumber && (
+                                <Typography variant="caption" sx={{ fontSize: '0.62rem', color: '#128C7E', fontWeight: 700, bgcolor: '#e8f5e9', px: 0.5, py: 0.1, borderRadius: 0.5 }}>
+                                  {conv.businessPhoneNumber}
+                                </Typography>
+                              )}
+                            </Stack>
                             <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap', gap: 0.5 }}>
                               {conv.status === 'WAITING_FOR_TEAM' ? (
                                 <Chip
@@ -1019,23 +1061,23 @@ export default function Conversations() {
                 height: '100%',
                 display: 'flex',
                 flexDirection: 'column',
-                borderRadius: 3,
-                border: '1px solid #e8eef7',
+                borderRadius: '8px',
+                border: '1px solid #e0e0e0',
                 overflow: 'hidden',
-                background: '#ffffff'
+                background: '#efeae2'
               }}
             >
               {/* Chat Window Header */}
-              <Box sx={{ p: 2, borderBottom: '1px solid #e8eef7', bgcolor: '#fcfdfe' }}>
+              <Box sx={{ p: 2, borderBottom: '1px solid #e0e0e0', bgcolor: '#f0f2f5' }}>
                 <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
                   <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
-                    <Avatar sx={{ bgcolor: selectedConversation.primaryPlatform === 'WHATSAPP' ? '#25D366' : '#E1306C', color: '#ffffff', fontWeight: 700 }}>
-                      {getAvatarInitial(selectedConversation.customerId)}
+                    <Avatar sx={{ bgcolor: selectedConversation.primaryPlatform === 'WHATSAPP' ? '#128C7E' : '#E1306C', color: '#ffffff', fontWeight: 700 }}>
+                      {getAvatarInitial(selectedConversation.customerId, selectedConversation)}
                     </Avatar>
                     <Box>
                       <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                        <Typography variant="h6" sx={{ fontWeight: 700, fontSize: '1.05rem' }}>
-                          {getDisplayName(selectedConversation.customerId)}
+                        <Typography variant="h6" sx={{ fontWeight: 700, fontSize: '0.95rem', color: '#303030' }}>
+                          {getDisplayName(selectedConversation.customerId, selectedConversation)}
                         </Typography>
                         {selectedConversation.customerId?.rfmSegment && (
                           <Chip
@@ -1051,15 +1093,15 @@ export default function Conversations() {
                         )}
                         {selectedConversation.customerId?.totalSpent > 0 && (
                           <Chip
-                            label={`Spent: â‚¹${selectedConversation.customerId.totalSpent.toLocaleString()}`}
+                            label={`Spent: ₹${selectedConversation.customerId.totalSpent.toLocaleString()}`}
                             size="small"
                             variant="outlined"
-                            sx={{ height: 18, fontSize: '0.65rem', fontWeight: 500 }}
+                            sx={{ height: 18, fontSize: '0.65rem', fontWeight: 500, borderColor: '#e0e0e0', bgcolor: '#ffffff' }}
                           />
                         )}
                       </Stack>
-                      <Typography variant="caption" color="text.secondary">
-                        {selectedConversation.customerId?.phone} | Channel: {selectedConversation.primaryPlatform}
+                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
+                        {selectedConversation.customerId?.phone} | Channel: {selectedConversation.primaryPlatform === 'WHATSAPP' ? `WhatsApp ${selectedConversation.businessPhoneNumber ? `(via ${selectedConversation.businessPhoneNumber})` : ''}` : selectedConversation.primaryPlatform}
                       </Typography>
                     </Box>
                   </Stack>
@@ -1135,7 +1177,7 @@ export default function Conversations() {
                   <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
                     <ReportProblemIcon sx={{ color: '#f57f17' }} />
                     <Typography variant="body2" sx={{ fontWeight: 600, color: '#f57f17', fontSize: '0.82rem' }}>
-                      AI Autopilot Paused â€” This conversation is escalated for admin takeover.
+                      AI Autopilot Paused — This conversation is escalated for admin takeover.
                     </Typography>
                   </Stack>
                   <Button
@@ -1160,7 +1202,7 @@ export default function Conversations() {
               )}
 
               {/* Chat Message Stream */}
-              <Box sx={{ flexGrow: 1, overflowY: 'auto', p: 3, bgcolor: '#fafbfd' }}>
+              <Box sx={{ flexGrow: 1, overflowY: 'auto', p: 3, bgcolor: '#efeae2', backgroundImage: 'url("https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png")', backgroundRepeat: 'repeat', backgroundBlendMode: 'multiply' }}>
                 {messagesLoading ? (
                   <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
                     <CircularProgress size={35} />
@@ -1550,14 +1592,15 @@ export default function Conversations() {
                               <Paper
                                 elevation={0}
                                 sx={{
-                                  p: 1.8,
-                                  borderRadius: isOutbound ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
+                                  p: 1.5,
+                                  px: 2,
+                                  borderRadius: isOutbound ? '8px 0px 8px 8px' : '0px 8px 8px 8px',
                                   background: isOutbound
-                                    ? 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)'
+                                    ? '#d9fdd3'
                                     : '#ffffff',
-                                  color: isOutbound ? '#ffffff' : 'text.primary',
-                                  border: isOutbound ? 'none' : '1px solid #e8eef7',
-                                  boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
+                                  color: '#303030',
+                                  border: 'none',
+                                  boxShadow: '0 1px 0.5px rgba(0,0,0,0.13)'
                                 }}
                               >
                                 <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
@@ -1597,8 +1640,8 @@ export default function Conversations() {
               </Box>
 
               {/* Chat Input Footer */}
-              <Divider />
-              <Box sx={{ p: 2, bgcolor: '#ffffff' }}>
+              <Divider sx={{ borderColor: '#e0e0e0' }} />
+              <Box sx={{ p: 2, bgcolor: '#f0f2f5' }}>
                 <AIProviderStatus compact sx={{ mb: 1.5 }} />
                 <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
                   <TextField
@@ -1616,8 +1659,14 @@ export default function Conversations() {
                     maxRows={4}
                     sx={{
                       '& .MuiOutlinedInput-root': {
-                        borderRadius: 3,
-                        bgcolor: '#fafafa'
+                        borderRadius: '24px',
+                        bgcolor: '#ffffff',
+                        border: 'none',
+                        px: 2,
+                        py: 1,
+                        '& fieldset': {
+                          border: 'none'
+                        }
                       }
                     }}
                   />
@@ -1626,18 +1675,20 @@ export default function Conversations() {
                     onClick={handleSendMessage}
                     disabled={!newMessage.trim() || sending}
                     sx={{
-                      borderRadius: 3,
-                      height: 48,
-                      minWidth: 48,
+                      borderRadius: '50%',
+                      height: 44,
+                      width: 44,
+                      minWidth: 44,
                       p: 0,
-                      boxShadow: '0 4px 12px rgba(25, 118, 210, 0.2)',
-                      bgcolor: 'primary.main',
+                      boxShadow: 'none',
+                      bgcolor: '#008069',
+                      color: '#ffffff',
                       '&:hover': {
-                        bgcolor: 'primary.dark'
+                        bgcolor: '#006653'
                       }
                     }}
                   >
-                    {sending ? <CircularProgress size={20} color="inherit" /> : <SendIcon sx={{ fontSize: 20 }} />}
+                    {sending ? <CircularProgress size={20} color="inherit" /> : <SendIcon sx={{ fontSize: 18 }} />}
                   </Button>
                 </Stack>
               </Box>

@@ -1,22 +1,42 @@
 import React from 'react';
-import { Card, CardContent, Box, Stack, Typography, IconButton, Menu, MenuItem, Button } from '@mui/material';
+import {
+  Card,
+  CardContent,
+  Box,
+  Stack,
+  Typography,
+  IconButton,
+  Menu,
+  MenuItem,
+  Button,
+  Divider,
+  Avatar
+} from '@mui/material';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PauseIcon from '@mui/icons-material/Pause';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import VisibilityIcon from '@mui/icons-material/Visibility';
-import ScheduleIcon from '@mui/icons-material/Schedule';
 import SendIcon from '@mui/icons-material/Send';
+import ScheduleIcon from '@mui/icons-material/Schedule';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import CampaignIcon from '@mui/icons-material/Campaign';
+import RepeatIcon from '@mui/icons-material/Repeat';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import FlashOnIcon from '@mui/icons-material/FlashOn';
+import ImageIcon from '@mui/icons-material/Image';
+import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
 import StatusBadge from './StatusBadge';
-import MetricsBar from './MetricsBar';
 import SkeletonCard from './SkeletonCard';
 
-/**
- * CampaignCard Component
- * Displays a single campaign in card format with metrics and actions
- */
+const typeMeta = {
+  ONE_TIME: { label: 'One-time', icon: CampaignIcon, color: '#6366f1', bg: 'rgba(99,102,241,0.10)' },
+  RECURRING: { label: 'Recurring', icon: RepeatIcon, color: '#8b5cf6', bg: 'rgba(139,92,246,0.10)' },
+  AUTOMATED: { label: 'Automated', icon: AutoAwesomeIcon, color: '#10b981', bg: 'rgba(16,185,129,0.10)' },
+  TRIGGERED: { label: 'Triggered', icon: FlashOnIcon, color: '#f59e0b', bg: 'rgba(245,158,11,0.10)' }
+};
+
 const CampaignCard = React.memo(({
   campaign = {},
   onView = () => {},
@@ -51,6 +71,9 @@ const CampaignCard = React.memo(({
     callback();
   };
 
+  const type = typeMeta[campaign.type] || typeMeta.ONE_TIME;
+  const TypeIcon = type.icon;
+
   const lastUpdate = campaign.updatedAt
     ? new Date(campaign.updatedAt).toLocaleDateString('en-US', {
         month: 'short',
@@ -60,263 +83,312 @@ const CampaignCard = React.memo(({
       })
     : 'N/A';
 
+  const mediaPreview = campaign.mediaPreviewData || campaign.mediaUrl;
+
+  const initial = (campaign.name || campaign.topic || '?').charAt(0).toUpperCase();
+
   return (
     <>
       <style>{`
         @keyframes fadeInScale {
           from {
             opacity: 0;
-            transform: scale(0.95);
+            transform: scale(0.96);
           }
           to {
             opacity: 1;
             transform: scale(1);
           }
         }
-        @keyframes buttonPress {
-          0% {
-            transform: scale(1);
-          }
-          50% {
-            transform: scale(0.95);
-          }
-          100% {
-            transform: scale(1);
-          }
-        }
       `}</style>
       <Card
         sx={{
-          height: '100%',
+          height: 288,
+          width: '100%',
           display: 'flex',
           flexDirection: 'column',
           position: 'relative',
-          transition: 'all 150ms ease-out',
+          borderRadius: '6px',
+          overflow: 'hidden',
           cursor: 'pointer',
-          animation: 'fadeInScale 200ms ease-out',
+          transition: 'all 0.2s ease',
+          animation: 'fadeInScale 220ms ease-out',
+          border: '1px solid #D9D9D9',
+          bgcolor: '#FFFFFF',
           '&:hover': {
-            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-            transform: 'translateY(-4px)'
-          },
-          border: '1px solid #E5E7EB'
+            transform: 'translateY(-3px)',
+            boxShadow: '0 10px 24px -8px rgba(15, 23, 42, 0.18)',
+            borderColor: '#0A6ED1'
+          }
         }}
         onClick={() => onView(campaign)}
       >
-        {/* Status Badge - Top Right */}
-        <Box sx={{
-          position: 'absolute',
-          top: 12,
-          right: 12,
-          zIndex: 1
-        }}>
-          <StatusBadge status={campaign.status} size="small" />
+        {/* SAP DMS-style thumbnail strip */}
+        <Box sx={{ position: 'relative', height: '92px', flexShrink: 0 }}>
+          <Box
+            sx={{
+              height: '92px',
+              background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 55%, #3b82f6 100%)'
+            }}
+          >
+            <Box
+              sx={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                height: '92px',
+                backgroundImage: 'radial-gradient(circle at 85% 20%, rgba(255,255,255,0.22) 0%, transparent 50%)'
+              }}
+            />
+          </Box>
+
+          {mediaPreview && (
+            <Box
+              component="img"
+              src={mediaPreview}
+              alt={campaign.mediaFileName || 'campaign media'}
+              sx={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '92px',
+                objectFit: 'cover',
+                opacity: 0.5
+              }}
+            />
+          )}
+
+          {/* Type badge over thumbnail (SAP tile style) */}
+          <Box
+            sx={{
+              position: 'absolute',
+              top: 8,
+              left: 10,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 0.6,
+              px: 1,
+              py: 0.35,
+              borderRadius: '4px',
+              bgcolor: 'rgba(255,255,255,0.92)',
+              color: type.color,
+              fontSize: '11px',
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em'
+            }}
+          >
+            <TypeIcon sx={{ fontSize: 13 }} />
+            {type.label}
+          </Box>
+
+          {/* Avatar overlapping */}
+          <Avatar
+            sx={{
+              position: 'absolute',
+              bottom: -18,
+              left: 14,
+              width: 42,
+              height: 42,
+              bgcolor: type.color,
+              color: '#fff',
+              fontWeight: 700,
+              fontSize: '16px',
+              boxShadow: '0 4px 10px rgba(15, 23, 42, 0.25)',
+              border: '2px solid #fff'
+            }}
+          >
+            {initial}
+          </Avatar>
         </Box>
 
-        {/* Main Content */}
-        <CardContent sx={{ flexGrow: 1, pb: 2 }}>
-          {/* Title & Topic */}
-          <Stack spacing={0.5} mb={2.5}>
+        {/* Body */}
+        <CardContent sx={{ flexGrow: 1, minHeight: 0, px: 2.5, pt: 2.5, pb: 1.25 }}>
+          <Stack spacing={0.75}>
+            {/* Title - always clamped to keep tiles uniform */}
             <Typography
               variant="h6"
               sx={{
-                fontSize: '16px',
-                fontWeight: 600,
-                color: '#1F2937',
-                pr: 6, // Space for status badge
-                wordBreak: 'break-word'
+                fontSize: '15px',
+                fontWeight: 700,
+                color: '#0f172a',
+                wordBreak: 'break-word',
+                lineHeight: 1.35,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                minHeight: '40px'
               }}
             >
-              {campaign.topic || campaign.name || 'Unnamed Campaign'}
+              {campaign.name || campaign.topic || 'Unnamed Campaign'}
             </Typography>
+
+            {/* Message excerpt - always 2 lines reserved */}
             <Typography
-              variant="caption"
+              variant="body2"
               sx={{
-                fontSize: '12px',
-                color: '#6B7280',
-                fontStyle: 'italic'
+                color: '#64748b',
+                fontSize: '12.5px',
+                lineHeight: 1.45,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                minHeight: '36px'
               }}
             >
-              ID: {campaign.name || campaign._id?.substring(0, 8) || 'N/A'}
+              {campaign.messageContent || (campaign.messageTemplate && campaign.messageTemplate.content) || 'No message preview available'}
             </Typography>
-          </Stack>
 
-          {/* Metrics */}
-          <Stack spacing={1.5} mb={2.5}>
-            <MetricsBar
-              label="Sent"
-              value={campaign.totalSent || 0}
-              max={campaign.totalTargets || 1}
-              color="primary"
-            />
-            <MetricsBar
-              label="Delivered"
-              value={campaign.totalDelivered || 0}
-              max={campaign.totalTargets || 1}
-              color="success"
-            />
-            <MetricsBar
-              label="Read"
-              value={campaign.totalRead || 0}
-              max={campaign.totalTargets || 1}
-              color="info"
-            />
+            {/* Metrics row - always rendered so every tile is identical */}
+            <Stack direction="row" spacing={2} sx={{ mt: 0.75 }}>
+              <Box sx={{ flex: 1 }}>
+                <Typography variant="caption" sx={{ color: '#64748b', fontSize: '10.5px', fontWeight: 600 }}>
+                  SENT
+                </Typography>
+                <Typography variant="body2" sx={{ fontWeight: 800, color: '#0f172a', fontSize: '14px', lineHeight: 1.2 }}>
+                  {campaign.totalSent || 0}
+                  <Box component="span" sx={{ color: '#94a3b8', fontSize: '10.5px', fontWeight: 500 }}>
+                    {' '}/ {campaign.totalTargets || 0}
+                  </Box>
+                </Typography>
+              </Box>
+              <Box sx={{ flex: 1 }}>
+                <Typography variant="caption" sx={{ color: '#64748b', fontSize: '10.5px', fontWeight: 600 }}>
+                  DELIVERED
+                </Typography>
+                <Typography variant="body2" sx={{ fontWeight: 800, color: '#059669', fontSize: '14px', lineHeight: 1.2 }}>
+                  {campaign.totalDelivered || 0}
+                </Typography>
+              </Box>
+              <Box sx={{ flex: 1 }}>
+                <Typography variant="caption" sx={{ color: '#64748b', fontSize: '10.5px', fontWeight: 600 }}>
+                  READ
+                </Typography>
+                <Typography variant="body2" sx={{ fontWeight: 800, color: '#6366f1', fontSize: '14px', lineHeight: 1.2 }}>
+                  {campaign.totalRead || 0}
+                </Typography>
+              </Box>
+            </Stack>
           </Stack>
-
-          {/* Last Update */}
-          <Typography
-            variant="caption"
-            sx={{
-              fontSize: '11px',
-              color: '#9CA3AF',
-              display: 'block',
-              mb: 2
-            }}
-          >
-            Last: {lastUpdate}
-          </Typography>
         </CardContent>
 
-        {/* Action Buttons */}
-        <Box
-          sx={{
-            px: 2,
-            pb: 2,
-            borderTop: '1px solid #E5E7EB',
-            pt: 2,
-            display: 'flex',
-            gap: 1,
-            justifyContent: 'space-between',
-            alignItems: 'center'
-          }}
-        >
-          <Stack direction="row" spacing={0.5} sx={{ flex: 1 }}>
-            <Button
-              size="small"
-              variant="outlined"
-              startIcon={<VisibilityIcon sx={{ width: 16, height: 16 }} />}
-              onClick={(e) => {
-                e.stopPropagation();
-                onView(campaign);
-              }}
-              sx={{
-                fontSize: '11px',
-                textTransform: 'none',
-                flex: 1,
-                minWidth: '0px',
-                px: 1,
-                transition: 'all 100ms ease-in-out',
-                '&:active': {
-                  animation: 'buttonPress 150ms ease-in-out'
-                }
-              }}
-            >
-              View
-            </Button>
-            <Button
-              size="small"
-              variant="outlined"
-              startIcon={<EditIcon sx={{ width: 16, height: 16 }} />}
-              onClick={(e) => {
-                e.stopPropagation();
-                onEdit(campaign);
-              }}
-              sx={{
-                fontSize: '11px',
-                textTransform: 'none',
-                flex: 1,
-                minWidth: '0px',
-                px: 1,
-                transition: 'all 100ms ease-in-out',
-                '&:active': {
-                  animation: 'buttonPress 150ms ease-in-out'
-                }
-              }}
-            >
-              Edit
-            </Button>
-            <Button
-              size="small"
-              variant="contained"
-              color="primary"
-              startIcon={<SendIcon sx={{ width: 16, height: 16 }} />}
-              onClick={(e) => {
-                e.stopPropagation();
-                onManualSend(campaign);
-              }}
-              sx={{
-                fontSize: '11px',
-                textTransform: 'none',
-                flex: 1.2,
-                minWidth: '0px',
-                px: 1,
-                bgcolor: '#2563EB',
-                transition: 'all 100ms ease-in-out',
-                '&:hover': {
-                  bgcolor: '#1D4ED8'
-                },
-                '&:active': {
-                  animation: 'buttonPress 150ms ease-in-out'
-                }
-              }}
-            >
-              Send
-            </Button>
-          </Stack>
+        <Divider sx={{ borderColor: '#F0F0F0' }} />
 
-          {/* More Menu */}
+        {/* Footer actions */}
+        <Box sx={{ px: 1.25, py: 1, display: 'flex', alignItems: 'center', gap: 0.5, flexShrink: 0 }}>
+          <Button
+            size="small"
+            variant="contained"
+            startIcon={<SendIcon sx={{ fontSize: 16 }} />}
+            onClick={(e) => {
+              e.stopPropagation();
+              onManualSend(campaign);
+            }}
+            sx={{
+              flex: 1,
+              height: '32px',
+              fontSize: '0.8125rem',
+              fontWeight: 700,
+              borderRadius: '4px',
+              textTransform: 'none',
+              bgcolor: '#0A6ED1',
+              boxShadow: 'none',
+              '&:hover': { bgcolor: '#0854A0', boxShadow: 'none' }
+            }}
+          >
+            Send
+          </Button>
+
+          <IconButton
+            size="small"
+            onClick={(e) => {
+              e.stopPropagation();
+              onView(campaign);
+            }}
+            sx={{
+              width: 32,
+              height: 32,
+              color: '#475569',
+              '&:hover': { bgcolor: 'rgba(99,102,241,0.10)', color: '#4338ca' }
+            }}
+          >
+            <VisibilityIcon sx={{ fontSize: 20 }} />
+          </IconButton>
+
+          <IconButton
+            size="small"
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit(campaign);
+            }}
+            sx={{
+              width: 32,
+              height: 32,
+              color: '#475569',
+              '&:hover': { bgcolor: 'rgba(99,102,241,0.10)', color: '#4338ca' }
+            }}
+          >
+            <EditIcon sx={{ fontSize: 20 }} />
+          </IconButton>
+
           <IconButton
             size="small"
             onClick={handleMenuOpen}
-            sx={{ color: '#6B7280' }}
+            sx={{
+              width: 32,
+              height: 32,
+              color: '#475569',
+              '&:hover': { bgcolor: 'rgba(99,102,241,0.10)', color: '#4338ca' }
+            }}
           >
-            <MoreVertIcon sx={{ width: 20, height: 20 }} />
+            <MoreVertIcon sx={{ fontSize: 20 }} />
           </IconButton>
+
           <Menu
             anchorEl={anchorEl}
             open={menuOpen}
             onClose={handleMenuClose}
             transformOrigin={{ horizontal: 'right', vertical: 'top' }}
             anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+            PaperProps={{ sx: { borderRadius: '12px', boxShadow: '0 12px 32px rgba(15,23,42,0.14)' } }}
           >
+            <MenuItem sx={{ fontWeight: 500 }} onClick={() => onView(campaign)}>
+              <VisibilityIcon sx={{ mr: 1.5, fontSize: 18 }} /> View Details
+            </MenuItem>
             {campaign.status === 'DRAFT' && (
-              <MenuItem onClick={() => handleMenuItemClick(() => onLaunch(campaign))}>
-                <PlayArrowIcon sx={{ mr: 1, width: 18, height: 18 }} />
-                Launch
+              <MenuItem sx={{ fontWeight: 500 }} onClick={() => handleMenuItemClick(() => onLaunch(campaign))}>
+                <PlayArrowIcon sx={{ mr: 1.5, fontSize: 18 }} /> Launch Now
               </MenuItem>
             )}
             {campaign.status === 'RUNNING' && (
-              <MenuItem onClick={() => handleMenuItemClick(() => onPause(campaign))}>
-                <PauseIcon sx={{ mr: 1, width: 18, height: 18 }} />
-                Pause
+              <MenuItem sx={{ fontWeight: 500 }} onClick={() => handleMenuItemClick(() => onPause(campaign))}>
+                <PauseIcon sx={{ mr: 1.5, fontSize: 18 }} /> Pause
               </MenuItem>
             )}
             {campaign.status === 'PAUSED' && (
-              <MenuItem onClick={() => handleMenuItemClick(() => onResume(campaign))}>
-                <PlayArrowIcon sx={{ mr: 1, width: 18, height: 18 }} />
-                Resume
+              <MenuItem sx={{ fontWeight: 500 }} onClick={() => handleMenuItemClick(() => onResume(campaign))}>
+                <PlayArrowIcon sx={{ mr: 1.5, fontSize: 18 }} /> Resume
               </MenuItem>
             )}
             {campaign.status === 'DRAFT' && campaign.scheduledAt && (
-              <MenuItem onClick={() => handleMenuItemClick(() => onSchedule(campaign))}>
-                <ScheduleIcon sx={{ mr: 1, width: 18, height: 18 }} />
-                Schedule
+              <MenuItem sx={{ fontWeight: 500 }} onClick={() => handleMenuItemClick(() => onSchedule(campaign))}>
+                <ScheduleIcon sx={{ mr: 1.5, fontSize: 18 }} /> Schedule
               </MenuItem>
             )}
             {campaign.status !== 'COMPLETED' && (
-              <MenuItem onClick={() => handleMenuItemClick(() => onComplete(campaign))}>
-                <CheckCircleIcon sx={{ mr: 1, width: 18, height: 18 }} />
-                Mark Complete
+              <MenuItem sx={{ fontWeight: 500 }} onClick={() => handleMenuItemClick(() => onComplete(campaign))}>
+                <CheckCircleIcon sx={{ mr: 1.5, fontSize: 18 }} /> Mark Complete
               </MenuItem>
             )}
-            <MenuItem onClick={() => handleMenuItemClick(() => onManualSend(campaign))}>
-              Send Manually
-            </MenuItem>
-            <MenuItem
-              onClick={() => handleMenuItemClick(() => onDelete(campaign))}
-              sx={{ color: '#EF4444' }}
-            >
-              <DeleteIcon sx={{ mr: 1, width: 18, height: 18 }} />
-              Delete
+            <Divider sx={{ my: 0.5 }} />
+            <MenuItem sx={{ fontWeight: 500, color: '#dc2626' }} onClick={() => handleMenuItemClick(() => onDelete(campaign))}>
+              <DeleteIcon sx={{ mr: 1.5, fontSize: 18 }} /> Delete
             </MenuItem>
           </Menu>
         </Box>

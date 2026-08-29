@@ -106,49 +106,18 @@ export default function Workflows() {
     }
   };
 
-  // Open Create Dialog
+  // Open Create Studio
   const handleOpenCreate = () => {
-    setEditingId(null);
-    setWorkflowForm({
-      name: '',
-      description: '',
-      category: categories[0]?._id || '',
-      triggerField: 'intent',
-      triggerOperator: 'equals',
-      triggerValue: 'customization',
-      steps: [
-        {
-          id: 'step_1',
-          type: 'SEND_MESSAGE',
-          name: 'Send Automated Reply',
-          config: { value: 'Namaste! We would love to customize this piece for you. Would you like to consult our designer?' }
-        }
-      ]
-    });
-    setOpenDialog(true);
+    navigate('/workflows/create');
   };
 
-  // Open Edit Dialog & populate visual builder steps
+  // Open Edit Studio
   const handleOpenEdit = (workflow) => {
-    setEditingId(workflow._id);
-    const cond = workflow.trigger?.conditions?.[0] || {};
-    setWorkflowForm({
-      name: workflow.name,
-      description: workflow.description || '',
-      category: workflow.category || '',
-      triggerField: cond.field || 'intent',
-      triggerOperator: cond.operator || 'equals',
-      triggerValue: cond.value || '',
-      steps: workflow.steps && workflow.steps.length > 0 ? workflow.steps : [
-        {
-          id: 'step_1',
-          type: 'SEND_MESSAGE',
-          name: 'Send Automated Reply',
-          config: { value: '' }
-        }
-      ]
-    });
-    setOpenDialog(true);
+    if (workflow._id) {
+      navigate(`/workflows/${workflow._id}`);
+    } else {
+      navigate('/workflows/create');
+    }
   };
 
   // Delete Workflow
@@ -325,36 +294,34 @@ export default function Workflows() {
 
   return (
     <Box sx={{ width: '100%', flexGrow: 1 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-        <Box>
-          <Typography variant="h4" sx={{ fontWeight: 700, letterSpacing: '-0.5px' }} gutterBottom>
-            Automation Workflows
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Design triggered marketing, tags, and escalation steps visually
-          </Typography>
-        </Box>
-        <Stack direction="row" spacing={2}>
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', mb: 3 }}>
+        <Stack direction="row" spacing={1.5} alignItems="center">
           <Button
             variant="outlined"
             startIcon={<FolderIcon />}
+            size="small"
             onClick={() => setOpenCategoryDialog(true)}
+            sx={{ textTransform: 'none', fontWeight: 500, fontSize: '0.8125rem', height: '28px', borderRadius: '4px' }}
           >
             New Category
           </Button>
           <Button
             variant="contained"
             startIcon={<AddIcon />}
+            size="small"
             onClick={() => navigate('/workflows/create')}
             disableElevation
+            sx={{ textTransform: 'none', fontWeight: 500, fontSize: '0.8125rem', height: '28px', borderRadius: '4px' }}
           >
             Conditional Workflow
           </Button>
           <Button
             variant="outlined"
             startIcon={<AddIcon />}
+            size="small"
             onClick={handleOpenCreate}
             disableElevation
+            sx={{ textTransform: 'none', fontWeight: 500, fontSize: '0.8125rem', height: '28px', borderRadius: '4px' }}
           >
             Create Workflow
           </Button>

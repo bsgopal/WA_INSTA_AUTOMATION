@@ -925,7 +925,8 @@ class AIChatHandler {
             outboundContent,
             {
               ...(media ? { mediaUrl: media } : {}),
-              ...extraOptions
+              ...extraOptions,
+              userId
             }
           );
         }
@@ -939,6 +940,7 @@ class AIChatHandler {
           language,
           status: result.success ? 'SENT' : 'FAILED',
           externalMessageId: result.externalMessageId,
+          businessPhoneNumber: conversation.businessPhoneNumber || '',
           aiGenerated: true,
           aiModel: process.env.GEMINI_MODEL || 'gemini-flash-latest',
           tags: ['outbound', 'ai_generated'],
@@ -966,6 +968,7 @@ class AIChatHandler {
           },
           status: msg.status === 'SENT' ? 'SENT' : 'FAILED',
           platformMessageId: result.externalMessageId,
+          businessPhoneNumber: conversation.businessPhoneNumber || '',
           isAutoResponse: true,
           widgetData: extraOptions
         });
@@ -1192,6 +1195,97 @@ class AIChatHandler {
     } catch (error) {
       console.error('Hot Leads Error:', error.message);
       return [];
+    }
+  }
+
+  /**
+   * Log an outbound message to a conversation (creates/updates conversation & logs message)
+   */
+  async logOutboundMessage(userId, customerId, content, platform, messageId, mediaUrl = null, options = {}) {
+    try {
+      const Conversation = require('../models/Conversation');
+      const ConversationMessage = require('../models/ConversationMessage');
+      const ShopConfig = require('../models/ShopConfig');
+
+      const shop = await ShopConfig.findOne({ userId });
+      const currentMetaPhoneNumberId = shop?.metaPhoneNumberId || '';
+      const currentBusinessPhoneNumber = shop?.metaDisplayPhoneNumber || shop?.contactPhone || '';
+
+      const metaPhoneNumberId = options.metaPhoneNumberId || currentMetaPhoneNumberId;
+      const businessPhoneNumber = options.businessPhoneNumber || currentBusinessPhoneNumber;
+
+      // Find or create conversation
+      let conversation = await Conversation.findOne({
+        customerId,
+        userId,
+        status: 'ACTIVE',
+        $or: [
+          { metaPhoneNumberId: metaPhoneNumberId },
+          { metaPhoneNumberId: { $exists: false } },
+          { metaPhoneNumberId: null },
+          { metaPhoneNumberId: '' }
+        ]
+      });
+
+      const messageContent = content || (mediaUrl ? 'Sent an image' : '');
+
+      if (!conversation) {
+        conversation = await Conversation.create({
+          userId,
+          customerId,
+          title: `Chat with customer`,
+          primaryPlatform: platform.toUpperCase(),
+          metaPhoneNumberId,
+          businessPhoneNumber,
+          platforms: [{
+            type: platform.toUpperCase(),
+            isLinked: true,
+            linkedAt: new Date()
+          }],
+          status: 'ACTIVE',
+          messageCount: 1,
+          lastMessage: {
+            content: messageContent.substring(0, 100),
+            sender: 'TEAM',
+            timestamp: new Date(),
+            platform: platform.toLowerCase()
+          }
+        });
+      } else {
+        conversation.messageCount += 1;
+        conversation.lastMessage = {
+          content: messageContent.substring(0, 100),
+          sender: 'TEAM',
+          timestamp: new Date(),
+          platform: platform.toLowerCase()
+        };
+        conversation.lastActivityAt = new Date();
+        if (metaPhoneNumberId) conversation.metaPhoneNumberId = metaPhoneNumberId;
+        if (businessPhoneNumber) conversation.businessPhoneNumber = businessPhoneNumber;
+        await conversation.save();
+      }
+
+      // Log conversation message
+      await ConversationMessage.create({
+        conversationId: conversation._id,
+        customerId,
+        content: messageContent,
+        messageType: mediaUrl ? 'IMAGE' : 'TEXT',
+        media: mediaUrl ? { url: mediaUrl, type: 'image' } : undefined,
+        platform: platform.toUpperCase(),
+        sender: {
+          type: 'SYSTEM',
+          name: 'Campaign Broadcast'
+        },
+        status: 'SENT',
+        platformMessageId: messageId,
+        businessPhoneNumber,
+        isAutoResponse: true
+      });
+
+      return conversation;
+    } catch (error) {
+      console.error('Failed to log outbound campaign message to conversation:', error.message);
     }
   }
 }

@@ -51,8 +51,19 @@ const CampaignSchema = new mongoose.Schema({
   // Content
   messageTemplate: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Template',
-    required: true
+    ref: 'Template'
+  },
+  metaTemplateName: {
+    type: String,
+    default: ''
+  },
+  metaTemplateLanguage: {
+    type: String,
+    default: 'en_US'
+  },
+  messageContent: {
+    type: String,
+    default: ''
   },
   messageType: {
     type: String,

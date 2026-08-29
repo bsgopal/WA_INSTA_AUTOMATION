@@ -3,6 +3,7 @@ const Campaign = require('../models/Campaign');
 const Customer = require('../models/Customer');
 const Message = require('../models/Message');
 const WhatsAppService = require('./WhatsAppService');
+const MetaService = require('./MetaService');
 const VariableInterpolationService = require('./VariableInterpolationService');
 
 /**
@@ -15,15 +16,22 @@ async function executeCampaign(campaign, customers) {
       campaign = await Campaign.findById(campaign._id).populate('messageTemplate');
     }
 
+    const content = campaign.messageTemplate?.content || campaign.messageContent || 'Hello!';
+
+    // Make sure the target count is reflected so UI progress is accurate
+    if (!campaign.totalTargets || campaign.totalTargets < customers.length) {
+      campaign.totalTargets = customers.length;
+    }
+
     const batchSize = campaign.batchSize || 100;
     const throttleDelay = campaign.throttleDelay || 1000;
-    const mediaUrl = campaign.mediaUrl || campaign.messageTemplate?.mediaUrl || null;
-    const mediaPreviewData = campaign.mediaPreviewData || null;
-    const mediaType = campaign.mediaType && campaign.mediaType !== 'none'
-      ? campaign.mediaType
-      : (campaign.messageTemplate?.mediaType || null);
-    const mediaMimeType = campaign.mediaMimeType || null;
-    const mediaFileName = campaign.mediaFileName || 'campaign-media';
+    const mediaUrl = campaign.messageTemplate?.mediaUrl || campaign.mediaUrl || null;
+    const mediaPreviewData = campaign.messageTemplate?.mediaPreviewData || campaign.mediaPreviewData || null;
+    const mediaType = (campaign.messageTemplate?.mediaType
+      || (campaign.mediaType && campaign.mediaType !== 'none' ? campaign.mediaType : null))
+      || null;
+    const mediaMimeType = campaign.messageTemplate?.mediaMimeType || campaign.mediaMimeType || null;
+    const mediaFileName = campaign.messageTemplate?.mediaFileName || campaign.mediaFileName || 'campaign-media';
     const buttons = campaign.buttonUrl ? [{
       label: campaign.buttonLabel || 'Open Link',
       value: campaign.buttonUrl,
@@ -32,6 +40,24 @@ async function executeCampaign(campaign, customers) {
     }] : null;
 
     console.log(`[CampaignService] Starting execution of campaign ${campaign.name} (${campaign._id}) for ${customers.length} target customers.`);
+
+    // Resolve the Meta template once for the whole batch and fetch its real
+    // body-parameter count so the send payload always matches the template.
+    const hasMedia = !!(mediaUrl || mediaPreviewData);
+    let resolvedTemplateName = campaign.metaTemplateName || campaign.messageTemplate?.name;
+    if (!resolvedTemplateName || !/^[a-z0-9_-]+$/.test(resolvedTemplateName)) {
+      resolvedTemplateName = hasMedia ? 'sales_promotion' : 'message';
+    }
+    const templateLang = campaign.metaTemplateLanguage || campaign.messageTemplate?.language || campaign.language || 'en_US';
+    let bodyParamCount = await MetaService.getTemplateBodyParamCount(
+      campaign.userId,
+      resolvedTemplateName,
+      templateLang
+    );
+    if (bodyParamCount === null || bodyParamCount === undefined) {
+      bodyParamCount = hasMedia ? 0 : 1;
+    }
+    console.log(`[CampaignService] Template resolution: ${resolvedTemplateName} (${templateLang}) expects ${bodyParamCount} body param(s)`);
 
     for (let i = 0; i < customers.length; i += batchSize) {
       // Check if campaign is still running/active
@@ -47,65 +73,114 @@ async function executeCampaign(campaign, customers) {
         try {
           // Send message based on channel
           if (campaign.channels.includes('whatsapp')) {
+            const destinationNumber = customer.whatsappNumber || customer.phone;
+            if (!destinationNumber) {
+              campaign.totalFailed++;
+              continue;
+            }
             const personalizedContent = await VariableInterpolationService.interpolateVariables(
-              campaign.messageTemplate.content || 'Hello!',
+              content,
               campaign.userId,
               { customer }
             );
             
-            // Prepare media payload - always use base64 when available
+            // Prepare media payload
             const mediaPayload = {};
-            if (mediaPreviewData) {
-              // Use base64 data URL from database - most reliable
-              mediaPayload.mediaData = mediaPreviewData;
+            if (mediaUrl || mediaPreviewData) {
               mediaPayload.mediaType = mediaType;
               mediaPayload.mediaMimeType = mediaMimeType;
               mediaPayload.mediaFileName = mediaFileName;
-              console.log(`[CampaignService] Using base64 media for customer ${customer._id}`);
-            } else if (mediaUrl) {
-              // Fall back to HTTP URL if base64 not available
-              mediaPayload.mediaUrl = mediaUrl;
-              mediaPayload.mediaType = mediaType;
-              mediaPayload.mediaMimeType = mediaMimeType;
-              mediaPayload.mediaFileName = mediaFileName;
-              console.log(`[CampaignService] Using HTTP URL media for customer ${customer._id}`);
+              if (mediaUrl) mediaPayload.mediaUrl = mediaUrl;
+              if (mediaPreviewData) mediaPayload.mediaData = mediaPreviewData;
+              console.log(`[CampaignService] Preparing media for customer ${customer._id}`, {
+                hasMediaUrl: !!mediaUrl,
+                hasMediaData: !!mediaPreviewData
+              });
             }
             
+            const isDirectMediaSend = campaign.messageType === 'MEDIA' && hasMedia && !campaign.metaTemplateName;
+            const sendOptions = {
+              ...mediaPayload,
+              ...(buttons ? { buttons } : {}),
+              userId: campaign.userId,
+              // Bulk campaign sends must always use the Meta Cloud API configuration
+              forceMeta: true
+            };
+
+            if (!isDirectMediaSend) {
+              // Use the resolved template and the real parameter count for every customer
+              sendOptions.templateName = resolvedTemplateName;
+              sendOptions.templateLanguage = templateLang;
+              sendOptions.templateParams = MetaService.buildTemplateParams(bodyParamCount, personalizedContent);
+            }
+
             const result = await WhatsAppService.sendMessage(
-              customer.whatsappNumber,
+              destinationNumber,
               personalizedContent,
-              {
-                ...mediaPayload,
-                ...(buttons ? { buttons } : {})
-              }
+              sendOptions
             );
+
+            // Update campaign stats based on the ACTUAL send result
+            if (result.success) {
+              campaign.totalSent++;
+            } else {
+              campaign.totalFailed++;
+            }
+
+            // Get business phone number from ShopConfig
+            const ShopConfig = require('../models/ShopConfig');
+            const shop = await ShopConfig.findOne({ userId: campaign.userId });
+            const displayNum = shop?.metaDisplayPhoneNumber || shop?.contactPhone || '';
+
+            const placeholderContent = personalizedContent || (hasMedia ? `[${mediaType || 'Media'}]` : '');
+            const placeholderOriginalContent = content || (hasMedia ? `[${mediaType || 'Media'}]` : '');
+
+            if (result.success) {
+              // Log campaign sent message to Unified Inbox Conversation
+              try {
+                const aiChatHandler = require('./aiChatHandler');
+                await aiChatHandler.logOutboundMessage(
+                  campaign.userId,
+                  customer._id,
+                  placeholderContent,
+                  'whatsapp',
+                  result.externalMessageId,
+                  mediaUrl,
+                  {
+                    businessPhoneNumber: displayNum
+                  }
+                );
+              } catch (logErr) {
+                console.error('[Campaign Service Log] Failed to log conversation:', logErr.message);
+              }
+            }
 
             // Create message record
             const message = new Message({
               userId: campaign.userId,
               campaignId: campaign._id,
               customerId: customer._id,
-              content: personalizedContent,
+              templateId: campaign.messageTemplate?._id,
+              content: placeholderContent,
+              originalContent: placeholderOriginalContent,
               channel: 'whatsapp',
-              status: result.success ? 'SENT' : 'FAILED',
-              sentAt: result.success ? new Date() : null,
-              failureReason: result.error,
-              externalMessageId: result.externalMessageId,
-              mediaUrl,
-              mediaType,
-              mediaMimeType,
+              messageType: 'MANUAL',
+              status: result?.status || (result?.success ? 'SENT' : 'FAILED'),
+              sentAt: result?.success ? new Date() : null,
+              failureReason: result?.failureReason || result?.error,
+              externalMessageId: result?.externalMessageId,
+              businessPhoneNumber: displayNum,
               clickUrl: campaign.buttonUrl || null,
               widgetData: buttons ? { buttons } : null
               // NOTE: NOT storing mediaPreviewData to avoid large document sizes
             });
 
-            await message.save();
-
-            // Update campaign stats
-            if (result.success) {
-              campaign.totalSent++;
-            } else {
-              campaign.totalFailed++;
+            try {
+              await message.save();
+            } catch (saveError) {
+              // Message record failure should NOT flip the send counter -
+              // the WhatsApp send itself already succeeded/failed above.
+              console.error(`[CampaignService] Failed to save message record for customer ${customer._id}:`, saveError.message);
             }
           }
 

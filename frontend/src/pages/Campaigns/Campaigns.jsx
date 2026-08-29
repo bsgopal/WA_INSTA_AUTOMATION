@@ -361,39 +361,32 @@ export default function Campaigns() {
   // ============ RENDER ============
 
   return (
-    <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
-      {/* Main Content Area */}
-      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        
-        {/* Header with Stats, Search, Filter, and Create Button */}
-        <Box sx={{ p: { xs: 2, sm: 3 }, overflow: 'auto', flexShrink: 0 }}>
-          <CampaignHeader
-            stats={stats}
-            onSearch={handleSearch}
-            onFilterChange={handleFilterChange}
-            onCreate={() => setCreateWizardOpen(true)}
-            searchValue={searchValue}
-            filterValue={filterValue}
-            loading={loading}
-          />
-        </Box>
+    <Box sx={{ width: '100%', flexGrow: 1, pb: 4 }}>
+      <CampaignHeader
+        stats={stats}
+        onSearch={handleSearch}
+        onFilterChange={handleFilterChange}
+        onCreate={() => setCreateWizardOpen(true)}
+        searchValue={searchValue}
+        filterValue={filterValue}
+        loading={loading}
+      />
 
-        {/* Campaign List with Virtual Scrolling */}
-        <Box sx={{ flex: 1, overflow: 'hidden', px: { xs: 2, sm: 3 }, pb: 3 }}>
-          <CampaignList
-            campaigns={filteredCampaigns}
-            loading={loading}
-            onView={handleViewCampaign}
-            onEdit={handleEditCampaign}
-            onDelete={handleDeleteCampaign}
-            onLaunch={handleLaunchCampaign}
-            onPause={handlePauseCampaign}
-            onResume={handleResumeCampaign}
-            onComplete={handleCompleteCampaign}
-            onSchedule={handleScheduleCampaign}
-            onManualSend={handleManualSendCampaign}
-          />
-        </Box>
+      <Box sx={{ mt: 2 }}>
+<CampaignList
+          campaigns={filteredCampaigns}
+          loading={loading}
+          onCreate={() => setCreateWizardOpen(true)}
+          onView={handleViewCampaign}
+          onEdit={handleEditCampaign}
+          onDelete={handleDeleteCampaign}
+          onLaunch={handleLaunchCampaign}
+          onPause={handlePauseCampaign}
+          onResume={handleResumeCampaign}
+          onComplete={handleCompleteCampaign}
+          onSchedule={handleScheduleCampaign}
+          onManualSend={handleManualSendCampaign}
+        />
       </Box>
 
       {/* Details Panel (Right Side) */}
@@ -407,10 +400,11 @@ export default function Campaigns() {
         onEdit={handleEditCampaign}
         onLaunch={handleLaunchCampaign}
         onPause={handlePauseCampaign}
-        onResume={handleResumeCampaign}
+onResume={handleResumeCampaign}
         onComplete={handleCompleteCampaign}
         onDelete={handleDeleteCampaign}
         onSchedule={handleScheduleCampaign}
+        onManualSend={handleManualSendCampaign}
         loading={loading}
       />
 

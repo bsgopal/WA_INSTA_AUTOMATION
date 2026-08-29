@@ -26,6 +26,7 @@ const ConversationLogSchema = new mongoose.Schema({
   // Interaction Context for workflow routing
   interactionContext: {
     type: {
+      type: String,
       enum: ['LIST_SELECTION', 'BUTTON_PRESS', 'QUICK_REPLY', 'TEXT_INPUT'],
       default: 'TEXT_INPUT'
     },

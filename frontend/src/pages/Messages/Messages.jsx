@@ -72,7 +72,8 @@ export default function Messages() {
       DELIVERED: 'success',
       READ: 'primary',
       FAILED: 'error',
-      PENDING: 'warning'
+      PENDING: 'warning',
+      QUEUED: 'warning'
     };
     return colors[status] || 'default';
   };
@@ -83,18 +84,8 @@ export default function Messages() {
 
   return (
     <Box sx={{ width: '100%', flexGrow: 1 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2, mb: 4, flexWrap: 'wrap' }}>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-          <Box>
-            <Typography variant="h4" gutterBottom>
-              Messages
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              View and manage all message communications
-            </Typography>
-          </Box>
-          <AIProviderStatus compact />
-        </Box>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <AIProviderStatus compact />
         <IconButton onClick={fetchMessages}>
           <RefreshIcon />
         </IconButton>
@@ -127,6 +118,7 @@ export default function Messages() {
               onChange={(e) => setStatusFilter(e.target.value)}
             >
               <MenuItem value="">All</MenuItem>
+              <MenuItem value="QUEUED">Queued</MenuItem>
               <MenuItem value="SENT">Sent</MenuItem>
               <MenuItem value="DELIVERED">Delivered</MenuItem>
               <MenuItem value="READ">Read</MenuItem>

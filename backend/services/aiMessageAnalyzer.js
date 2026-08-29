@@ -144,8 +144,8 @@ const LOCALIZATIONS = {
     comparison_info: "For jewelry, *22K gold* is usually better for daily wear because it is stronger. *24K gold* is purer but softer, so it is not ideal for most jewelry pieces.",
     payment_options_info: "Yes, we accept GPay, PhonePe, BHIM UPI, and major debit/credit cards. Payments on kanalli.in are secure.",
     cod_info: "COD is available for select orders. Please contact us at {phone} so our team can confirm it for your order.",
-    payment_admin_info: "For payment number, bank transfer, NEFT, EMI, or installment details, please contact us directly:\nðŸ“ž {phone}",
-    vague_budget_prompt: "Sure. What is your approximate budget? You can say something like *under â‚¹5,000* or *â‚¹5,000 to â‚¹10,000*.",
+    payment_admin_info: "For payment number, bank transfer, NEFT, EMI, or installment details, please contact us directly:\n📞 {phone}",
+    vague_budget_prompt: "Sure. What is your approximate budget? You can say something like *under ₹5,000* or *₹5,000 to ₹10,000*.",
     gift_help_prompt: "Absolutely. Who is the gift for, and what budget should we keep in mind?",
     gift_service_info: "Gift wrapping and personalised notes may be available for select orders. Please contact us at {phone} to confirm for your item.",
     closing_response: "Thank you for visiting Renic Jewellers! We will be here whenever you need help finding something beautiful.",
@@ -2822,148 +2822,6 @@ ${remainingText}`;
   async checkInterceptions(messageBody, customerProfile, config, analysis = null, mediaUrl = null) {
     if (!customerProfile) return null;
 
-    const Customer = mongoose.model('Customer');
-    const lowerMsg = (messageBody || '').toLowerCase().trim();
-    const languageSelected = customerProfile.customFields?.languageSelected;
-    const awaitingLanguage = customerProfile.customFields?.awaitingLanguageSelection;
-
-    const languageMenu = `Welcome to Renic Jewellers! Please select your preferred language to continue:
-नमस्ते! कृपया आगे बढ़ने के लिए अपनी पसंदीदा भाषा चुनें:
-
-1. English 🇬🇧
-2. Hindi (हिंदी) 🇮🇳
-3. Tamil (தமிழ்) 🇮🇳
-4. Telugu (తెలుగు) 🇮🇳
-5. Marathi (मराठी) 🇮🇳
-6. Kannada (ಕನ್ನಡ) 🇮🇳
-
-Please reply with the number (1-6) of your choice! / कृपया अपनी पसंद की संख्या (1-6) के साथ उत्तर दें!`;
-
-    // Dynamic Language Switching Check
-    const changeLangKeywords = [
-      'change language', 'switch language', 'select language', 'language', 'change lang',
-      'भाषा बदलें', 'भाषा', 'बोली',
-      'மொழி மாற்று', 'மொழி',
-      'భాష మార్చండి', 'భాష',
-      'ಭಾಷೆ ಬದಲಾಯಿಸಿ', 'ಭಾಷೆ'
-    ];
-    const isChangeLangRequest = changeLangKeywords.some(kw => lowerMsg === kw || lowerMsg.includes(kw)) &&
-                                !['1', '2', '3', '4', '5', '6'].includes(lowerMsg);
-
-    if (isChangeLangRequest) {
-      await Customer.findByIdAndUpdate(customerProfile._id, {
-        'customFields.languageSelected': false,
-        'customFields.awaitingLanguageSelection': true
-      });
-      return {
-        success: true,
-        text: languageMenu,
-        generatedAt: new Date()
-      };
-    }
-
-    // Language Onboarding on First Message
-    if (!languageSelected) {
-      const detectedLang = customerProfile.language || this.detectLanguage(messageBody);
-      const isGreeting = this.isSimpleGreeting(messageBody);
-      let priorCustomerMessages = 0;
-
-      try {
-        const Message = mongoose.model('Message');
-        priorCustomerMessages = await Message.countDocuments({
-          customerId: customerProfile._id,
-          aiGenerated: { $ne: true },
-          tags: 'incoming'
-        });
-      } catch (error) {
-        console.warn('Language onboarding history check failed:', error.message);
-      }
-
-      const shouldBypassLanguagePrompt = !awaitingLanguage && (priorCustomerMessages > 1 || mediaUrl);
-
-      if (shouldBypassLanguagePrompt) {
-        await Customer.findByIdAndUpdate(customerProfile._id, {
-          language: detectedLang,
-          'customFields.languageSelected': true,
-          'customFields.awaitingLanguageSelection': false
-        });
-        customerProfile.language = detectedLang;
-        customerProfile.customFields = {
-          ...(customerProfile.customFields || {}),
-          languageSelected: true,
-          awaitingLanguageSelection: false
-        };
-      } else if (isGreeting) {
-        await Customer.findByIdAndUpdate(customerProfile._id, {
-          language: detectedLang,
-          'customFields.languageSelected': true,
-          'customFields.awaitingLanguageSelection': false
-        });
-
-        return {
-          success: true,
-          text: this.localize('general_inquiry', detectedLang),
-          language: detectedLang,
-          generatedAt: new Date()
-        };
-      }
-
-      if (!awaitingLanguage && !shouldBypassLanguagePrompt) {
-        // First message - prompt for language
-        await Customer.findByIdAndUpdate(customerProfile._id, {
-          'customFields.awaitingLanguageSelection': true
-        });
-        return {
-          success: true,
-          text: languageMenu,
-          generatedAt: new Date()
-        };
-      } else if (awaitingLanguage) {
-        // Awaiting language input - match the number
-        let selectedLang = null;
-        let welcomeMsg = '';
-        
-        if (lowerMsg === '1' || lowerMsg.includes('english')) {
-          selectedLang = 'en';
-          welcomeMsg = `Nice to meet you! Welcome to Renic Jewellers. How can we help you today?`;
-        } else if (lowerMsg === '2' || lowerMsg.includes('hindi') || lowerMsg.includes('हिंदी')) {
-          selectedLang = 'hi';
-          welcomeMsg = `नमस्ते! रेनिक ज्वेलर्स में आपका स्वागत है। आज हम आपकी क्या सहायता कर सकते हैं?`;
-        } else if (lowerMsg === '3' || lowerMsg.includes('tamil') || lowerMsg.includes('தமிழ்')) {
-          selectedLang = 'ta';
-          welcomeMsg = `வணக்கம்! ரெனிக் ஜூவல்லரிக்கு உங்களை வரவேற்கிறோம். இன்று உங்களுக்கு எவ்வாறு உதவலாம்?`;
-        } else if (lowerMsg === '4' || lowerMsg.includes('telugu') || lowerMsg.includes('తెలుగు')) {
-          selectedLang = 'te';
-          welcomeMsg = `నమస్కారం! రేనిక్ జ్యువెలర్స్‌కు స్వాగతం. ఈరోజు మేము మీకు ఎలా సహాయపడగలము?`;
-        } else if (lowerMsg === '5' || lowerMsg.includes('marathi') || lowerMsg.includes('मराठी')) {
-          selectedLang = 'mr';
-          welcomeMsg = `नमस्कार! रेनिक ज्वेलर्समध्ये आपले स्वागत आहे. आज आम्ही आपली काय मदत करू शकतो?`;
-        } else if (lowerMsg === '6' || lowerMsg.includes('kannada') || lowerMsg.includes('ಕನ್ನಡ')) {
-          selectedLang = 'kn';
-          welcomeMsg = `ನಮಸ್ಕಾರ! ರೆನಿಕ್ ಜ್ಯುವೆಲ್ಲರ್ಸ್ ಗೆ ಸ್ವಾಗತ. ಇಂದು ನಾವು ನಿಮಗೆ ಹೇಗೆ ಸಹಾಯ ಮಾಡಬಹುದು?`;
-        }
-
-        if (selectedLang) {
-          await Customer.findByIdAndUpdate(customerProfile._id, {
-            language: selectedLang,
-            'customFields.languageSelected': true,
-            'customFields.awaitingLanguageSelection': false
-          });
-
-          return {
-            success: true,
-            text: welcomeMsg,
-            generatedAt: new Date()
-          };
-        } else {
-          return {
-            success: true,
-            text: `Invalid selection. / अमान्य विकल्प।\n\n${languageMenu}`,
-            generatedAt: new Date()
-          };
-        }
-      }
-    }
     // Custom Response Rules Check (Admins define custom layouts, FAQ, or flows)
     const ruleMatch = await this.checkCustomResponseRules(messageBody, customerProfile, analysis);
     if (ruleMatch) {

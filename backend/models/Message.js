@@ -24,7 +24,8 @@ const MessageSchema = new mongoose.Schema({
   // Message Content
   content: {
     type: String,
-    required: true
+    required: false,
+    default: ''
   },
   originalContent: String, // Before variables replacement
   messageType: {
@@ -60,7 +61,7 @@ const MessageSchema = new mongoose.Schema({
   // Status & Delivery
   status: {
     type: String,
-    enum: ['PENDING', 'SENT', 'DELIVERED', 'READ', 'FAILED', 'SKIPPED'],
+    enum: ['PENDING', 'QUEUED', 'SENT', 'DELIVERED', 'READ', 'FAILED', 'SKIPPED'],
     default: 'PENDING'
   },
   sentAt: Date,
@@ -78,6 +79,10 @@ const MessageSchema = new mongoose.Schema({
   
   // External IDs
   externalMessageId: String, // Twilio/Meta ID
+  businessPhoneNumber: {
+    type: String,
+    default: ''
+  },
   externalStatusCode: String,
   
   // Media

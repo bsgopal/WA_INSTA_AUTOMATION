@@ -46,6 +46,14 @@ const ConversationSchema = new mongoose.Schema({
     enum: ['WHATSAPP', 'INSTAGRAM', 'FACEBOOK'],
     required: true
   },
+  metaPhoneNumberId: {
+    type: String,
+    default: ''
+  },
+  businessPhoneNumber: {
+    type: String,
+    default: ''
+  },
   
   // Team Assignment
   assignedTo: {
@@ -103,6 +111,10 @@ const ConversationSchema = new mongoose.Schema({
   autoResponseTemplate: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Template'
+  },
+  metaHandoffSent: {
+    type: Boolean,
+    default: false
   },
   
   // Timestamps

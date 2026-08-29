@@ -237,10 +237,12 @@ const ReviewStep = React.memo(({
       {/* Final Confirmation */}
       <Alert severity="success" sx={{ mt: 1 }}>
         <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
-          ✓ Campaign is ready to launch!
+          ✓ Campaign is ready!
         </Typography>
         <Typography variant="caption" sx={{ color: 'inherit', display: 'block' }}>
-          Click "Launch Campaign" to send to {estimatedReach.toLocaleString()} customers.
+          {data.scheduledAt 
+            ? `Click "Schedule Campaign" to queue sending to ${estimatedReach.toLocaleString()} customers.`
+            : `Click "Save as Draft" to save. You can manually launch it from your campaigns list whenever you want.`}
         </Typography>
       </Alert>
     </Stack>

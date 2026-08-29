@@ -1,32 +1,18 @@
-import React, { useCallback } from 'react';
-import { Box, CircularProgress, Typography, Stack, Grid } from '@mui/material';
+import React from 'react';
+import { Box, CircularProgress, Typography, Stack, Grid, Button } from '@mui/material';
+import CampaignIcon from '@mui/icons-material/Campaign';
+import AddIcon from '@mui/icons-material/Add';
 import CampaignCard from './CampaignCard';
 import SkeletonCard from './SkeletonCard';
 
 /**
  * CampaignList Component
- * Renders campaigns in a responsive grid with smooth animations
- * 
- * Features:
- * - Responsive grid layout (1 column mobile, 2 tablet, 3+ desktop)
- * - Smooth animations on cards
- * - Optimized for performance
- * - Memoized for preventing unnecessary re-renders
- * 
- * Props:
- * - campaigns: array - List of campaigns to display
- * - loading: boolean - Whether campaigns are loading
- * - onView: function - Callback for view action
- * - onEdit: function - Callback for edit action
- * - onDelete: function - Callback for delete action
- * - onLaunch: function - Callback for launch action
- * - onPause: function - Callback for pause action
- * - onComplete: function - Callback for complete action
- * - onManualSend: function - Callback for manual send action
+ * Responsive grid of campaign cards with loading skeletons and an engaging empty state.
  */
 const CampaignList = React.memo(({
   campaigns = [],
   loading = false,
+  onCreate = () => {},
   onView = () => {},
   onEdit = () => {},
   onDelete = () => {},
@@ -37,15 +23,20 @@ const CampaignList = React.memo(({
   onSchedule = () => {},
   onManualSend = () => {}
 }) => {
-  // Show loading skeletons
   const skeletonCount = 6;
 
   if (loading && campaigns.length === 0) {
     return (
       <Box sx={{ width: '100%' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2, justifyContent: 'center', color: '#94a3b8' }}>
+          <CircularProgress size={18} />
+          <Typography variant="caption" sx={{ fontWeight: 500 }}>
+            Loading campaigns...
+          </Typography>
+        </Box>
         <Grid container spacing={2}>
           {Array.from({ length: skeletonCount }).map((_, index) => (
-            <Grid item xs={12} sm={6} md={4} lg={3} key={`skeleton-${index}`}>
+            <Grid item xs={12} sm={6} md={4} lg={4} xl={3} key={`skeleton-${index}`}>
               <SkeletonCard />
             </Grid>
           ))}
@@ -61,61 +52,74 @@ const CampaignList = React.memo(({
           display: 'flex',
           justifyContent: 'center',
           alignItems: 'center',
-          minHeight: '400px',
-          p: 3
+          minHeight: 360,
+          borderRadius: '16px',
+          border: '1px dashed #cbd5e1',
+          bgcolor: '#fbfcfe'
         }}
       >
-        <Stack alignItems="center" spacing={1}>
-          <Typography variant="body1" fontWeight={600} color="text.primary">
-            No campaigns yet
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Create your first campaign to get started
-          </Typography>
+        <Stack alignItems="center" spacing={2} sx={{ p: 4, textAlign: 'center' }}>
+          <Box
+            sx={{
+              width: 72,
+              height: 72,
+              borderRadius: '18px',
+              background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 12px 24px -8px rgba(99,102,241,0.5)'
+            }}
+          >
+            <CampaignIcon sx={{ fontSize: 36, color: '#ffffff' }} />
+          </Box>
+          <Box>
+            <Typography variant="h6" sx={{ fontWeight: 700, color: '#0f172a', mb: 0.5 }}>
+              No campaigns yet
+            </Typography>
+            <Typography variant="body2" sx={{ color: '#64748b' }}>
+              Create your first campaign and start reaching your customers on WhatsApp.
+            </Typography>
+          </Box>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={onCreate}
+            sx={{
+              mt: 1,
+              px: 3,
+              height: '40px',
+              borderRadius: '10px',
+              fontWeight: 700,
+              textTransform: 'none'
+            }}
+          >
+            New Campaign
+          </Button>
         </Stack>
       </Box>
     );
   }
 
   return (
-    <Box
-      sx={{
-        width: '100%',
-        scrollBehavior: 'smooth',
-        '&::-webkit-scrollbar': {
-          width: '8px'
-        },
-        '&::-webkit-scrollbar-track': {
-          background: 'transparent'
-        },
-        '&::-webkit-scrollbar-thumb': {
-          background: '#D1D5DB',
-          borderRadius: '4px',
-          '&:hover': {
-            background: '#9CA3AF'
-          }
-        }
-      }}
-    >
-      <Grid container spacing={2}>
-        {campaigns.map((campaign) => (
-          <Grid item xs={12} sm={6} md={4} lg={3} key={campaign._id}>
-            <CampaignCard
-              campaign={campaign}
-              onView={onView}
-              onEdit={onEdit}
-              onDelete={onDelete}
-              onLaunch={onLaunch}
-              onPause={onPause}
-              onResume={onResume}
-              onComplete={onComplete}
-              onSchedule={onSchedule}
-              onManualSend={onManualSend}
-            />
-          </Grid>
-        ))}
-      </Grid>
-    </Box>
+    <Grid container spacing={2}>
+      {campaigns.map((campaign) => (
+        <Grid item xs={12} sm={6} lg={4} xl={3} key={campaign._id}>
+          <CampaignCard
+            campaign={campaign}
+            onView={onView}
+            onEdit={onEdit}
+            onDelete={onDelete}
+            onLaunch={onLaunch}
+            onPause={onPause}
+            onResume={onResume}
+            onComplete={onComplete}
+            onSchedule={onSchedule}
+            onManualSend={onManualSend}
+          />
+        </Grid>
+      ))}
+    </Grid>
   );
 });
 

@@ -405,6 +405,18 @@ router.post('/', [
     if (bodyData.templateId === '' || bodyData.templateId === null) delete bodyData.templateId;
     if (bodyData.workflowId === '' || bodyData.workflowId === null) delete bodyData.workflowId;
 
+    // Additional runtime validation for messageBlocks
+    if (!Array.isArray(bodyData.messageBlocks) || bodyData.messageBlocks.length === 0) {
+      return res.status(400).json({ error: 'messageBlocks must be a non-empty array' });
+    }
+
+    for (let i = 0; i < bodyData.messageBlocks.length; i++) {
+      const mb = bodyData.messageBlocks[i];
+      if (!mb || !mb.type || !mb.config) {
+        return res.status(400).json({ error: `messageBlocks[${i}] must have 'type' and 'config'` });
+      }
+    }
+
     const rule = new ResponseRule({
       ...bodyData,
       userId: req.user.id

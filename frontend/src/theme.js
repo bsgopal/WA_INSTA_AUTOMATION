@@ -1,119 +1,135 @@
+import React from 'react';
 import { createTheme } from '@mui/material/styles';
+import Zoom from '@mui/material/Zoom';
+
+const ZoomTransition = React.forwardRef(function Transition(props, ref) {
+  return <Zoom ref={ref} {...props} />;
+});
 
 const theme = createTheme({
   palette: {
     primary: {
-      main: '#1976d2',
-      light: '#42a5f5',
-      dark: '#1565c0',
-      50: '#e3f2fd',
-      100: '#bbdefb',
-      200: '#90caf9',
-      300: '#64b5f6',
-      400: '#42a5f5',
-      500: '#2196f3',
-      600: '#1e88e5',
-      700: '#1976d2',
-      800: '#1565c0',
-      900: '#0d47a1',
+      main: '#6366f1', // Indigo 500
+      light: '#818cf8', // Indigo 400
+      dark: '#4f46e5', // Indigo 600
+      50: '#e0e7ff',
+      100: '#c7d2fe',
+      200: '#a5b4fc',
+      300: '#818cf8',
+      400: '#6366f1',
+      500: '#4f46e5',
+      600: '#4338ca',
+      700: '#3730a3',
+      800: '#1e1b4b',
     },
     secondary: {
-      main: '#f50057',
-      light: '#ff4081',
-      dark: '#c51162',
+      main: '#06b6d4', // Teal 500
+      light: '#22d3ee',
+      dark: '#0891b2',
     },
     success: {
-      main: '#4caf50',
-      light: '#81c784',
-      dark: '#388e3c',
+      main: '#10b981', // Emerald 500
+      light: '#34d399',
+      dark: '#059669',
     },
     warning: {
-      main: '#ff9800',
-      light: '#ffb74d',
-      dark: '#f57c00',
+      main: '#f59e0b', // Amber 500
+      light: '#fbbf24',
+      dark: '#d97706',
     },
     error: {
-      main: '#f44336',
-      light: '#ef5350',
-      dark: '#d32f2f',
+      main: '#ef4444', // Red 500
+      light: '#f87171',
+      dark: '#dc2626',
     },
     info: {
-      main: '#2196f3',
-      light: '#64b5f6',
-      dark: '#1976d2',
+      main: '#3b82f6', // Blue 500
+      light: '#60a5fa',
+      dark: '#2563eb',
     },
     background: {
-      default: '#f8f9fb',
+      default: '#f8fafc', // Slate 50
       paper: '#ffffff',
     },
     text: {
-      primary: '#1a1a1a',
-      secondary: '#666666',
-      disabled: '#999999',
+      primary: '#0f172a', // Slate 900
+      secondary: '#475569', // Slate 600
+      disabled: '#94a3b8', // Slate 400
     },
-    divider: '#e8eef7',
+    divider: '#f1f5f9', // Slate 100
   },
   typography: {
-    fontFamily: '"Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif',
+    fontFamily: '"Plus Jakarta Sans", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
     h1: {
       fontSize: '2.5rem',
       fontWeight: 700,
       lineHeight: 1.2,
+      color: '#0f172a',
     },
     h2: {
       fontSize: '2rem',
       fontWeight: 700,
       lineHeight: 1.3,
+      color: '#0f172a',
     },
     h3: {
       fontSize: '1.75rem',
       fontWeight: 700,
       lineHeight: 1.4,
+      color: '#0f172a',
     },
     h4: {
       fontSize: '1.5rem',
       fontWeight: 700,
       lineHeight: 1.4,
+      color: '#0f172a',
     },
     h5: {
       fontSize: '1.25rem',
       fontWeight: 600,
       lineHeight: 1.5,
+      color: '#0f172a',
     },
     h6: {
       fontSize: '1rem',
       fontWeight: 600,
       lineHeight: 1.6,
+      color: '#0f172a',
     },
     body1: {
       fontSize: '1rem',
       fontWeight: 400,
       lineHeight: 1.5,
+      color: '#475569',
     },
     body2: {
       fontSize: '0.875rem',
       fontWeight: 400,
       lineHeight: 1.57,
+      color: '#475569',
     },
     subtitle1: {
       fontSize: '1rem',
       fontWeight: 500,
       lineHeight: 1.75,
+      color: '#0f172a',
     },
     subtitle2: {
       fontSize: '0.875rem',
       fontWeight: 500,
       lineHeight: 1.57,
+      color: '#475569',
     },
     button: {
       textTransform: 'none',
       fontWeight: 600,
-      fontSize: '0.9375rem',
+      fontSize: '0.875rem',
     },
     caption: {
       fontSize: '0.75rem',
       fontWeight: 400,
       lineHeight: 1.66,
+      color: '#94a3b8',
     },
   },
   shape: {
@@ -125,23 +141,37 @@ const theme = createTheme({
         root: {
           textTransform: 'none',
           fontWeight: 600,
-          borderRadius: 8,
-          padding: '10px 24px',
-          transition: 'all 0.3s ease',
-          '&:hover': {
-            transform: 'translateY(-2px)',
-          },
+          borderRadius: 6,
+          transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+        },
+        sizeSmall: {
+          padding: '4px 10px',
+          fontSize: '0.8125rem',
+          height: '28px',
+        },
+        sizeMedium: {
+          padding: '6px 16px',
+          fontSize: '0.875rem',
+          height: '36px',
+        },
+        sizeLarge: {
+          padding: '8px 22px',
+          fontSize: '0.9375rem',
+          height: '42px',
         },
         contained: {
-          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+          boxShadow: 'none',
           '&:hover': {
-            boxShadow: '0 6px 16px rgba(0, 0, 0, 0.2)',
+            boxShadow: '0 4px 12px rgba(99, 102, 241, 0.16)',
           },
         },
         outlined: {
-          borderWidth: 2,
+          borderWidth: 1,
+          borderColor: '#cbd5e1',
           '&:hover': {
-            borderWidth: 2,
+            borderWidth: 1,
+            borderColor: '#6366f1',
+            backgroundColor: 'rgba(99, 102, 241, 0.04)',
           },
         },
       },
@@ -150,13 +180,8 @@ const theme = createTheme({
       styleOverrides: {
         root: {
           borderRadius: 12,
-          border: '1px solid #e8eef7',
-          background: 'linear-gradient(135deg, #ffffff 0%, #f5f7fa 100%)',
-          transition: 'all 0.3s ease',
-          '&:hover': {
-            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.08)',
-            transform: 'translateY(-2px)',
-          },
+          border: '1px solid #e2e8f0', // Slate 200
+          background: '#ffffff',
         },
       },
     },
@@ -165,10 +190,10 @@ const theme = createTheme({
         root: {
           backgroundImage: 'none',
           borderRadius: 12,
-          border: '1px solid #e8eef7',
+          border: '1px solid #e2e8f0',
         },
         elevation0: {
-          background: 'linear-gradient(135deg, #ffffff 0%, #f5f7fa 100%)',
+          background: '#ffffff',
         },
       },
     },
@@ -178,13 +203,13 @@ const theme = createTheme({
           '& .MuiOutlinedInput-root': {
             borderRadius: 8,
             '& fieldset': {
-              borderColor: '#e8eef7',
+              borderColor: '#e2e8f0',
             },
             '&:hover fieldset': {
-              borderColor: '#1976d2',
+              borderColor: '#6366f1',
             },
             '&.Mui-focused fieldset': {
-              borderColor: '#1976d2',
+              borderColor: '#6366f1',
               borderWidth: 2,
             },
           },
@@ -195,28 +220,32 @@ const theme = createTheme({
       styleOverrides: {
         root: {
           borderRadius: 6,
-          fontWeight: 500,
+          fontWeight: 600,
         },
       },
     },
     MuiTableCell: {
       styleOverrides: {
         root: {
-          borderColor: '#e8eef7',
-          padding: '16px',
+          borderColor: '#f1f5f9',
+          padding: '10px 16px',
         },
         head: {
-          backgroundColor: '#f5f7fa',
+          backgroundColor: '#f8fafc',
           fontWeight: 600,
-          color: '#1a1a1a',
+          color: '#0f172a',
         },
       },
     },
     MuiDialog: {
+      defaultProps: {
+        TransitionComponent: ZoomTransition,
+      },
       styleOverrides: {
         paper: {
-          borderRadius: 12,
-          border: '1px solid #e8eef7',
+          borderRadius: 16,
+          border: '1px solid #e2e8f0',
+          boxShadow: '0 24px 48px -12px rgba(0,0,0,0.08)',
         },
       },
     },

@@ -31,6 +31,18 @@ const ProtectedRoute = ({ children }) => {
 
 function App() {
   const user = useAuthStore((state) => state.user);
+
+  const hasAccess = (path) => {
+    const role = user?.role;
+    if (role === 'PLATFORM_OWNER' || role === 'ADMIN') return true;
+    
+    // Restrict manager/user
+    if (path.startsWith('/workflows') || path === '/response-rules' || path === '/ai-features' || path === '/settings') {
+      return false;
+    }
+    return true;
+  };
+
   return (
     <Suspense
       fallback={
@@ -47,7 +59,7 @@ function App() {
           path="/workflows/create"
           element={
             <ProtectedRoute>
-              <ConditionalWorkflowBuilder />
+              {hasAccess('/workflows/create') ? <ConditionalWorkflowBuilder /> : <Navigate to="/" replace />}
             </ProtectedRoute>
           }
         />
@@ -55,7 +67,7 @@ function App() {
           path="/workflows/:id"
           element={
             <ProtectedRoute>
-              <ConditionalWorkflowBuilder />
+              {hasAccess('/workflows/:id') ? <ConditionalWorkflowBuilder /> : <Navigate to="/" replace />}
             </ProtectedRoute>
           }
         />
@@ -77,10 +89,10 @@ function App() {
           <Route path="catalog" element={<Catalog />} />
           <Route path="messages" element={<Messages />} />
           <Route path="analytics" element={<Analytics />} />
-          <Route path="workflows" element={<Workflows />} />
-          <Route path="response-rules" element={<ResponseRules />} />
-          <Route path="ai-features" element={user?.role === 'ADMIN' ? <AIFeatures /> : <Navigate to="/" replace />} />
-          <Route path="settings" element={<Settings />} />
+          <Route path="workflows" element={hasAccess('/workflows') ? <Workflows /> : <Navigate to="/" replace />} />
+          <Route path="response-rules" element={hasAccess('/response-rules') ? <ResponseRules /> : <Navigate to="/" replace />} />
+          <Route path="ai-features" element={hasAccess('/ai-features') ? <AIFeatures /> : <Navigate to="/" replace />} />
+          <Route path="settings" element={hasAccess('/settings') ? <Settings /> : <Navigate to="/" replace />} />
         </Route>
       </Routes>
     </Suspense>

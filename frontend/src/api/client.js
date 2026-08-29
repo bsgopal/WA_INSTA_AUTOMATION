@@ -1,7 +1,8 @@
 import axios from 'axios';
+import { API_BASE } from './base';
 
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
+  baseURL: API_BASE,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -27,7 +28,9 @@ apiClient.interceptors.response.use(
     if (error.response && error.response.status === 401) {
       // Handle unauthorized access (e.g., clear token and redirect to login)
       localStorage.removeItem('token');
-      window.location.href = '/login';
+      localStorage.removeItem('user');
+      // HashRouter-compatible navigation (works in packaged Electron file:// mode too)
+      window.location.hash = '#/login';
     }
     return Promise.reject(error);
   }

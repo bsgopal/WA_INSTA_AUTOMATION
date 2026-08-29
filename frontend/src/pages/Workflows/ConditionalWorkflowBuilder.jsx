@@ -26,6 +26,7 @@ import ConditionBuilder from '../../components/Workflows/ConditionBuilder';
 import WorkflowCanvas from '../../components/Workflows/WorkflowCanvas';
 import QuickMessageConfig from '../../components/Workflows/QuickMessageConfig';
 import WorkflowTestModal from '../../components/Workflows/WorkflowTestModal';
+import SapDmProcessDesigner from '../../components/SAPDM/SapDmProcessDesigner';
 import {
   createConditionalWorkflow,
   updateWorkflow,
@@ -306,126 +307,41 @@ const ConditionalWorkflowBuilder = () => {
   }
 
   return (
-    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      {/* Header Toolbar */}
-      <Box
-        sx={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          p: 2,
-          borderBottom: '1px solid #e0e0e0',
-          backgroundColor: '#fafafa',
+    <Box sx={{ height: '100vh', width: '100%', display: 'flex', flexDirection: 'column', p: 1, bgcolor: '#0F172A' }}>
+      <SapDmProcessDesigner
+        isWorkflow={true}
+        initialData={{
+          name: workflow.name || 'Conditional Workflow',
+          status: workflow.status || 'ACTIVE',
+          nodes: workflow.conditions && workflow.conditions.length > 0 ? [
+            {
+              id: 'node_trigger',
+              type: 'LIST_SELECT',
+              category: 'triggers',
+              label: workflow.trigger?.responseRuleName || 'List Selection Trigger',
+              config: { ruleId: workflow.trigger?.responseRuleId },
+              position: { x: 80, y: 120 }
+            },
+            ...workflow.conditions.map((cond, i) => ({
+              id: cond.id || `cond_${i}`,
+              type: 'MATCH_CONDITION',
+              category: 'logic',
+              label: `Condition: ${cond.label || cond.value || 'Match'}`,
+              config: { ...cond },
+              position: { x: 400 + i * 320, y: 120 }
+            }))
+          ] : undefined
         }}
-      >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Button
-            startIcon={<ArrowBackIcon />}
-            onClick={() => navigate('/workflows')}
-            variant="outlined"
-          >
-            Back
-          </Button>
-          <Box>
-            <Typography variant="h5" sx={{ fontWeight: 700 }}>
-              {id ? 'Edit Workflow' : 'Create Conditional Workflow'}
-            </Typography>
-            <TextField
-              size="small"
-              placeholder="Workflow name..."
-              value={workflow.name}
-              onChange={(e) => setWorkflow({ ...workflow, name: e.target.value })}
-              variant="standard"
-              sx={{ width: 300, mt: 0.5 }}
-            />
-          </Box>
-        </Box>
-
-        <Stack direction="row" spacing={1}>
-          <Tooltip title={!id ? "Save your workflow first to enable testing" : ""}>
-            <span>
-              <Button
-                startIcon={<PlayArrowIcon />}
-                onClick={() => setTestModalOpen(true)}
-                variant="outlined"
-                disabled={!id || !workflow.trigger?.responseRuleId}
-              >
-                Test
-              </Button>
-            </span>
-          </Tooltip>
-          <Button
-            startIcon={<SaveIcon />}
-            onClick={handleSave}
-            variant="contained"
-            disabled={saving}
-            disableElevation
-          >
-            {saving ? <CircularProgress size={20} /> : 'Save'}
-          </Button>
-          {id && (
-            <Button
-              startIcon={<PublishIcon />}
-              onClick={handleActivate}
-              variant="contained"
-              color={workflow.status === 'ACTIVE' ? 'warning' : 'success'}
-              disabled={saving}
-              disableElevation
-            >
-              {workflow.status === 'ACTIVE' ? 'Pause' : 'Activate'}
-            </Button>
-          )}
-        </Stack>
-      </Box>
-
-      {/* Main Content: 3-Panel Layout */}
-      <Box sx={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-        {/* Left Panel: Conditions (320px) */}
-        <Box sx={{ width: 320, overflow: 'auto', borderRight: '1px solid #e0e0e0', p: 2, backgroundColor: '#fff' }}>
-          <ConditionBuilder
-            workflow={workflow}
-            onConditionsChange={setWorkflow}
-            selectedConditionId={selectedConditionId}
-            onSelectCondition={setSelectedConditionId}
-            onSelectResponse={setSelectedResponseId}
-            initialRuleId={ruleIdParam}
-          />
-        </Box>
-
-        {/* Center Panel: Canvas (flex) */}
-        <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
-          <WorkflowCanvas
-            workflow={workflow}
-            selectedConditionId={selectedConditionId}
-            selectedResponseId={selectedResponseId}
-            onSelectCondition={setSelectedConditionId}
-            onSelectResponse={setSelectedResponseId}
-            onDeleteCondition={handleDeleteCondition}
-            onDeleteResponse={handleDeleteResponse}
-          />
-
-          {/* Add Response Card Button */}
-          {selectedConditionId && (
-            <Box sx={{ mt: 2, textAlign: 'center' }}>
-              <Button
-                variant="contained"
-                onClick={handleAddResponseCard}
-              >
-                Add Response for Selected Condition
-              </Button>
-            </Box>
-          )}
-        </Box>
-
-        {/* Right Panel: Message Config (380px) */}
-        <Box sx={{ width: 380, overflow: 'auto', borderLeft: '1px solid #e0e0e0', p: 2, backgroundColor: '#fff' }}>
-          <QuickMessageConfig
-            workflow={workflow}
-            selectedId={selectedResponseId}
-            onSave={handleSaveResponseCard}
-          />
-        </Box>
-      </Box>
+        onSave={async (dmData) => {
+          setWorkflow(prev => ({
+            ...prev,
+            name: dmData.name,
+            status: dmData.status
+          }));
+          await handleSave();
+        }}
+        onClose={() => navigate('/workflows')}
+      />
 
       {/* Test Modal */}
       <WorkflowTestModal
@@ -435,34 +351,11 @@ const ConditionalWorkflowBuilder = () => {
         workflow={workflow}
       />
 
-      {/* JSON Editor Dialog */}
-      <Dialog open={showJsonDialog} onClose={() => setShowJsonDialog(false)} maxWidth="md" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700 }}>Edit Workflow JSON</DialogTitle>
-        <DialogContent sx={{ pt: 2 }}>
-          <TextField
-            fullWidth
-            multiline
-            rows={15}
-            value={jsonValue}
-            onChange={(e) => setJsonValue(e.target.value)}
-            placeholder="Paste or edit JSON here..."
-            sx={{ fontFamily: 'monospace' }}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setShowJsonDialog(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleSaveJson} disableElevation>
-            Import JSON
-          </Button>
-        </DialogActions>
-      </Dialog>
-
       {/* Snackbar */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={6000}
         onClose={() => setSnackbar({ ...snackbar, open: false })}
-        message={snackbar.message}
       >
         <Alert severity={snackbar.severity} onClose={() => setSnackbar({ ...snackbar, open: false })}>
           {snackbar.message}

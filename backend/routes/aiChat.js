@@ -135,7 +135,19 @@ router.post('/send-message', async (req, res) => {
       result = await InstagramService.sendDirectMessage(customer.instagramHandle, message);
     } else {
       const WhatsAppService = require('../services/WhatsAppService');
-      result = await WhatsAppService.sendMessage(customer.whatsappNumber, message);
+      const ShopConfig = require('../models/ShopConfig');
+      const shop = await ShopConfig.findOne({ userId });
+      const sendOptions = { userId };
+
+      if (shop?.metaApiEnabled) {
+        const templateLang = customer.language || 'en';
+        sendOptions.forceMeta = true;
+        sendOptions.templateName = 'message';
+        sendOptions.templateLanguage = templateLang;
+        sendOptions.templateParams = [{ type: 'text', text: message }];
+      }
+
+      result = await WhatsAppService.sendMessage(customer.whatsappNumber, message, sendOptions);
     }
 
     if (!result.success) {
@@ -646,10 +658,25 @@ const WhatsAppService = require('../services/WhatsAppService');
  */
 router.get('/whatsapp/status', async (req, res) => {
   try {
-    const status = await WhatsAppService.getSessionStatus();
+    const userId = req.userId || req.user?._id || req.user?.id;
+    const status = await WhatsAppService.getSessionStatus(userId);
     res.json(status);
   } catch (error) {
     console.error('Fetch WhatsApp Status Error:', error.message);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/ai-chat/whatsapp/waha-status
+ * Get the raw WAHA (QR-scanned) session status - used by the WhatsApp Login tab
+ */
+router.get('/whatsapp/waha-status', async (req, res) => {
+  try {
+    const status = await WhatsAppService.getWAHAStatus();
+    res.json(status);
+  } catch (error) {
+    console.error('Fetch WAHA Status Error:', error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -678,6 +705,20 @@ router.post('/whatsapp/logout', async (req, res) => {
     res.json(result);
   } catch (error) {
     console.error('WhatsApp Logout Error:', error.message);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/ai-chat/whatsapp/session/restart
+ * Restart the WAHA session (breaks stuck STARTING/registering loops)
+ */
+router.post('/whatsapp/session/restart', async (req, res) => {
+  try {
+    const result = await WhatsAppService.restartSession();
+    res.json(result);
+  } catch (error) {
+    console.error('WhatsApp Session Restart Error:', error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 });

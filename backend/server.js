@@ -4,7 +4,29 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+const fs = require('fs');
+const path = require('path');
 require('dotenv').config();
+
+// ============ CRASH-PROOFING ============
+// Never let the packaged server die from an unexpected exception.
+// Log everything and keep serving.
+process.on('uncaughtException', (err) => {
+  console.error('[uncaughtException]', err && err.stack ? err.stack : err);
+});
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[unhandledRejection]', reason && reason.stack ? reason.stack : reason);
+});
+
+// Make sure the uploads directory tree exists (multer writes here)
+const uploadsRoot = path.join(__dirname, 'uploads');
+try {
+  fs.mkdirSync(path.join(uploadsRoot, 'templates'), { recursive: true });
+  fs.mkdirSync(path.join(uploadsRoot, 'campaigns'), { recursive: true });
+  fs.mkdirSync(path.join(uploadsRoot, 'catalog'), { recursive: true });
+} catch (e) {
+  console.warn('⚠️ Could not pre-create uploads directories:', e.message);
+}
 
 const app = express();
 
@@ -22,7 +44,6 @@ app.use(express.urlencoded({ limit: '10mb', extended: true }));
 app.use(morgan('combined'));
 
 // Serve static uploads
-const path = require('path');
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // ============ ROUTES ============
@@ -66,6 +87,19 @@ app.use((err, _, res) => {
 });
 
 // ============ DATABASE & SERVER START ============
+const connectWithRetry = async (mongoUri, attempts = 0) => {
+  try {
+    return await mongoose.connect(mongoUri, { serverSelectionTimeoutMS: 15000 });
+  } catch (err) {
+    if (attempts < 10) {
+      console.warn(`⏳ MongoDB not ready yet (attempt ${attempts + 1}/10). Retrying in 5s...`);
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      return connectWithRetry(mongoUri, attempts + 1);
+    }
+    throw err;
+  }
+};
+
 const startServer = async () => {
   try {
     // Connect to MongoDB
@@ -73,7 +107,7 @@ const startServer = async () => {
       ? process.env.MONGODB_LOCAL_URI || 'mongodb://localhost:27017/renic-automation'
       : process.env.MONGODB_ATLAS_URI;
 
-    await mongoose.connect(mongoUri);
+    await connectWithRetry(mongoUri);
 
     console.log('✅ MongoDB connected successfully');
     console.log(`📍 Connected to: ${process.env.NODE_ENV === 'development' ? 'Local MongoDB' : 'MongoDB Atlas'}`);
@@ -123,7 +157,7 @@ const startServer = async () => {
 
     // Start server
     const PORT = process.env.PORT || 5000;
-    app.listen(PORT, () => {
+    const server = app.listen(PORT, () => {
       console.log(`🚀 RENIC TECHNOLOGY API running on port ${PORT}`);
       console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(`📊 API Base: http://localhost:${PORT}/api`);
@@ -135,13 +169,102 @@ const startServer = async () => {
       } catch (err) {
         console.warn('⚠️ Scheduler initialization skipped:', err.message);
       }
+
+      // Auto-start Docker WAHA
+      try {
+        const { exec } = require('child_process');
+        console.log(`🐳 [Auto-Docker] Attempting to start WAHA container...`);
+        exec('docker start waha', (error) => {
+          if (error) {
+            console.warn(`⚠️ [Auto-Docker] Could not start WAHA container (it might already be running or docker is not installed): ${error.message}`);
+          } else {
+            console.log(`✅ [Auto-Docker] WAHA container started successfully!`);
+          }
+        });
+      } catch (err) {
+        console.warn(`⚠️ [Auto-Docker] Failed to execute docker command.`);
+      }
+
+      // Auto-start ngrok tunnel if packaged as an EXE or explicitly enabled
+      const isExe = typeof process.pkg !== 'undefined';
+      const shouldStartNgrok = isExe || process.env.START_NGROK === 'true';
+      
+      if (shouldStartNgrok) {
+        const webhookUrl = process.env.WAHA_WEBHOOK_URL || '';
+        let ngrokDomain = null;
+        if (webhookUrl.includes('.ngrok-free.dev')) {
+          const match = webhookUrl.match(/https?:\/\/([a-zA-Z0-9.-]+\.ngrok-free\.dev)/);
+          if (match) {
+            ngrokDomain = match[1];
+          }
+        }
+        
+        if (ngrokDomain) {
+          console.log(`⚡ [Auto-Ngrok] Programmatic tunnel request detected (EXE / Prod mode)`);
+          const token = process.env.NGROK_AUTHTOKEN;
+          
+          if (!token) {
+             console.warn('⚠️ [Auto-Ngrok] NGROK_AUTHTOKEN is missing in .env! Custom domains require an authtoken.');
+             console.warn('⚠️ [Auto-Ngrok] Please add NGROK_AUTHTOKEN=your_token to your .env file.');
+          }
+
+          try {
+            const ngrok = require('@ngrok/ngrok');
+            ngrok.connect({
+              addr: PORT,
+              domain: ngrokDomain,
+              authtoken: token || undefined
+            }).then(url => {
+              const tunnelUrl = typeof url === 'string' ? url : (url.url ? url.url() : String(url));
+              console.log(`✅ [Auto-Ngrok] Tunnel established programmatically at: ${tunnelUrl}`);
+              global.ngrokStatus = { running: true, url: tunnelUrl };
+            }).catch(e => {
+              console.error(`❌ [Auto-Ngrok] Failed to start programmatic tunnel: ${e.message}`);
+              global.ngrokStatus = { running: false, url: null, error: e.message };
+              if (e.message.includes('authentication failed')) {
+                console.error('❌ [Auto-Ngrok] You MUST provide a valid NGROK_AUTHTOKEN in your .env file.');
+              }
+            });
+          } catch (e) {
+            console.warn(`⚠️ [Auto-Ngrok] @ngrok/ngrok module not found. Falling back to system ngrok. ERROR: ${e.message}`);
+            const { exec } = require('child_process');
+            const authCmd = token ? `ngrok config add-authtoken ${token} && ` : '';
+            const ngrokCmd = `${authCmd}ngrok http ${PORT} --domain=${ngrokDomain}`;
+            console.log(`⚡ [Auto-Ngrok] Launching child process: ${ngrokCmd}`);
+            global.ngrokStatus = { running: true, url: `https://${ngrokDomain}` };
+            
+            const ngrokProcess = exec(ngrokCmd, (error) => {
+              if (error) {
+                console.error(`❌ [Auto-Ngrok] Process failed or was terminated: ${error.message}`);
+                console.error(`❌ [Auto-Ngrok] Ensure ngrok is installed and added to your system PATH!`);
+                global.ngrokStatus = { running: false, url: null };
+              }
+            });
+            
+            ngrokProcess.stdout.on('data', (data) => {
+              console.log(`[ngrok-stdout] ${data.trim()}`);
+            });
+            
+            ngrokProcess.stderr.on('data', (data) => {
+              console.warn(`[ngrok-stderr] ${data.trim()}`);
+            });
+          }
+        } else {
+          console.warn(`⚠️ [Auto-Ngrok] Could not autostart ngrok: No static ngrok domain found in WAHA_WEBHOOK_URL.`);
+        }
+      }
     });
   } catch (err) {
     console.error('❌ MongoDB Connection Error:', err.message);
-    process.exit(1);
+    console.error('ℹ️ Server will keep running and retry MongoDB connection in 15s...');
+    setTimeout(startServer, 15000);
   }
 };
+  // If this file is the entrypoint, start the server. Otherwise export the app for integration tests.
+  if (require.main === module) {
+    startServer();
+  }
 
-startServer();
+  module.exports = { app, startServer };
 
 module.exports = app;

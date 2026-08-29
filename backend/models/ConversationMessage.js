@@ -33,7 +33,7 @@ const ConversationMessageSchema = new mongoose.Schema({
   // Media Information
   media: {
     url: String,
-    type: String,
+    type: { type: String },
     size: Number,
     mimeType: String
   },
@@ -62,7 +62,7 @@ const ConversationMessageSchema = new mongoose.Schema({
   // Message Status
   status: {
     type: String,
-    enum: ['SENT', 'DELIVERED', 'READ', 'FAILED', 'PENDING'],
+    enum: ['SENT', 'DELIVERED', 'READ', 'FAILED', 'PENDING', 'QUEUED', 'RECEIVED'],
     default: 'SENT'
   },
   

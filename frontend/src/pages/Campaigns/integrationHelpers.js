@@ -18,6 +18,7 @@ export const createCampaignHandlers = (setSnackbar, fetchCampaigns, setLoading) 
         topic: formData.topic,
         description: formData.description,
         type: formData.type || 'ONE_TIME',
+        channels: formData.channels || ['whatsapp'],
         messageContent: formData.messageContent,
         messageType: formData.messageType || 'TEXT',
         messageTemplate: formData.messageTemplate,
@@ -35,6 +36,8 @@ export const createCampaignHandlers = (setSnackbar, fetchCampaigns, setLoading) 
         mediaPreviewData: formData.mediaPreviewData,
         mediaMimeType: formData.mediaMimeType,
         mediaFileName: formData.mediaFileName,
+        metaTemplateName: formData.metaTemplateName,
+        metaTemplateLanguage: formData.metaTemplateLanguage,
         scheduledAt: formData.scheduledAt || undefined
       };
 
@@ -70,6 +73,7 @@ export const createCampaignHandlers = (setSnackbar, fetchCampaigns, setLoading) 
         topic: formData.topic,
         description: formData.description,
         type: formData.type || 'ONE_TIME',
+        channels: formData.channels || ['whatsapp'],
         messageContent: formData.messageContent,
         messageType: formData.messageType || 'TEXT',
         messageTemplate: formData.messageTemplate,
@@ -87,6 +91,8 @@ export const createCampaignHandlers = (setSnackbar, fetchCampaigns, setLoading) 
         mediaPreviewData: formData.mediaPreviewData,
         mediaMimeType: formData.mediaMimeType,
         mediaFileName: formData.mediaFileName,
+        metaTemplateName: formData.metaTemplateName,
+        metaTemplateLanguage: formData.metaTemplateLanguage,
         scheduledAt: formData.scheduledAt || undefined
       };
 

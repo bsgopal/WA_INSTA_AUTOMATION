@@ -140,10 +140,33 @@ router.post('/send', [
 
     // Send based on channel
     if (channel === 'whatsapp') {
+      const sendOptions = { mediaUrl };
+      
+      const ShopConfig = require('../models/ShopConfig');
+      const shop = await ShopConfig.findOne({ userId: req.user.id });
+      if (shop && shop.metaApiEnabled) {
+        const hasMedia = !!mediaUrl;
+        const templateLang = customer.language || 'en';
+        if (hasMedia) {
+          sendOptions.templateName = 'sales_promotion';
+          sendOptions.templateLanguage = templateLang;
+          sendOptions.templateParams = [];
+        } else {
+          sendOptions.templateName = 'message';
+          sendOptions.templateLanguage = templateLang;
+          sendOptions.templateParams = [
+            {
+              type: 'text',
+              text: finalContent
+            }
+          ];
+        }
+      }
+
       result = await WhatsAppService.sendMessage(
         customer.whatsappNumber,
         finalContent,
-        { mediaUrl }
+        { ...sendOptions, forceMeta: true }
       );
     } else if (channel === 'instagram') {
       const InstagramService = require('../services/InstagramService');
@@ -160,9 +183,10 @@ router.post('/send', [
     const message = new Message({
       userId: req.user.id,
       customerId: customer._id,
-      content: finalContent,
-      originalContent: content,
+      content: finalContent || (mediaUrl ? '[Media]' : ''),
+      originalContent: content || (mediaUrl ? '[Media]' : ''),
       channel,
+      messageType: 'MANUAL',
       status: result.success ? 'SENT' : 'FAILED',
       sentAt: result.success ? new Date() : null,
       failureReason: result.error,
@@ -323,10 +347,25 @@ router.post('/:id/retry', async (req, res) => {
     let result;
 
     if (message.channel === 'whatsapp') {
+      const retryOptions = {
+        mediaUrl: message.mediaUrl,
+        mediaType: message.mediaType,
+        mediaMimeType: message.mediaMimeType,
+        mediaFileName: message.mediaFileName,
+        ...(message.widgetData?.buttons ? { buttons: message.widgetData.buttons } : {})
+      };
+
+      const isMetaReengagementFailure = /META_|Re-?engagement/i.test(message.failureReason || '');
+      if (isMetaReengagementFailure) {
+        retryOptions.forceWaha = true;
+      } else {
+        retryOptions.forceMeta = true;
+      }
+
       result = await WhatsAppService.sendMessage(
         message.customerId.whatsappNumber,
         message.content,
-        { mediaUrl: message.mediaUrl }
+        retryOptions
       );
     }
 
@@ -415,11 +454,22 @@ router.post('/bulk-send', [
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { customerIds, content, channel } = req.body;
+    const { customerIds, content, channel, sendToAll } = req.body;
+    let finalCustomerIds = customerIds || [];
+    if (sendToAll) {
+      const allCustomers = await Customer.find({ userId: req.user.id }).select('_id');
+      finalCustomerIds = allCustomers.map(c => c._id);
+    }
+    
     let successCount = 0;
     let failCount = 0;
+    let processedCount = 0;
 
-    for (const customerId of customerIds) {
+    const ShopConfig = require('../models/ShopConfig');
+    const shop = await ShopConfig.findOne({ userId: req.user.id });
+    const isMetaEnabled = shop && shop.metaApiEnabled;
+
+    for (const customerId of finalCustomerIds) {
       try {
         const customer = await Customer.findOne({
           _id: customerId,
@@ -433,6 +483,13 @@ router.post('/bulk-send', [
           failCount++;
           continue;
         }
+
+        // Apply throttling delay (only for WAHA; official Meta API does not need throttling)
+        if (processedCount > 0 && !isMetaEnabled) {
+          const sleepTime = (processedCount % 10 === 0) ? 20000 : 6000;
+          await new Promise(resolve => setTimeout(resolve, sleepTime));
+        }
+        processedCount++;
 
         let finalContent = await VariableInterpolationService.interpolateVariables(content, req.user.id, {
           customer
@@ -464,7 +521,7 @@ router.post('/bulk-send', [
 
         let result;
         if (channel === 'whatsapp') {
-          result = await WhatsAppService.sendMessage(customer.whatsappNumber, finalContent, {});
+          result = await WhatsAppService.sendMessage(customer.whatsappNumber, finalContent, { forceMeta: true });
         } else if (channel === 'instagram') {
           const InstagramService = require('../services/InstagramService');
           result = await InstagramService.sendDirectMessage(customer.instagramHandle || customer.phone, finalContent, {});
@@ -473,9 +530,10 @@ router.post('/bulk-send', [
         const message = new Message({
           userId: req.user.id,
           customerId: customer._id,
-          content: finalContent,
-          originalContent: content,
+          content: finalContent || '[Media]',
+          originalContent: content || '[Media]',
           channel,
+          messageType: 'MANUAL',
           status: result.success ? 'SENT' : 'FAILED',
           sentAt: result.success ? new Date() : null,
           failureReason: result.error,

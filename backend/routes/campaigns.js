@@ -8,10 +8,24 @@ const Campaign = require('../models/Campaign');
 const Customer = require('../models/Customer');
 const Message = require('../models/Message');
 const WhatsAppService = require('../services/WhatsAppService');
+const MetaService = require('../services/MetaService');
 const GeminiService = require('../services/GeminiService');
 const campaignService = require('../services/campaignService');
 const VariableInterpolationService = require('../services/VariableInterpolationService');
 const { body, validationResult, query } = require('express-validator');
+
+function appendWhatsAppOptInQuery(query) {
+  if (!query.$and) {
+    query.$and = [];
+  }
+  query.$and.push({
+    $or: [
+      { 'optedIn.whatsapp': true },
+      { optedIn: { $exists: false } },
+      { optedIn: null }
+    ]
+  });
+}
 
 const campaignUploadsDir = path.join(__dirname, '..', 'uploads', 'campaigns');
 if (!fs.existsSync(campaignUploadsDir)) {
@@ -170,7 +184,11 @@ router.get('/:id/targets', async (req, res) => {
       }
     }
 
-    const customers = await Customer.find(query).select('firstName lastName phone email rfmSegment');
+    if (campaign.channels.includes('whatsapp')) {
+      appendWhatsAppOptInQuery(query);
+    }
+
+    const customers = await Customer.find(query).select('firstName lastName phone email rfmSegment whatsappNumber');
     res.json(customers);
   } catch (error) {
     console.error('Get Campaign Targets Error:', error);
@@ -183,13 +201,29 @@ router.post('/', [
   body('name').notEmpty().trim(),
   body('type').isIn(['ONE_TIME', 'RECURRING', 'AUTOMATED', 'TRIGGERED']),
   body('channels').isArray(),
-  body('messageTemplate').notEmpty(),
-  body('messageType').notEmpty()
+  body('messageType').notEmpty(),
+  body('messageTemplate').optional({ checkFalsy: true }).isMongoId(),
+  body('metaTemplateName').optional({ checkFalsy: true }).trim().isString(),
+  body('metaTemplateLanguage').optional({ checkFalsy: true }).trim().isString()
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ errors: errors.array() });
+    }
+
+    // Require either a template or direct content, unless it is a media campaign
+    if (!req.body.messageTemplate && !req.body.messageContent && req.body.messageType !== 'MEDIA') {
+      return res.status(400).json({ error: 'Either a message template or message content is required' });
+    }
+
+    // Strip empty template reference so Mongoose doesn't CastError on ""
+    const campaignBody = { ...req.body };
+    if (!campaignBody.messageTemplate) {
+      delete campaignBody.messageTemplate;
+    }
+    if (!campaignBody.messageContent) {
+      delete campaignBody.messageContent;
     }
 
     // Calculate estimated reach
@@ -215,7 +249,7 @@ router.post('/', [
     }
 
     const campaign = new Campaign({
-      ...req.body,
+      ...campaignBody,
       userId: req.user.id,
       estimatedReach,
       status: 'DRAFT'
@@ -247,7 +281,15 @@ router.put('/:id', async (req, res) => {
       return res.status(400).json({ error: 'Cannot edit a running campaign' });
     }
 
-    Object.assign(campaign, req.body);
+    const updateData = { ...req.body };
+    if (updateData.messageTemplate === '') {
+      updateData.messageTemplate = null;
+    }
+    if (updateData.messageContent === '') {
+      updateData.messageContent = '';
+    }
+
+    Object.assign(campaign, updateData);
     campaign.updatedAt = Date.now();
 
     await campaign.save();
@@ -356,7 +398,7 @@ router.post('/:id/launch', async (req, res) => {
 
     // Only send to opted-in customers
     if (campaign.channels.includes('whatsapp')) {
-      query['optedIn.whatsapp'] = true;
+      appendWhatsAppOptInQuery(query);
     }
 
     const customers = await Customer.find(query);
@@ -430,7 +472,7 @@ router.post('/:id/manual-send', async (req, res) => {
       query._id = { $in: customerIds };
     }
 
-    query['optedIn.whatsapp'] = true;
+    appendWhatsAppOptInQuery(query);
 
     const customers = await Customer.find(query);
 
@@ -450,8 +492,8 @@ router.post('/:id/manual-send', async (req, res) => {
       });
     }
 
-    const content = campaign.messageTemplate?.content || '';
-    if (!content) {
+    const content = campaign.messageTemplate?.content || campaign.messageContent || '';
+    if (!content && campaign.messageType !== 'MEDIA') {
       console.error('❌ Campaign message template is empty');
       return res.status(400).json({ 
         error: 'Campaign message template is empty',
@@ -460,13 +502,13 @@ router.post('/:id/manual-send', async (req, res) => {
       });
     }
 
-    const mediaUrl = campaign.mediaUrl || campaign.messageTemplate?.mediaUrl || null;
-    const mediaPreviewData = campaign.mediaPreviewData || null;
-    const mediaType = campaign.mediaType && campaign.mediaType !== 'none'
-      ? campaign.mediaType
-      : (campaign.messageTemplate?.mediaType || null);
-    const mediaMimeType = campaign.mediaMimeType || null;
-    const mediaFileName = campaign.mediaFileName || 'campaign-media';
+    const mediaUrl = campaign.messageTemplate?.mediaUrl || campaign.mediaUrl || null;
+    const mediaPreviewData = campaign.messageTemplate?.mediaPreviewData || campaign.mediaPreviewData || null;
+    const mediaType = (campaign.messageTemplate?.mediaType
+      || (campaign.mediaType && campaign.mediaType !== 'none' ? campaign.mediaType : null))
+      || null;
+    const mediaMimeType = campaign.messageTemplate?.mediaMimeType || campaign.mediaMimeType || null;
+    const mediaFileName = campaign.messageTemplate?.mediaFileName || campaign.mediaFileName || 'campaign-media';
     const buttons = campaign.buttonUrl ? [{
       label: campaign.buttonLabel || 'Open Link',
       value: campaign.buttonUrl,
@@ -476,6 +518,37 @@ router.post('/:id/manual-send', async (req, res) => {
 
     let successCount = 0;
     let failCount = 0;
+    let processedCount = 0;
+
+    // Resolve the Meta template once for the whole batch and fetch its real
+    // body-parameter count so the send payload always matches the template.
+    const hasMedia = !!(mediaUrl || mediaPreviewData);
+    const isDirectMediaSend = campaign.messageType === 'MEDIA' && hasMedia && !campaign.metaTemplateName;
+    let resolvedTemplateName;
+    let templateLang;
+    let bodyParamCount;
+
+    if (!isDirectMediaSend) {
+      resolvedTemplateName = campaign.metaTemplateName || campaign.messageTemplate?.name;
+      if (!resolvedTemplateName || !/^[a-z0-9_-]+$/.test(resolvedTemplateName)) {
+        resolvedTemplateName = hasMedia ? 'sales_promotion' : 'message';
+      }
+      templateLang = campaign.metaTemplateLanguage || campaign.messageTemplate?.language || campaign.language || 'en_US';
+      bodyParamCount = await MetaService.getTemplateBodyParamCount(
+        req.user.id,
+        resolvedTemplateName,
+        templateLang
+      );
+      if (bodyParamCount === null || bodyParamCount === undefined) {
+        bodyParamCount = hasMedia ? 0 : 1;
+      }
+      console.log(`📨 Manual Send template resolution: ${resolvedTemplateName} (${templateLang}) expects ${bodyParamCount} body param(s)`);
+    } else {
+      templateLang = campaign.metaTemplateLanguage || campaign.messageTemplate?.language || campaign.language || 'en_US';
+    }
+
+    // Persist the target count so the UI counters reflect this manual send
+    campaign.totalTargets = (campaign.totalTargets || 0) + customers.length;
 
     console.log(`📨 Campaign Manual Send Started for ${customers.length} customers`, {
       campaignId: campaign._id,
@@ -504,6 +577,8 @@ router.post('/:id/manual-send', async (req, res) => {
           continue;
         }
 
+        processedCount++;
+
         const finalContent = await VariableInterpolationService.interpolateVariables(
           content,
           req.user.id,
@@ -512,48 +587,76 @@ router.post('/:id/manual-send', async (req, res) => {
 
         const channel = 'whatsapp';
         
-        // Prepare media payload - prefer HTTP URL over base64 for reliability
+        // Prepare media payload
         const mediaPayload = {};
-        if (mediaUrl) {
-          // Use HTTP URL - most reliable for WAHA
-          mediaPayload.mediaUrl = mediaUrl;
+        if (mediaUrl || mediaPreviewData) {
           mediaPayload.mediaType = mediaType;
           mediaPayload.mediaMimeType = mediaMimeType;
           mediaPayload.mediaFileName = mediaFileName;
-          console.log(`📨 Campaign Manual Send: Using HTTP URL media for customer ${customer._id}`, {
-            mediaUrl,
+          if (mediaUrl) mediaPayload.mediaUrl = mediaUrl;
+          if (mediaPreviewData) mediaPayload.mediaData = mediaPreviewData;
+          
+          console.log(`📨 Campaign Manual Send: Preparing media for customer ${customer._id}`, {
+            hasMediaUrl: !!mediaUrl,
+            hasMediaData: !!mediaPreviewData,
             mediaType,
             mediaMimeType,
             mediaFileName
-          });
-        } else if (mediaPreviewData) {
-          // Fall back to base64 if URL not available
-          mediaPayload.mediaData = mediaPreviewData;
-          mediaPayload.mediaType = mediaType;
-          mediaPayload.mediaMimeType = mediaMimeType;
-          mediaPayload.mediaFileName = mediaFileName;
-          console.log(`📨 Campaign Manual Send: Using base64 media for customer ${customer._id}`, {
-            mediaType,
-            mediaMimeType,
-            mediaFileName,
-            base64Length: mediaPreviewData.length
           });
         } else {
           console.log(`📨 Campaign Manual Send: Sending text only for customer ${customer._id}`);
         }
         
-        const result = await WhatsAppService.sendMessage(destinationNumber, finalContent, {
+        const isDirectMediaSend = campaign.messageType === 'MEDIA' && hasMedia;
+        const sendOptions = {
           ...mediaPayload,
-          ...(buttons ? { buttons } : {})
-        });
+          ...(buttons ? { buttons } : {}),
+          userId: req.user.id,
+          // Bulk campaign sends must always use the Meta Cloud API configuration
+          forceMeta: true
+        };
+
+        if (!isDirectMediaSend) {
+          // Use the resolved template and the real parameter count for every customer
+          sendOptions.templateName = resolvedTemplateName;
+          sendOptions.templateLanguage = templateLang;
+          sendOptions.templateParams = MetaService.buildTemplateParams(bodyParamCount, finalContent);
+        }
+
+        const result = await WhatsAppService.sendMessage(destinationNumber, finalContent, sendOptions);
 
         console.log(`📬 Campaign Manual Send Result for ${destinationNumber}:`, result);
+
+        const ShopConfig = require('../models/ShopConfig');
+        const shop = await ShopConfig.findOne({ userId: req.user.id });
+        const displayNum = shop?.metaDisplayPhoneNumber || shop?.contactPhone || '';
+
+        const placeholderContent = finalContent || (hasMedia ? `[${mediaType || 'Media'}]` : '');
+        const placeholderOriginalContent = content || (hasMedia ? `[${mediaType || 'Media'}]` : '');
 
         if (result && result.success) {
           successCount++;
           customer.lastMessageSentDate = new Date();
           customer.messagesSentCount++;
           await customer.save();
+
+          // Log campaign sent message to Unified Inbox Conversation
+          try {
+            const aiChatHandler = require('../services/aiChatHandler');
+            await aiChatHandler.logOutboundMessage(
+              req.user.id,
+              customer._id,
+              placeholderContent,
+              channel,
+              result.externalMessageId,
+              mediaUrl,
+              {
+                businessPhoneNumber: displayNum
+              }
+            );
+          } catch (logErr) {
+            console.error('[Campaign Manual Log] Failed to log conversation:', logErr.message);
+          }
         } else {
           failCount++;
           console.warn(`Campaign manual send failed for customer ${customer._id}:`, result?.error || result?.failureReason);
@@ -563,13 +666,14 @@ router.post('/:id/manual-send', async (req, res) => {
           userId: req.user.id,
           customerId: customer._id,
           campaignId: campaign._id,
-          content: finalContent,
-          originalContent: content,
+          content: placeholderContent,
+          originalContent: placeholderOriginalContent,
           channel,
-          status: result?.success ? 'SENT' : 'FAILED',
+          status: result?.status || (result?.success ? 'SENT' : 'FAILED'),
           sentAt: result?.success ? new Date() : null,
-          failureReason: result?.error,
+          failureReason: result?.failureReason || result?.error,
           externalMessageId: result?.externalMessageId,
+          businessPhoneNumber: displayNum,
           messageType: 'MANUAL',
           mediaUrl,
           mediaType,
@@ -585,6 +689,21 @@ router.post('/:id/manual-send', async (req, res) => {
         failCount++;
       }
     }
+
+    if (successCount === 0) {
+      console.warn(`⚠️  Manual send had no successes. FailCount: ${failCount}`);
+    }
+
+    // Update campaign counters so the UI metrics (Sent/Failed) increase correctly
+    campaign.totalSent = (campaign.totalSent || 0) + successCount;
+    campaign.totalFailed = (campaign.totalFailed || 0) + failCount;
+    campaign.deliveryRate = campaign.totalSent > 0
+      ? (campaign.totalDelivered / campaign.totalSent * 100)
+      : 0;
+    campaign.updatedAt = Date.now();
+    await campaign.save();
+
+    console.log(`✅ Campaign stats updated after manual send. Targets: ${campaign.totalTargets}, Sent: ${campaign.totalSent}, Failed: ${campaign.totalFailed}`);
 
     if (successCount === 0) {
       console.warn(`⚠️  Manual send had no successes. FailCount: ${failCount}`);

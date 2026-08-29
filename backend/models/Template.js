@@ -87,6 +87,9 @@ const TemplateSchema = new mongoose.Schema({
   // Media
   mediaUrl: String,
   mediaType: String, // image, video, document
+  mediaPreviewData: String, // base64 data URL - reliable for Meta Cloud API
+  mediaMimeType: String,
+  mediaFileName: String,
   
   // AI Configuration
   aiGenerated: {

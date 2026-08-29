@@ -18,6 +18,7 @@ import {
   TrendingUp as TrendIcon
 } from '@mui/icons-material';
 import apiClient from '../../api/client';
+import { API_ORIGIN } from '../../api/base';
 import CustomSnackbar from '../../components/Snackbar';
 
 // Categories options matching backend
@@ -104,7 +105,7 @@ function ProductImage({ src, name, category }) {
   };
 
   // Resolve full backend URL if relative path
-  const fullUrl = src && src.startsWith('/') ? `http://localhost:5000${src}` : src;
+  const fullUrl = src && src.startsWith('/') ? `${API_ORIGIN}${src}` : src;
 
   if (error || !src) {
     return (
@@ -310,39 +311,25 @@ export default function Catalog() {
     <Box sx={{ width: '100%', flexGrow: 1, pb: 4 }}>
       
       {/* Header section with Premium Gold/Metal accents */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 4, flexWrap: 'wrap', gap: 2 }}>
-        <Box>
-          <Typography variant="h4" sx={{ fontWeight: 700, color: 'text.primary', letterSpacing: '-0.5px', mb: 1, display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <StoreIcon sx={{ color: 'primary.main', fontSize: 36 }} />
-            Jewelry Catalog
-            <Chip 
-              icon={<SparklesIcon sx={{ fontSize: '14px !important', color: '#B8860B !important' }} />}
-              label="Premium Collections" 
-              size="small" 
-              sx={{ backgroundColor: 'rgba(218,165,32,0.12)', border: '1px solid rgba(218,165,32,0.3)', color: '#B8860B', fontWeight: 600 }}
-            />
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Manage your exclusive collection of rings, necklaces, bangles, and earrings synced with the conversational AI.
-          </Typography>
-        </Box>
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', mb: 3 }}>
         <Button
           variant="contained"
           startIcon={<AddIcon />}
+          size="small"
           onClick={() => handleOpenDialog()}
           disableElevation
           sx={{
-            px: 3,
-            py: 1.2,
-            borderRadius: '8px',
+            px: 1.5,
+            py: 0.5,
+            height: '28px',
+            borderRadius: '4px',
             textTransform: 'none',
-            fontWeight: 600,
+            fontWeight: 500,
+            fontSize: '0.8125rem',
             background: 'linear-gradient(135deg, #d4af37 0%, #aa7c11 100%)',
             color: '#ffffff',
-            boxShadow: '0 4px 14px 0 rgba(170,124,17,0.4)',
             '&:hover': {
               background: 'linear-gradient(135deg, #e5c158 0%, #c59b27 100%)',
-              boxShadow: '0 6px 20px 0 rgba(170,124,17,0.5)',
             }
           }}
         >

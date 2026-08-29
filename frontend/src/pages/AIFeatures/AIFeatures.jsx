@@ -153,15 +153,7 @@ export default function AIFeatures() {
 
   return (
     <Box sx={{ width: '100%', flexGrow: 1 }}>
-      <Box sx={{ mb: 4, display: 'flex', flexDirection: 'column', gap: 2 }}>
-        <Box>
-          <Typography variant="h4" gutterBottom>
-            AI-Powered Features
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Leverage artificial intelligence for smarter automation
-          </Typography>
-        </Box>
+      <Box sx={{ mb: 3 }}>
         <AIProviderStatus compact />
       </Box>
 
