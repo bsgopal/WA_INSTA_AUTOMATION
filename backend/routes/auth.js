@@ -235,7 +235,7 @@ router.post('/license/activate', async (req, res) => {
     if (autoLogin) {
       const token = jwt.sign(
         { id: newUser._id, role: newUser.role },
-        process.env.JWT_SECRET || 'fallback_secret',
+        process.env.JWT_SECRET || 'renic_secret_key_2026',
         { expiresIn: process.env.JWT_EXPIRE || '30d' }
       );
 

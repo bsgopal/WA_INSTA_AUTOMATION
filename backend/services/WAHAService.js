@@ -2,6 +2,8 @@
 // WAHA (WhatsApp HTTP API) - Open-source WhatsApp integration
 // Free, self-hosted, no approval needed
 
+const fs = require('fs');
+const path = require('path');
 const axios = require('axios');
 const Message = require('../models/Message');
 
@@ -182,24 +184,59 @@ const setupWebhook = async () => {
   try {
     console.log('🔗 Setting up WAHA webhook...');
 
-    const webhookConfig = {
-      name: SESSION_NAME,
-      url: WEBHOOK_URL,
-      events: ['message', 'message.status', 'presence.update']
-    };
+    const defaultLocalWebhook = 'http://host.docker.internal:5000/api/webhooks/whatsapp';
+    const targetWebhookUrl = process.env.WAHA_WEBHOOK_URL || defaultLocalWebhook;
 
-    // Register webhook
-    await wahaClient.post('/webhooks', webhookConfig);
+    const webhookList = [
+      {
+        url: targetWebhookUrl,
+        events: ['message', 'message.ack']
+      }
+    ];
 
-    console.log(`✅ Webhook registered: ${WEBHOOK_URL}`);
+    // In modern WAHA, webhooks are configured directly on the session
+    try {
+      await wahaClient.put(`/sessions/${SESSION_NAME}`, {
+        config: {
+          webhooks: webhookList
+        }
+      });
+      console.log(`✅ Session webhook registered: ${targetWebhookUrl}`);
+      return { success: true };
+    } catch (putErr) {
+      console.warn(`Could not update session webhooks via PUT: ${putErr.message}`);
+    }
+
+    // Fallback to legacy global /webhooks endpoint if supported
+    try {
+      await wahaClient.post('/webhooks', {
+        name: SESSION_NAME,
+        url: targetWebhookUrl,
+        events: ['message', 'message.status', 'presence.update']
+      });
+      console.log(`✅ Legacy Webhook registered: ${targetWebhookUrl}`);
+    } catch {
+      // ignore
+    }
+
     return { success: true };
   } catch (error) {
-    if (error.response?.status === 404) {
-      console.log('ℹ️ Webhook API registration returned 404. Relying on pre-configured webhook environment variables.');
-      return { success: true, message: 'Using environment variables' };
-    }
     console.error('❌ Webhook Setup Error:', error.message);
     return { success: false, error: error.message };
+  }
+};
+
+/**
+ * Get contact info from WAHA
+ */
+const getContact = async (contactId, session = SESSION_NAME) => {
+  try {
+    const response = await wahaClient.get('/contacts', {
+      params: { contactId, session }
+    });
+    return response.data || null;
+  } catch (err) {
+    return null;
   }
 };
 
@@ -338,6 +375,141 @@ const formatPhoneNumber = (phone) => {
 };
 
 /**
+ * Resolve media file from options (base64, local file path, or remote URL)
+ * Converts to base64 payload so WAHA inside Docker does not fail with network URL fetches.
+ */
+const resolveMediaFilePayload = async (options = {}) => {
+  const mediaDataUrl =
+    (typeof options.mediaData === 'string' && options.mediaData.startsWith('data:') ? options.mediaData : null) ||
+    (typeof options.mediaUrl === 'string' && options.mediaUrl.startsWith('data:') ? options.mediaUrl : null);
+
+  let mediaType = options.mediaType || 'image';
+  let mimetype = options.mediaMimeType || '';
+  let filename = options.mediaFileName || 'media';
+  let base64Data = null;
+
+  if (mediaDataUrl) {
+    const match = mediaDataUrl.match(/^data:(.*?);base64,(.*)$/);
+    if (match) {
+      mimetype = mimetype || match[1];
+      base64Data = match[2];
+    }
+  } else if (options.mediaUrl) {
+    let urlStr = String(options.mediaUrl).trim();
+
+    // Check if URL contains /uploads/ or points to a local file
+    let relativePath = null;
+    if (urlStr.includes('/uploads/')) {
+      relativePath = urlStr.substring(urlStr.indexOf('/uploads/') + 1);
+    } else if (urlStr.startsWith('uploads/')) {
+      relativePath = urlStr;
+    }
+
+    if (relativePath) {
+      relativePath = decodeURIComponent(relativePath);
+      const possiblePath = path.join(__dirname, '..', relativePath);
+
+      if (fs.existsSync(possiblePath)) {
+        try {
+          const fileBuffer = fs.readFileSync(possiblePath);
+          base64Data = fileBuffer.toString('base64');
+          if (!mimetype) {
+            const ext = path.extname(possiblePath).toLowerCase().replace('.', '');
+            if (['png', 'jpg', 'jpeg', 'webp', 'gif'].includes(ext)) {
+              mimetype = `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+            } else if (['mp4', 'mov'].includes(ext)) {
+              mimetype = 'video/mp4';
+            } else if (ext === 'pdf') {
+              mimetype = 'application/pdf';
+            }
+          }
+          filename = filename || path.basename(possiblePath);
+        } catch (readErr) {
+          console.warn(`WAHAService: Could not read local file ${possiblePath}:`, readErr.message);
+        }
+      } else {
+        // Try searching in directory in case of minor filename differences
+        const dir = path.dirname(possiblePath);
+        const base = path.basename(possiblePath);
+        if (fs.existsSync(dir)) {
+          const files = fs.readdirSync(dir);
+          const prefix = base.split('-')[0];
+          const matchedFile = files.find(f => f.startsWith(prefix) || f === base);
+          if (matchedFile) {
+            const actualPath = path.join(dir, matchedFile);
+            const fileBuffer = fs.readFileSync(actualPath);
+            base64Data = fileBuffer.toString('base64');
+            if (!mimetype) {
+              const ext = path.extname(actualPath).toLowerCase().replace('.', '');
+              if (['png', 'jpg', 'jpeg', 'webp', 'gif'].includes(ext)) {
+                mimetype = `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+              }
+            }
+            filename = filename || matchedFile;
+          }
+        }
+      }
+    }
+
+    // If still no base64 and it's a remote URL (http/https), fetch it into buffer so WAHA doesn't have to download it
+    if (!base64Data && (urlStr.startsWith('http://') || urlStr.startsWith('https://'))) {
+      let fetchUrl = urlStr;
+      if (fetchUrl.includes('host.docker.internal')) {
+        fetchUrl = fetchUrl.replace('host.docker.internal', '127.0.0.1');
+      }
+      try {
+        const res = await axios.get(fetchUrl, { responseType: 'arraybuffer', timeout: 15000 });
+        const buf = Buffer.from(res.data);
+        base64Data = buf.toString('base64');
+        mimetype = mimetype || res.headers['content-type'] || 'image/jpeg';
+      } catch (dlErr) {
+        console.warn(`WAHAService: Could not pre-fetch remote media URL (${fetchUrl}): ${dlErr.message}`);
+      }
+    }
+  }
+
+  if (!mimetype) {
+    mimetype = mediaType === 'image' ? 'image/jpeg' : mediaType === 'video' ? 'video/mp4' : 'application/octet-stream';
+  }
+  if (!filename.includes('.')) {
+    const ext = mimetype.split('/')[1] || 'jpg';
+    filename = `${filename}.${ext}`;
+  }
+
+  if (base64Data) {
+    const dataUri = `data:${mimetype};base64,${base64Data}`;
+    return {
+      filePayload: {
+        mimetype,
+        filename,
+        data: base64Data
+      },
+      hasMedia: true,
+      hasBase64: true,
+      mediaType,
+      targetUrl: options.mediaUrl || dataUri
+    };
+  }
+
+  let targetUrl = options.mediaUrl;
+  if (targetUrl && (targetUrl.includes('localhost') || targetUrl.includes('127.0.0.1'))) {
+    targetUrl = targetUrl.replace('localhost', 'host.docker.internal').replace('127.0.0.1', 'host.docker.internal');
+  }
+
+  return {
+    filePayload: {
+      mimetype,
+      filename,
+      url: targetUrl
+    },
+    hasMedia: !!(options.mediaUrl || mediaDataUrl),
+    hasBase64: false,
+    mediaType,
+    targetUrl
+  };
+};
+
+/**
  * Send a WhatsApp message via WAHA
  */
 const sendMessage = async (to, message, options = {}) => {
@@ -395,21 +567,18 @@ const sendMessage = async (to, message, options = {}) => {
     // 1.5 Handle split sending for media card with buttons
     else if ((mediaDataUrl || options.mediaUrl) && options.buttons && options.buttons.length > 0) {
       try {
-        const filePayload = mediaDataUrl
-          ? {
-              mimetype: options.mediaMimeType || mediaDataUrl.match(/^data:(.*?);base64,/)?.[1] || 'application/octet-stream',
-              filename: options.mediaFileName || 'campaign-media',
-              data: mediaDataUrl.split(',')[1]
-            }
-          : { url: options.mediaUrl };
-        await wahaClient.post('/sendFile', {
+        const mediaInfo = await resolveMediaFilePayload(options);
+        const filePayload = mediaInfo.filePayload;
+        const isImage = (mediaInfo.mediaType === 'image') || (filePayload.mimetype && filePayload.mimetype.startsWith('image/'));
+        const mediaEndpoint = isImage ? '/sendImage' : '/sendFile';
+        await wahaClient.post(mediaEndpoint, {
           session: SESSION_NAME,
           chatId: formattedPhone,
           file: filePayload,
           caption: message
         });
       } catch (err) {
-        console.warn(`⚠️ WAHAService: /sendFile failed in card-button send:`, err.message);
+        console.warn(`⚠️ WAHAService: media send failed in card-button send:`, err.message);
       }
       const wahaButtons = options.buttons.map(b => ({
         id: b.value,
@@ -458,33 +627,18 @@ const sendMessage = async (to, message, options = {}) => {
     }
     // 3. Handle file media
     else if (mediaDataUrl || options.mediaUrl) {
-      const mediaType = options.mediaType || 'image';
-      let targetUrl = options.mediaUrl;
-      
-      // Translate localhost/127.0.0.1 to host.docker.internal so Docker container can resolve it
-      if (targetUrl && (targetUrl.includes('localhost') || targetUrl.includes('127.0.0.1'))) {
-        targetUrl = targetUrl.replace('localhost', 'host.docker.internal').replace('127.0.0.1', 'host.docker.internal');
-        console.log(`🔄 WAHAService: Local URL detected, translated to: ${targetUrl}`);
-      }
+      const mediaInfo = await resolveMediaFilePayload(options);
+      const filePayload = mediaInfo.filePayload;
+      const isImage = (mediaInfo.mediaType === 'image') || (filePayload.mimetype && filePayload.mimetype.startsWith('image/'));
+      const isVideo = (mediaInfo.mediaType === 'video') || (filePayload.mimetype && filePayload.mimetype.startsWith('video/'));
+      const primaryEndpoint = isImage ? '/sendImage' : isVideo ? '/sendVideo' : '/sendFile';
+      const secondaryEndpoint = isImage ? '/sendFile' : '/sendImage';
 
-      console.log(`📤 WAHAService: Preparing ${mediaType} media send for ${formattedPhone}`, {
-        hasBase64: !!mediaDataUrl,
-        hasUrl: !!targetUrl,
-        mediaFileName: options.mediaFileName
+      console.log(`📤 WAHAService: Preparing ${mediaInfo.mediaType || 'media'} send via ${primaryEndpoint} for ${formattedPhone}`, {
+        hasBase64: !!mediaInfo.hasBase64,
+        filename: filePayload.filename,
+        mimetype: filePayload.mimetype
       });
-
-      // Construct file payload according to WAHA schema (using "file" object)
-      const filePayload = mediaDataUrl
-        ? {
-            mimetype: options.mediaMimeType || mediaDataUrl.match(/^data:(.*?);base64,/)?.[1] || 'application/octet-stream',
-            filename: options.mediaFileName || 'campaign-media',
-            data: mediaDataUrl.split(',')[1]
-          }
-        : {
-            mimetype: options.mediaMimeType || (mediaType === 'image' ? 'image/jpeg' : mediaType === 'video' ? 'video/mp4' : 'application/octet-stream'),
-            filename: options.mediaFileName || 'campaign-media',
-            url: targetUrl
-          };
 
       const payload = {
         session: SESSION_NAME,
@@ -493,91 +647,74 @@ const sendMessage = async (to, message, options = {}) => {
         caption: message
       };
 
-      // Determine endpoint based on media type
-      let endpoint = '/sendFile'; // Default fallback
-      if (mediaType === 'image') {
-        endpoint = '/sendImage';
-      } else if (mediaType === 'video') {
-        endpoint = '/sendVideo';
-      } else if (mediaType === 'document' || mediaType === 'pdf') {
-        endpoint = '/sendDocument';
-      } else if (mediaType === 'audio') {
-        endpoint = '/sendAudio';
-      }
-
       let mediaAttemptFailed = false;
       let lastError = null;
 
-      // Try type-specific endpoint
+      // Primary send (via /sendImage for photos, /sendVideo for videos, /sendFile for docs)
       try {
-        console.log(`🔄 WAHAService: Trying endpoint ${endpoint}...`);
-        response = await wahaClient.post(endpoint, payload);
-        console.log(`✅ WAHAService: ${endpoint} success response:`, response.data);
-      } catch (typeSpecificErr) {
+        console.log(`🔄 WAHAService: Sending media via ${primaryEndpoint}...`);
+        response = await wahaClient.post(primaryEndpoint, payload);
+        console.log(`✅ WAHAService: ${primaryEndpoint} success response:`, response.data);
+      } catch (sendErr) {
         mediaAttemptFailed = true;
-        lastError = typeSpecificErr;
-        const errStatus = typeSpecificErr.response?.status;
-        const errMsg = typeSpecificErr.response?.data?.description || typeSpecificErr.response?.data?.message || typeSpecificErr.message;
-        
-        console.warn(`⚠️  WAHAService: ${endpoint} failed (${errStatus}): ${errMsg}`);
+        lastError = sendErr;
+        const errStatus = sendErr.response?.status;
+        const errMsg = sendErr.response?.data?.description || sendErr.response?.data?.message || sendErr.message;
+        console.warn(`⚠️ WAHAService: ${primaryEndpoint} failed (${errStatus}): ${errMsg}`);
 
-        // If type-specific endpoint failed, try generic /sendFile
-        if (endpoint !== '/sendFile') {
-          try {
-            console.log(`🔄 WAHAService: Falling back to /sendFile endpoint...`);
-            response = await wahaClient.post('/sendFile', payload);
-            console.log(`✅ WAHAService: /sendFile fallback success:`, response.data);
-            mediaAttemptFailed = false; // Reset since fallback succeeded
-          } catch (fileSendErr) {
-            lastError = fileSendErr;
-            const fileErrStatus = fileSendErr.response?.status;
-            const fileErrMsg = fileSendErr.response?.data?.description || fileSendErr.response?.data?.message || fileSendErr.message;
-            console.error(`❌ WAHAService: /sendFile also failed (${fileErrStatus}):`, fileErrMsg);
-          }
+        // Try secondary fallback endpoint
+        try {
+          console.log(`🔄 WAHAService: Retrying via ${secondaryEndpoint} endpoint...`);
+          response = await wahaClient.post(secondaryEndpoint, payload);
+          console.log(`✅ WAHAService: ${secondaryEndpoint} fallback success:`, response.data);
+          mediaAttemptFailed = false;
+          lastError = null;
+        } catch (fallbackErr) {
+          lastError = fallbackErr;
+          console.error(`❌ WAHAService: ${secondaryEndpoint} also failed:`, fallbackErr.response?.data || fallbackErr.message);
         }
       }
 
-      // If media send completely failed, check if it's a Plus version issue or any other recoverable error
+      // If media send completely failed, fall back to text message delivery with media link
       if (mediaAttemptFailed && lastError) {
         const errStatus = lastError.response?.status;
         const errData = lastError.response?.data || {};
-        const errMsg = errData.description || errData.message || lastError.message || '';
+        const errMsg = errData.exception?.message || errData.description || errData.message || lastError.message || '';
         
-        console.log(`🔍 WAHAService: Error details:`, {
-          status: errStatus,
-          description: errData.description,
-          message: errData.message,
-          fullMsg: errMsg,
-          isPlusRequired: errMsg.includes('Plus version') || errMsg.includes('NOWEB')
-        });
-        
-        if (errStatus === 422 && (errMsg.includes('Plus version') || errMsg.includes('NOWEB') || errMsg.includes('available only'))) {
-          console.warn(`⚠️  WAHAService: WAHA Plus version required for media. Falling back to link-in-text method.`);
-          
-          // Send message with media link as text instead
-          const mediaEmoji = mediaType === 'image' ? '🖼️' 
-                           : mediaType === 'video' ? '🎥'
-                           : mediaType === 'audio' ? '🎵'
-                           : '📎';
-          
-          const linkText = targetUrl 
-            ? `${message}\n\n${mediaEmoji} ${options.mediaFileName || 'Media'}: ${targetUrl}`
-            : `${message}\n\n${mediaEmoji} [${options.mediaFileName || 'Media'} attached but could not be sent]`;
-          
-          try {
-            response = await wahaClient.post('/sendText', {
-              session: SESSION_NAME,
-              chatId: formattedPhone,
-              text: linkText
-            });
-            console.log(`✅ WAHAService: Sent message with media link as fallback`);
-          } catch (linkErr) {
-            console.error(`❌ WAHAService: Even text fallback failed:`, linkErr.message);
-            throw linkErr;
-          }
-        } else {
-          // Some other error, re-throw it
-          throw lastError;
+        console.warn(`⚠️ WAHAService: Media send failed (${errStatus || 'error'}: ${errMsg}). Falling back to text message delivery.`);
+
+        const mediaEmoji = mediaType === 'image' ? '🖼️' 
+                         : mediaType === 'video' ? '🎥'
+                         : mediaType === 'audio' ? '🎵'
+                         : '📎';
+
+        let linkText = message || '';
+        let targetUrl = mediaInfo.targetUrl || options.mediaUrl || '';
+        if (global.ngrokStatus?.url && (targetUrl.includes('localhost') || targetUrl.includes('127.0.0.1') || targetUrl.includes('host.docker.internal'))) {
+          targetUrl = targetUrl.replace(/https?:\/\/[^\/]+/, global.ngrokStatus.url);
+        } else if (process.env.PUBLIC_URL && (targetUrl.includes('localhost') || targetUrl.includes('127.0.0.1') || targetUrl.includes('host.docker.internal'))) {
+          targetUrl = targetUrl.replace(/https?:\/\/[^\/]+/, process.env.PUBLIC_URL);
+        }
+
+        if (targetUrl && !targetUrl.startsWith('data:')) {
+          linkText = linkText ? `${linkText}\n\n${mediaEmoji} ${options.mediaFileName || 'Media'}: ${targetUrl}` : `${mediaEmoji} ${options.mediaFileName || 'Media'}: ${targetUrl}`;
+        }
+        if (!linkText.trim()) {
+          linkText = `${mediaEmoji} [${options.mediaFileName || 'Media attached'}]`;
+        }
+
+        try {
+          response = await wahaClient.post('/sendText', {
+            session: SESSION_NAME,
+            chatId: formattedPhone,
+            text: linkText
+          });
+          console.log(`✅ WAHAService: Sent message with media link as fallback for ${formattedPhone}`);
+          mediaAttemptFailed = false;
+          lastError = null;
+        } catch (linkErr) {
+          console.error(`❌ WAHAService: Even text fallback failed:`, linkErr.message);
+          throw linkErr;
         }
       }
     } 
@@ -1029,6 +1166,7 @@ module.exports = {
   formatPhoneNumber,
   mapWAHAStatus,
   updateCampaignStatusCounters,
+  getContact,
   WAHA_API_URL,
   SESSION_NAME
 };

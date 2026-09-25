@@ -1,7 +1,18 @@
 import { create } from 'zustand';
 
+const getInitialUser = () => {
+  try {
+    const stored = localStorage.getItem('user');
+    return stored && stored !== 'undefined' && stored !== 'null' ? JSON.parse(stored) : null;
+  } catch (e) {
+    console.warn('Failed to parse stored user, clearing cache:', e);
+    localStorage.removeItem('user');
+    return null;
+  }
+};
+
 const useAuthStore = create((set) => ({
-  user: localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')) : null,
+  user: getInitialUser(),
   isAuthenticated: !!localStorage.getItem('token'),
   login: (userData, token) => {
     localStorage.setItem('token', token);

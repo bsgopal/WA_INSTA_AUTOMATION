@@ -35,7 +35,10 @@ function getLicenseStatus(license) {
     daysRemaining: Math.max(daysRemaining, 0),
     warningDays: WARNING_DAYS,
     planTier: license.planTier || 'basic',
-    companyName: license.companyName || null
+    companyName: license.companyName || null,
+    subdomain: license.subdomain || null,
+    customerCode: license.customerCode || (license.subdomain ? license.subdomain.toUpperCase() : 'RENIC'),
+    featurePermissions: license.featurePermissions || {}
   };
 }
 

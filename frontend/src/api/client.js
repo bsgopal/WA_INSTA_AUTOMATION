@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { API_BASE } from './base';
+import tenantGateway from '../services/clientGateway';
 
 const apiClient = axios.create({
   baseURL: API_BASE,
@@ -8,10 +9,17 @@ const apiClient = axios.create({
   },
 });
 
-// Interceptor to add auth token
+// SAP DM Style Destination Resolver attached directly to apiClient
+apiClient.getRestAPIUrl = (endpointPath) => tenantGateway.getRestAPIUrl(endpointPath);
+
+// Interceptor to add auth token and tenant routing headers
 apiClient.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
+    const customerCode = tenantGateway.resolveCustomerCode();
+    config.headers['X-Customer-Code'] = customerCode;
+    config.headers['X-Tenant-Code'] = customerCode;
+
+    const token = localStorage.getItem('oauth_token') || localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }

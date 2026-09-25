@@ -41,4 +41,9 @@ function legacyGridCompat() {
 export default defineConfig({
   plugins: [react(), legacyGridCompat()],
   base: './',
+  server: {
+    host: true,
+    port: 5173,
+    allowedHosts: true,
+  },
 })

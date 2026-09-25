@@ -162,9 +162,8 @@ const handleForwardedMessage = async ({ phoneNumber, messageBody, userId, metaPh
     // Check if this is the first message in the conversation
     let conversation = await Conversation.findOne({
       userId,
-      customerId: customer._id,
-      metaPhoneNumberId: metaPhoneNumberId || { $exists: true }
-    }).sort({ lastActivityAt: -1 });
+      customerId: customer._id
+    }).sort({ updatedAt: -1 });
 
     const isFirstMessage = !conversation || !conversation.metaHandoffSent;
 
@@ -342,6 +341,11 @@ const forwardMetaReplyToWhatsApp = async ({ phoneNumber, userId, metaPhoneNumber
         return { forwarded: false, reason: fallbackErr.message };
       }
     }
+
+    let conversation = await Conversation.findOne({
+      userId,
+      customerId: customer._id
+    }).sort({ updatedAt: -1 });
 
     if (!conversation) {
       conversation = await Conversation.create({

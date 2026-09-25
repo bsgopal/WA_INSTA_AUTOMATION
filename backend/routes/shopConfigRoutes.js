@@ -171,7 +171,7 @@ router.post('/meta-test', async (req, res) => {
 router.get('/system-status', async (req, res) => {
   try {
     const status = {
-      ngrok: { running: false, url: null },
+      ngrok: { running: false },
       waha: { running: false }
     };
     
@@ -180,13 +180,11 @@ router.get('/system-status', async (req, res) => {
     // Check Ngrok
     if (global.ngrokStatus && global.ngrokStatus.running) {
       status.ngrok.running = true;
-      status.ngrok.url = global.ngrokStatus.url;
     } else {
       try {
         const ngrokRes = await axios.get('http://127.0.0.1:4040/api/tunnels', { timeout: 2000 });
         if (ngrokRes.data && ngrokRes.data.tunnels && ngrokRes.data.tunnels.length > 0) {
           status.ngrok.running = true;
-          status.ngrok.url = ngrokRes.data.tunnels[0].public_url;
         }
       } catch (e) {
         // Ngrok not running or API not accessible

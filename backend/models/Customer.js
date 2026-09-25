@@ -32,7 +32,7 @@ const CustomerSchema = new mongoose.Schema({
   },
   language: {
     type: String,
-    enum: ['en', 'hi', 'ta', 'te', 'mr', 'gu', 'kn', 'ml', 'pa'],
+    enum: ['en', 'hi', 'ta', 'te', 'mr', 'gu', 'kn', 'ml', 'pa', 'bn', 'or', 'as', 'ur', 'sa'],
     default: 'en'
   },
   region: {

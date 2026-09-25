@@ -1,12 +1,13 @@
-// renic-automation-backend/services/schedulerService.js
 const Campaign = require('../models/Campaign');
 const Customer = require('../models/Customer');
 const campaignService = require('./campaignService');
+const { runDailyRFMSweep } = require('./rfmService');
 
 class SchedulerService {
   constructor() {
     this.initialized = false;
     this.intervalId = null;
+    this.rfmIntervalId = null;
   }
 
   init() {
@@ -19,6 +20,10 @@ class SchedulerService {
     
     // Run an initial check shortly after startup
     setTimeout(() => this.checkScheduledCampaigns(), 5000);
+
+    // Run automated RFM recalculation every 12 hours (and 30s after startup)
+    setTimeout(() => runDailyRFMSweep(), 30000);
+    this.rfmIntervalId = setInterval(() => runDailyRFMSweep(), 12 * 60 * 60 * 1000);
     
     this.initialized = true;
   }

@@ -73,6 +73,46 @@ const LANGUAGE_CONFIG = {
     region: 'North',     
     speakers: '125M+', 
     maxChars: 240 
+  },
+  bn: {
+    name: 'Bengali',
+    script: 'Bengali',
+    nativeName: 'বাংলা',
+    region: 'East',
+    speakers: '100M+',
+    maxChars: 240
+  },
+  or: {
+    name: 'Odia',
+    script: 'Odia',
+    nativeName: 'ଓଡ଼ିଆ',
+    region: 'East',
+    speakers: '40M+',
+    maxChars: 240
+  },
+  as: {
+    name: 'Assamese',
+    script: 'Assamese',
+    nativeName: 'অসমীয়া',
+    region: 'Northeast',
+    speakers: '15M+',
+    maxChars: 240
+  },
+  ur: {
+    name: 'Urdu',
+    script: 'Arabic/Persian',
+    nativeName: 'اردو',
+    region: 'North',
+    speakers: '50M+',
+    maxChars: 240
+  },
+  sa: {
+    name: 'Sanskrit',
+    script: 'Devanagari',
+    nativeName: 'संस्कृतम्',
+    region: 'All',
+    speakers: '2M+',
+    maxChars: 240
   }
 };
 

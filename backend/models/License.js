@@ -58,6 +58,42 @@ const LicenseSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  subdomain: {
+    type: String,
+    lowercase: true,
+    trim: true,
+    default: ''
+  },
+  customerCode: {
+    type: String,
+    trim: true,
+    default: ''
+  },
+  billingCycle: {
+    type: String,
+    enum: ['1_MONTH', '3_MONTHS', '6_MONTHS', '1_YEAR'],
+    default: '1_MONTH'
+  },
+  featurePermissions: {
+    quickReplies: { type: Boolean, default: true },
+    workflows: { type: Boolean, default: true },
+    catalog: { type: Boolean, default: true },
+    templates: { type: Boolean, default: true },
+    responseRules: { type: Boolean, default: true },
+    bulkBroadcast: { type: Boolean, default: true },
+    aiAgent: { type: Boolean, default: false },
+    metaCloudApi: { type: Boolean, default: true },
+    exportReports: { type: Boolean, default: true }
+  },
+  limits: {
+    maxContacts: { type: Number, default: 10000 },
+    maxMonthlyMessages: { type: Number, default: 50000 },
+    maxConcurrentSessions: { type: Number, default: 2 }
+  },
+  lastSyncAt: {
+    type: Date,
+    default: Date.now
+  },
   createdAt: {
     type: Date,
     default: Date.now

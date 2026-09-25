@@ -24,10 +24,12 @@ import SmartToyIcon from '@mui/icons-material/SmartToy';
 import CloudIcon from '@mui/icons-material/Cloud';
 import KeyIcon from '@mui/icons-material/Key';
 import ForwardIcon from '@mui/icons-material/Forward';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 
 import apiClient from '../../api/client';
 import { API_ORIGIN } from '../../api/base';
 import CustomSnackbar from '../../components/Snackbar';
+import { useTenant } from '../../context/TenantContext';
 
 function TabPanel(props) {
   const { children, value, index, ...other } = props;
@@ -199,7 +201,7 @@ export default function Settings() {
   
   // System Status State
   const [systemStatus, setSystemStatus] = useState({
-    ngrok: { running: false, url: null },
+    ngrok: { running: false },
     waha: { running: false }
   });
 
@@ -264,6 +266,92 @@ export default function Settings() {
       setMetaTesting(false);
     }
   };
+
+  // OAuth 2.0 State
+  const { oauthEnforced, oauthStatus, refreshScreens } = useTenant();
+  const [tenantClientId, setTenantClientId] = useState('');
+  const [tenantClientSecret, setTenantClientSecret] = useState('');
+  const [verifyingOauth, setVerifyingOauth] = useState(false);
+  const [savingOauth, setSavingOauth] = useState(false);
+
+  useEffect(() => {
+    if (oauthStatus?.clientId) {
+      setTenantClientId(oauthStatus.clientId);
+    }
+  }, [oauthStatus?.clientId]);
+
+  const handleVerifyOauth = async () => {
+    if (!tenantClientId.trim() || !tenantClientSecret.trim()) {
+      setSnackbar({ open: true, message: 'Please enter both Client ID and Client Secret.', severity: 'warning' });
+      return;
+    }
+    setVerifyingOauth(true);
+    try {
+      const res = await apiClient.post('/settings/verify-oauth', {
+        clientId: tenantClientId.trim(),
+        clientSecret: tenantClientSecret.trim()
+      });
+      if (res.data?.success) {
+        setSnackbar({ open: true, message: 'OAuth 2.0 Credentials verified successfully with Renic Soft Master!', severity: 'success' });
+        if (refreshScreens) refreshScreens();
+      } else {
+        setSnackbar({ open: true, message: res.data?.error || 'Verification failed', severity: 'error' });
+      }
+    } catch (err) {
+      const msg = err.response?.data?.error || err.message || 'Verification failed';
+      setSnackbar({ open: true, message: msg, severity: 'error' });
+    } finally {
+      setVerifyingOauth(false);
+    }
+  };
+
+  const handleSaveOauthCredentials = async () => {
+    setSavingOauth(true);
+    try {
+      const res = await apiClient.post('/settings/oauth-credentials', {
+        clientId: tenantClientId.trim(),
+        clientSecret: tenantClientSecret.trim()
+      });
+      if (res.data?.success) {
+        setSnackbar({ open: true, message: 'OAuth Credentials saved successfully.', severity: 'success' });
+        if (refreshScreens) refreshScreens();
+      } else {
+        setSnackbar({ open: true, message: res.data?.error || 'Failed to save', severity: 'error' });
+      }
+    } catch (err) {
+      setSnackbar({ open: true, message: err.message || 'Failed to save', severity: 'error' });
+    } finally {
+      setSavingOauth(false);
+    }
+  };
+
+  const [oauthData, setOauthData] = useState({
+    clientId: '',
+    scopes: [],
+    lastUsedAt: null
+  });
+  const [newSecretGenerated, setNewSecretGenerated] = useState('');
+  const [generatingSecret, setGeneratingSecret] = useState(false);
+
+  const fetchOAuthCredentials = async () => {
+    try {
+      const res = await apiClient.get('/v1/oauth/credentials');
+      if (res.data?.success) {
+        setOauthData({
+          clientId: res.data.clientId,
+          scopes: res.data.scopes || [],
+          lastUsedAt: res.data.lastUsedAt
+        });
+        if (res.data.clientSecret) {
+          setNewSecretGenerated(res.data.clientSecret);
+        }
+      }
+    } catch (err) {
+      console.warn('OAuth credentials fetch warning:', err);
+    }
+  };
+
+  // OAuth credentials are centrally managed by Renic Soft Master HQ (SAP DM Governance)
 
   const [knowledgeDocs, setKnowledgeDocs] = useState([]);
   const [loadingDocs, setLoadingDocs] = useState(false);
@@ -883,7 +971,10 @@ export default function Settings() {
       >
         <Tabs
           value={activeTab}
-          onChange={(_, val) => setActiveTab(val)}
+          onChange={(_, val) => {
+            setActiveTab(val);
+            if (val === 4) fetchOAuthCredentials();
+          }}
           variant="fullWidth"
           sx={{
             minHeight: 44,
@@ -900,13 +991,14 @@ export default function Settings() {
               transition: 'all 0.2s ease',
               gap: 1.2,
               '&.Mui-selected': {
-                color: '#2563eb',
+                color: '#3f6212',
                 bgcolor: '#ffffff',
-                boxShadow: '0 4px 6px -1px rgba(0,0,0,0.08), 0 2px 4px -1px rgba(0,0,0,0.03)'
+                boxShadow: '0 4px 6px -1px rgba(0,0,0,0.08), 0 2px 4px -1px rgba(0,0,0,0.03)',
+                border: '1px solid rgba(132, 204, 22, 0.4)'
               },
               '&:hover:not(.Mui-selected)': {
                 bgcolor: 'rgba(255,255,255,0.4)',
-                color: '#334155'
+                color: '#0f172a'
               }
             }
           }}
@@ -915,13 +1007,14 @@ export default function Settings() {
           <Tab icon={<SmartToyIcon sx={{ fontSize: 18 }} />} iconPosition="start" label="AI & Policies" />
           <Tab icon={<ChatIcon sx={{ fontSize: 18 }} />} iconPosition="start" label="WhatsApp Login" />
           <Tab icon={<CloudIcon sx={{ fontSize: 18 }} />} iconPosition="start" label="Meta API Config" />
+          <Tab icon={<KeyIcon sx={{ fontSize: 18 }} />} iconPosition="start" label="API & OAuth 2.0" />
         </Tabs>
       </Paper>
 
       {/* Tab Panels */}
       {loadingConfig ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-          <CircularProgress />
+          <CircularProgress sx={{ color: '#84cc16' }} />
         </Box>
       ) : (
         <Box sx={{ width: '100%' }}>
@@ -949,8 +1042,8 @@ export default function Settings() {
                 >
                   <CardContent sx={{ p: 4 }}>
                     <Stack direction="row" spacing={2} sx={{ alignItems: 'center', mb: 3 }}>
-                      <Box sx={{ width: 40, height: 40, borderRadius: '10px', bgcolor: '#DBEAFE', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <StorefrontIcon sx={{ color: '#2563EB', fontSize: 20 }} />
+                      <Box sx={{ width: 40, height: 40, borderRadius: '10px', bgcolor: 'rgba(132, 204, 22, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <StorefrontIcon sx={{ color: '#4d7c0f', fontSize: 20 }} />
                       </Box>
                       <Box>
                         <Typography variant="h6" sx={{ fontWeight: 800, color: '#1e293b' }}>
@@ -968,7 +1061,7 @@ export default function Settings() {
                         fullWidth
                         value={shopConfig.shopName}
                         onChange={(e) => handleConfigChange('shopName', e.target.value)}
-                        InputProps={{ sx: { borderRadius: '12px' } }}
+                        slotProps={{ input: { sx: { borderRadius: '12px' } } }}
                       />
                       <TextField
                         label="Store Address"
@@ -977,7 +1070,7 @@ export default function Settings() {
                         rows={2}
                         value={shopConfig.address}
                         onChange={(e) => handleConfigChange('address', e.target.value)}
-                        InputProps={{ sx: { borderRadius: '12px' } }}
+                        slotProps={{ input: { sx: { borderRadius: '12px' } } }}
                       />
                       <TextField
                         label="Jewelry Website URL (One URL)"
@@ -985,7 +1078,7 @@ export default function Settings() {
                         value={shopConfig.websiteUrl || ''}
                         placeholder="e.g. https://kanalli.in/"
                         onChange={(e) => handleConfigChange('websiteUrl', e.target.value)}
-                        InputProps={{ sx: { borderRadius: '12px' } }}
+                        slotProps={{ input: { sx: { borderRadius: '12px' } } }}
                       />
                       <TextField
                         label="Catalog Cover Image URL (One URL Image)"
@@ -994,7 +1087,7 @@ export default function Settings() {
                         placeholder="e.g. https://kanalli.in/wp-content/uploads/...logo.png"
                         onChange={(e) => handleConfigChange('catalogImageUrl', e.target.value)}
                         helperText="Used to scrape logo/banner dynamically if left blank."
-                        InputProps={{ sx: { borderRadius: '12px' } }}
+                        slotProps={{ input: { sx: { borderRadius: '12px' } } }}
                       />
 
                       <Grid container spacing={2.5}>
@@ -1004,7 +1097,7 @@ export default function Settings() {
                             fullWidth
                             value={shopConfig.contactPhone}
                             onChange={(e) => handleConfigChange('contactPhone', e.target.value)}
-                            InputProps={{ sx: { borderRadius: '12px' } }}
+                            slotProps={{ input: { sx: { borderRadius: '12px' } } }}
                           />
                         </Grid>
                         <Grid item xs={6}>
@@ -1013,7 +1106,7 @@ export default function Settings() {
                             fullWidth
                             value={shopConfig.operatingHours}
                             onChange={(e) => handleConfigChange('operatingHours', e.target.value)}
-                            InputProps={{ sx: { borderRadius: '12px' } }}
+                            slotProps={{ input: { sx: { borderRadius: '12px' } } }}
                           />
                         </Grid>
                       </Grid>
@@ -1033,15 +1126,16 @@ export default function Settings() {
                     disabled={savingConfig}
                     sx={{ 
                       borderRadius: '12px', 
-                      fontWeight: 700, 
+                      fontWeight: 800, 
                       px: 4, 
                       py: 1.5, 
                       textTransform: 'none',
-                      bgcolor: '#2563EB',
-                      boxShadow: '0 4px 14px rgba(37, 99, 235, 0.25)',
+                      bgcolor: '#84cc16',
+                      color: '#0f172a',
+                      boxShadow: '0 4px 14px rgba(132, 204, 22, 0.35)',
                       '&:hover': {
-                        bgcolor: '#1d4ed8',
-                        boxShadow: '0 6px 20px rgba(37, 99, 235, 0.35)'
+                        bgcolor: '#65a30d',
+                        boxShadow: '0 6px 20px rgba(132, 204, 22, 0.45)'
                       }
                     }}
                   >
@@ -1095,7 +1189,7 @@ export default function Settings() {
                         rows={3}
                         value={shopConfig.returnPolicy}
                         onChange={(e) => handleConfigChange('returnPolicy', e.target.value)}
-                        InputProps={{ sx: { borderRadius: '12px' } }}
+                        slotProps={{ input: { sx: { borderRadius: '12px' } } }}
                       />
                       <TextField
                         label="Custom AI Behavior Instructions"
@@ -1105,7 +1199,7 @@ export default function Settings() {
                         value={shopConfig.aiCustomInstructions}
                         onChange={(e) => handleConfigChange('aiCustomInstructions', e.target.value)}
                         placeholder="e.g. Always offer custom metal/carat configurations. Address customers with respect. Suggest visiting the website for checkout."
-                        InputProps={{ sx: { borderRadius: '12px' } }}
+                        slotProps={{ input: { sx: { borderRadius: '12px' } } }}
                         helperText="Provide specific guidelines on tone, language preference, and catalog presentation."
                       />
                     </Stack>
@@ -1195,7 +1289,7 @@ export default function Settings() {
                           value={newFaq.question}
                           onChange={(e) => setNewFaq({ ...newFaq, question: e.target.value })}
                           placeholder="e.g. Do you ship internationally?"
-                          InputProps={{ sx: { borderRadius: '12px' } }}
+                          slotProps={{ input: { sx: { borderRadius: '12px' } } }}
                         />
                       </Grid>
                       <Grid item xs={12} sm={5}>
@@ -1207,7 +1301,7 @@ export default function Settings() {
                           value={newFaq.answer}
                           onChange={(e) => setNewFaq({ ...newFaq, answer: e.target.value })}
                           placeholder="e.g. Yes, we ship worldwide. Shipping rates vary by country."
-                          InputProps={{ sx: { borderRadius: '12px' } }}
+                          slotProps={{ input: { sx: { borderRadius: '12px' } } }}
                         />
                       </Grid>
                       <Grid item xs={12} sm={2}>
@@ -1244,15 +1338,16 @@ export default function Settings() {
                     disabled={savingConfig}
                     sx={{ 
                       borderRadius: '12px', 
-                      fontWeight: 700, 
+                      fontWeight: 800, 
                       px: 4, 
                       py: 1.5, 
                       textTransform: 'none',
-                      bgcolor: '#2563EB',
-                      boxShadow: '0 4px 14px rgba(37, 99, 235, 0.25)',
+                      bgcolor: '#84cc16',
+                      color: '#0f172a',
+                      boxShadow: '0 4px 14px rgba(132, 204, 22, 0.35)',
                       '&:hover': {
-                        bgcolor: '#1d4ed8',
-                        boxShadow: '0 6px 20px rgba(37, 99, 235, 0.35)'
+                        bgcolor: '#65a30d',
+                        boxShadow: '0 6px 20px rgba(132, 204, 22, 0.45)'
                       }
                     }}
                   >
@@ -1395,11 +1490,11 @@ export default function Settings() {
                     <Grid item xs={12} sm={4}>
                       <Paper variant="outlined" sx={{ p: 2.5, borderRadius: '12px', textAlign: 'left', bgcolor: systemStatus.ngrok.running ? '#ECFDF5' : '#FEF2F2', borderColor: systemStatus.ngrok.running ? '#A7F3D0' : '#FECACA', height: '100%' }}>
                         <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
-                          PUBLIC TUNNEL (NGROK)
+                          TUNNEL STATUS
                           <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: systemStatus.ngrok.running ? '#10B981' : '#EF4444' }} />
                         </Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 600, mt: 0.5, color: systemStatus.ngrok.running ? '#065F46' : '#991B1B', wordBreak: 'break-all' }}>
-                          {systemStatus.ngrok.running ? systemStatus.ngrok.url : 'Not Running'}
+                        <Typography variant="body2" sx={{ fontWeight: 600, mt: 0.5, color: systemStatus.ngrok.running ? '#065F46' : '#991B1B' }}>
+                          {systemStatus.ngrok.running ? 'Connected' : 'Disconnected'}
                         </Typography>
                       </Paper>
                     </Grid>
@@ -1416,13 +1511,13 @@ export default function Settings() {
                           width: 56, 
                           height: 56, 
                           borderRadius: '12px', 
-                          bgcolor: '#EFF6FF', 
+                          bgcolor: 'rgba(132, 204, 22, 0.15)', 
                           display: 'flex', 
                           justifyContent: 'center', 
                           alignItems: 'center',
                           mb: 2.5
                         }}>
-                          <SmartToyIcon sx={{ fontSize: 28, color: '#2563EB' }} />
+                          <SmartToyIcon sx={{ fontSize: 28, color: '#4d7c0f' }} />
                         </Box>
                         
                         <Typography variant="h6" sx={{ fontWeight: 800, mb: 1, color: '#1F2937' }}>
@@ -1533,9 +1628,7 @@ export default function Settings() {
                             value={pairingPhone}
                             onChange={(e) => setPairingPhone(e.target.value)}
                             fullWidth
-                            InputProps={{
-                              sx: { borderRadius: '12px' }
-                            }}
+                            slotProps={{ input: { sx: { borderRadius: '12px' } } }}
                           />
                           <Button
                             variant="contained"
@@ -1545,11 +1638,12 @@ export default function Settings() {
                             disableElevation
                             sx={{ 
                               borderRadius: '12px', 
-                              fontWeight: 700,
+                              fontWeight: 800,
                               py: 1.5,
                               textTransform: 'none',
-                              bgcolor: '#2563EB',
-                              '&:hover': { bgcolor: '#1d4ed8' }
+                              bgcolor: '#84cc16',
+                              color: '#0f172a',
+                              '&:hover': { bgcolor: '#65a30d' }
                             }}
                           >
                             {requestingCode ? 'Requesting Code...' : 'Get Pairing Code'}
@@ -1695,7 +1789,7 @@ export default function Settings() {
                   onChange={(e) => handleMetaConfigChange('metaHandoffMessage', e.target.value)}
                   disabled={!metaConfig.metaApiEnabled || !metaConfig.metaForwardReplies}
                   helperText="Use {name} for the customer name. Sent from Meta when first message is received."
-                  InputProps={{ sx: { borderRadius: '12px' } }}
+                  slotProps={{ input: { sx: { borderRadius: '12px' } } }}
                 />
 
                 <TextField
@@ -1707,7 +1801,7 @@ export default function Settings() {
                   onChange={(e) => handleMetaConfigChange('metaAutoReplyMessage', e.target.value)}
                   disabled={!metaConfig.metaApiEnabled || !metaConfig.metaForwardReplies}
                   helperText="Use {name} for the customer name. Sent from your logged-in WhatsApp (WAHA) as the first reply."
-                  InputProps={{ sx: { borderRadius: '12px' } }}
+                  slotProps={{ input: { sx: { borderRadius: '12px' } } }}
                 />
 
                 <Alert
@@ -1730,8 +1824,8 @@ export default function Settings() {
               <Card elevation={0} sx={{ borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', bgcolor: '#ffffff', height: '100%' }}>
                 <CardContent sx={{ p: 4 }}>
                   <Stack direction="row" spacing={2} sx={{ alignItems: 'center', mb: 3 }}>
-                    <Box sx={{ width: 40, height: 40, borderRadius: '10px', bgcolor: '#DBEAFE', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <CloudIcon sx={{ color: '#2563EB', fontSize: 20 }} />
+                    <Box sx={{ width: 40, height: 40, borderRadius: '10px', bgcolor: 'rgba(132, 204, 22, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <CloudIcon sx={{ color: '#4d7c0f', fontSize: 20 }} />
                     </Box>
                     <Box>
                       <Typography variant="h6" sx={{ fontWeight: 800, color: '#1e293b' }}>
@@ -1762,7 +1856,7 @@ export default function Settings() {
                       onChange={(e) => handleMetaConfigChange('metaAppId', e.target.value)}
                       placeholder="e.g. 123456789012345"
                       disabled={!metaConfig.metaApiEnabled}
-                      InputProps={{ sx: { borderRadius: '12px' } }}
+                      slotProps={{ input: { sx: { borderRadius: '12px' } } }}
                     />
 
                     <TextField
@@ -1773,7 +1867,7 @@ export default function Settings() {
                       onChange={(e) => handleMetaConfigChange('metaAppSecret', e.target.value)}
                       placeholder="Enter your Meta App Secret"
                       disabled={!metaConfig.metaApiEnabled}
-                      InputProps={{ sx: { borderRadius: '12px' } }}
+                      slotProps={{ input: { sx: { borderRadius: '12px' } } }}
                     />
 
                     <TextField
@@ -1784,7 +1878,7 @@ export default function Settings() {
                       placeholder="e.g. 123456789012345"
                       disabled={!metaConfig.metaApiEnabled}
                       helperText="The WhatsApp Business phone number ID from Meta Developer Portal"
-                      InputProps={{ sx: { borderRadius: '12px' } }}
+                      slotProps={{ input: { sx: { borderRadius: '12px' } } }}
                     />
 
                     <TextField
@@ -1794,7 +1888,7 @@ export default function Settings() {
                       onChange={(e) => handleMetaConfigChange('metaBusinessAccountId', e.target.value)}
                       placeholder="e.g. 123456789012345"
                       disabled={!metaConfig.metaApiEnabled}
-                      InputProps={{ sx: { borderRadius: '12px' } }}
+                      slotProps={{ input: { sx: { borderRadius: '12px' } } }}
                     />
                   </Stack>
                 </CardContent>
@@ -1829,7 +1923,7 @@ export default function Settings() {
                       placeholder="Enter your Meta permanent access token"
                       disabled={!metaConfig.metaApiEnabled}
                       helperText="Use a permanent system user access token from Meta Business Manager"
-                      InputProps={{ sx: { borderRadius: '12px' } }}
+                      slotProps={{ input: { sx: { borderRadius: '12px' } } }}
                     />
 
                     <TextField
@@ -1840,7 +1934,7 @@ export default function Settings() {
                       placeholder="e.g. renic_meta_verify_token_2026"
                       disabled={!metaConfig.metaApiEnabled}
                       helperText="A secret token for webhook verification"
-                      InputProps={{ sx: { borderRadius: '12px' } }}
+                      slotProps={{ input: { sx: { borderRadius: '12px' } } }}
                     />
                   </Stack>
 
@@ -1852,12 +1946,13 @@ export default function Settings() {
                       disabled={savingConfig || !metaConfig.metaApiEnabled}
                       sx={{ 
                         borderRadius: '12px', 
-                        fontWeight: 700, 
+                        fontWeight: 800, 
                         textTransform: 'none',
                         px: 3.5,
                         py: 1.2,
-                        bgcolor: '#2563EB',
-                        '&:hover': { bgcolor: '#1d4ed8' }
+                        bgcolor: '#84cc16',
+                        color: '#0f172a',
+                        '&:hover': { bgcolor: '#65a30d' }
                       }}
                     >
                       {savingConfig ? 'Saving...' : 'Save Meta Config'}
@@ -1889,6 +1984,259 @@ export default function Settings() {
                       {metaTestResult.message}
                     </Alert>
                   )}
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
+        </Box>
+      )}
+
+      {/* Tab 5: API & OAuth 2.0 Credentials */}
+      {activeTab === 4 && (
+        <Box sx={{ width: '100%' }}>
+          <Grid container spacing={3.5} sx={{
+            '@keyframes tabFadeIn': {
+              from: { opacity: 0, transform: 'translateY(6px)' },
+              to: { opacity: 1, transform: 'translateY(0)' }
+            },
+            animation: 'tabFadeIn 0.25s cubic-bezier(0.25, 0.8, 0.25, 1) forwards'
+          }}>
+            {/* Credentials Card */}
+            <Grid item xs={12} md={7}>
+              <Card sx={{ 
+                borderRadius: '16px', 
+                border: '1px solid #e2e8f0', 
+                boxShadow: '0 4px 12px -2px rgba(0,0,0,0.05)',
+                bgcolor: '#ffffff',
+                p: { xs: 2.5, sm: 3 }
+              }}>
+                <CardContent sx={{ p: 0 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                      <Box sx={{ width: 40, height: 40, borderRadius: '10px', bgcolor: 'rgba(132, 204, 22, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <KeyIcon sx={{ color: '#65a30d', fontSize: 22 }} />
+                      </Box>
+                      <Box>
+                        <Typography variant="h6" sx={{ fontWeight: 800, color: '#0f172a', fontSize: '1.1rem' }}>
+                          OAuth 2.0 Client Credentials
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: '#64748b' }}>
+                          Standard RFC 6749 Client Credentials for Renic Soft Master Security & API Authentication
+                        </Typography>
+                      </Box>
+                    </Box>
+                    <Chip 
+                      label={!oauthEnforced ? 'Permissive Mode — Optional' : (oauthStatus?.verified ? 'OAuth 2.0 Verified & Active' : 'OAuth Enforced — Action Required')} 
+                      size="small" 
+                      sx={{ 
+                        bgcolor: !oauthEnforced ? '#f1f5f9' : (oauthStatus?.verified ? '#dcfce7' : '#ffedd5'), 
+                        color: !oauthEnforced ? '#64748b' : (oauthStatus?.verified ? '#166534' : '#c2410c'), 
+                        fontWeight: 800, 
+                        fontSize: '0.75rem',
+                        border: !oauthEnforced ? '1px solid #cbd5e1' : (oauthStatus?.verified ? '1px solid #86efac' : '1px solid #fdba74')
+                      }} 
+                    />
+                  </Box>
+
+                  {oauthEnforced && !oauthStatus?.verified && (
+                    <Alert severity="warning" sx={{ mb: 2.5, borderRadius: '10px' }}>
+                      <Typography variant="caption" sx={{ fontWeight: 700, display: 'block' }}>
+                        OAuth 2.0 Enforcement Active
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: '#9a3412', display: 'block', mt: 0.3 }}>
+                        Renic Soft Master HQ has strictly enforced OAuth authentication. Other screens are currently locked. Enter your provisioned Client ID &amp; Secret and click &quot;Verify Credentials&quot; to unlock.
+                      </Typography>
+                    </Alert>
+                  )}
+
+                  {oauthEnforced && oauthStatus?.verified && (
+                    <Alert severity="success" sx={{ mb: 2.5, borderRadius: '10px' }}>
+                      <Typography variant="caption" sx={{ fontWeight: 700, display: 'block' }}>
+                        OAuth 2.0 Machine-to-Machine Security Verified &amp; Active
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: '#166534', display: 'block', mt: 0.3 }}>
+                        Valid tokens verified with Renic Soft Master HQ. All automation features and workflows unlocked.
+                      </Typography>
+                    </Alert>
+                  )}
+
+                  <Stack spacing={2.5}>
+                    <Box>
+                      <Typography variant="caption" sx={{ fontWeight: 700, color: '#475569', mb: 0.8, display: 'block' }}>
+                        Client ID
+                      </Typography>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        placeholder="e.g. rnc_cli_live_..."
+                        value={tenantClientId}
+                        onChange={(e) => setTenantClientId(e.target.value)}
+                        slotProps={{
+                          input: {
+                            sx: { fontFamily: 'monospace', fontSize: '0.9rem', bgcolor: '#f8fafc', fontWeight: 600 }
+                          }
+                        }}
+                      />
+                    </Box>
+
+                    <Box>
+                      <Typography variant="caption" sx={{ fontWeight: 700, color: '#475569', mb: 0.8, display: 'block' }}>
+                        Client Secret
+                      </Typography>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        type="password"
+                        placeholder="Enter Client Secret from Renic Soft"
+                        value={tenantClientSecret}
+                        onChange={(e) => setTenantClientSecret(e.target.value)}
+                        slotProps={{
+                          input: {
+                            sx: { fontFamily: 'monospace', bgcolor: '#f8fafc' }
+                          }
+                        }}
+                      />
+                    </Box>
+
+                    <Box sx={{ display: 'flex', gap: 1.5 }}>
+                      <Button
+                        variant="contained"
+                        disabled={verifyingOauth || !tenantClientId.trim() || !tenantClientSecret.trim()}
+                        onClick={handleVerifyOauth}
+                        sx={{
+                          bgcolor: '#84cc16',
+                          color: '#0f172a',
+                          fontWeight: 800,
+                          textTransform: 'none',
+                          px: 3,
+                          '&:hover': { bgcolor: '#65a30d' }
+                        }}
+                      >
+                        {verifyingOauth ? 'Verifying with HQ...' : 'Verify Credentials'}
+                      </Button>
+                      <Button
+                        variant="outlined"
+                        disabled={savingOauth}
+                        onClick={handleSaveOauthCredentials}
+                        sx={{
+                          borderColor: '#cbd5e1',
+                          color: '#334155',
+                          fontWeight: 700,
+                          textTransform: 'none',
+                          '&:hover': { borderColor: '#94a3b8' }
+                        }}
+                      >
+                        {savingOauth ? 'Saving...' : 'Save Credentials'}
+                      </Button>
+                    </Box>
+
+                    <Box sx={{ mt: 1.5, p: 1.5, bgcolor: '#f8fafc', borderRadius: 2, border: '1px dashed #cbd5e1' }}>
+                      <Typography variant="caption" sx={{ color: '#0f172a', display: 'flex', alignItems: 'center', gap: 0.8, fontWeight: 700 }}>
+                        <span>🛡️</span> Security &amp; Token Architecture:
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mt: 0.5, lineHeight: 1.45 }}>
+                        OAuth 2.0 Client credentials authorize external API integrations (Tally, ERP, POS) and secure tenant software access. Credentials can be generated in Renic Soft Master Cockpit.
+                      </Typography>
+                    </Box>
+
+                    <Box sx={{ pt: 1 }}>
+                      <Typography variant="caption" sx={{ fontWeight: 700, color: '#475569', mb: 1, display: 'block' }}>
+                        Permitted OAuth 2.0 Scopes
+                      </Typography>
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                        {(oauthData.scopes.length > 0 ? oauthData.scopes : [
+                          'messages:send', 'messages:read', 'catalog:read', 'templates:read', 'customers:read'
+                        ]).map((scope) => (
+                          <Chip 
+                            key={scope} 
+                            label={scope} 
+                            size="small" 
+                            sx={{ 
+                              bgcolor: '#f1f5f9', 
+                              color: '#334155', 
+                              fontFamily: 'monospace', 
+                              fontSize: '0.75rem',
+                              fontWeight: 600,
+                              border: '1px solid #e2e8f0' 
+                            }} 
+                          />
+                        ))}
+                      </Box>
+                    </Box>
+                  </Stack>
+                </CardContent>
+              </Card>
+            </Grid>
+
+            {/* Developer Integration Guide */}
+            <Grid item xs={12} md={5}>
+              <Card sx={{ 
+                borderRadius: '16px', 
+                border: '1px solid #e2e8f0', 
+                boxShadow: '0 4px 12px -2px rgba(0,0,0,0.05)',
+                bgcolor: '#0f172a',
+                color: '#ffffff',
+                p: { xs: 2.5, sm: 3 }
+              }}>
+                <CardContent sx={{ p: 0 }}>
+                  <Typography variant="h6" sx={{ fontWeight: 800, color: '#ffffff', mb: 1, fontSize: '1rem', display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <span style={{ color: '#84cc16' }}>⚡</span> Integration Guide (Tally / ERP)
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: '#94a3b8', mb: 2, display: 'block' }}>
+                    Step 1: Obtain a temporary 1-hour Bearer Token using your credentials:
+                  </Typography>
+
+                  <Box sx={{ 
+                    p: 1.5, 
+                    borderRadius: '8px', 
+                    bgcolor: 'rgba(0,0,0,0.4)', 
+                    fontFamily: 'monospace', 
+                    fontSize: '0.72rem', 
+                    color: '#a7f3d0',
+                    overflowX: 'auto',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    mb: 2
+                  }}>
+                    {`curl -X POST ${window.location.origin}/api/v1/oauth/token \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "grant_type": "client_credentials",
+    "client_id": "${oauthData.clientId || 'YOUR_CLIENT_ID'}",
+    "client_secret": "YOUR_CLIENT_SECRET"
+  }'`}
+                  </Box>
+
+                  <Typography variant="caption" sx={{ color: '#94a3b8', mb: 1, display: 'block' }}>
+                    Step 2: Dispatch WhatsApp message with your token:
+                  </Typography>
+
+                  <Box sx={{ 
+                    p: 1.5, 
+                    borderRadius: '8px', 
+                    bgcolor: 'rgba(0,0,0,0.4)', 
+                    fontFamily: 'monospace', 
+                    fontSize: '0.72rem', 
+                    color: '#93c5fd',
+                    overflowX: 'auto',
+                    border: '1px solid rgba(255,255,255,0.08)'
+                  }}>
+                    {`curl -X POST ${window.location.origin}/api/messages \\
+  -H "Authorization: Bearer <ACCESS_TOKEN>" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "to": "919876543210",
+    "message": "Your invoice INV-001 is ready!"
+  }'`}
+                  </Box>
+
+                  <Box sx={{ mt: 2.5, p: 1.5, borderRadius: '8px', bgcolor: 'rgba(132, 204, 22, 0.1)', border: '1px solid rgba(132, 204, 22, 0.2)' }}>
+                    <Typography variant="caption" sx={{ color: '#bef264', fontWeight: 700, display: 'block' }}>
+                      🔒 Zero-Knowledge Security Active
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: '#e2e8f0', fontSize: '0.7rem' }}>
+                      Tokens auto-expire every 3600 seconds. If an ERP system is compromised, regenerate your secret above to revoke all active tokens immediately.
+                    </Typography>
+                  </Box>
                 </CardContent>
               </Card>
             </Grid>

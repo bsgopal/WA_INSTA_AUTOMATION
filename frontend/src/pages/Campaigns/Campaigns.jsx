@@ -36,7 +36,6 @@ export default function Campaigns() {
 
   // Campaign data management
   const [campaigns, setCampaigns] = useState([]);
-  const [filteredCampaigns, setFilteredCampaigns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     total: 0,
@@ -57,9 +56,10 @@ export default function Campaigns() {
   const [launchConfirmOpen, setLaunchConfirmOpen] = useState(false);
   const [scheduleConfirmOpen, setScheduleConfirmOpen] = useState(false);
 
-  // Search and filter
+  // Search, filter and view mode
   const [searchValue, setSearchValue] = useState('');
   const [filterValue, setFilterValue] = useState('');
+  const [viewMode, setViewMode] = useState('CARDS');
 
   // Notification
   const [snackbar, setSnackbar] = useState({
@@ -75,10 +75,11 @@ export default function Campaigns() {
 
   /**
    * Fetch all campaigns from API
+   * @param {boolean} silent - When true, refreshes data in background without showing full-page skeletons
    */
-  const fetchCampaigns = useCallback(async () => {
+  const fetchCampaigns = useCallback(async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const response = await apiClient.get('/campaigns');
       const campaignsList = response.data.campaigns || [];
       setCampaigns(campaignsList);
@@ -92,13 +93,15 @@ export default function Campaigns() {
       setStats({ total, active, completed, draft });
     } catch (error) {
       console.error('Failed to fetch campaigns:', error);
-      setSnackbar({
-        open: true,
-        message: 'Failed to load campaigns',
-        severity: 'error'
-      });
+      if (!silent) {
+        setSnackbar({
+          open: true,
+          message: 'Failed to load campaigns',
+          severity: 'error'
+        });
+      }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 
@@ -110,21 +113,18 @@ export default function Campaigns() {
     [fetchCampaigns]
   );
 
-  // Auto-refresh campaigns every 10 seconds for status updates
+  // Auto-refresh campaigns every 10 seconds for status updates silently in the background
   useEffect(() => {
-    fetchCampaigns();
+    fetchCampaigns(false);
     const refreshInterval = setInterval(() => {
-      fetchCampaigns();
+      fetchCampaigns(true);
     }, 10000);
     return () => clearInterval(refreshInterval);
   }, [fetchCampaigns]);
 
-  // ============ SEARCH AND FILTERING ============
+  // ============ SEARCH AND FILTERING (MEMOIZED) ============
 
-  /**
-   * Apply search and filter to campaigns
-   */
-  useEffect(() => {
+  const filteredCampaigns = useMemo(() => {
     let result = campaigns;
 
     // Apply status filter
@@ -142,7 +142,7 @@ export default function Campaigns() {
       );
     }
 
-    setFilteredCampaigns(result);
+    return result;
   }, [campaigns, searchValue, filterValue]);
 
   // ============ EVENT HANDLERS ============
@@ -174,6 +174,7 @@ export default function Campaigns() {
    */
   const handleEditCampaign = useCallback((campaign) => {
     setSelectedCampaign(campaign);
+    setDetailsPanelOpen(false);
     setEditFormOpen(true);
   }, []);
 
@@ -182,6 +183,7 @@ export default function Campaigns() {
    */
   const handleLaunchCampaign = useCallback(async (campaign) => {
     setSelectedCampaign(campaign);
+    setDetailsPanelOpen(false);
     
     // Estimate reach based on target segment
     const segment = campaign.targetAudience?.segments?.[0] || 'ALL';
@@ -232,6 +234,7 @@ export default function Campaigns() {
    */
   const handleDeleteCampaign = useCallback((campaign) => {
     setSelectedCampaign(campaign);
+    setDetailsPanelOpen(false);
     setDeleteConfirmOpen(true);
   }, []);
 
@@ -240,6 +243,7 @@ export default function Campaigns() {
    */
   const handleManualSendCampaign = useCallback((campaign) => {
     setSelectedCampaign(campaign);
+    setDetailsPanelOpen(false);
     setManualSendOpen(true);
   }, []);
 
@@ -369,13 +373,16 @@ export default function Campaigns() {
         onCreate={() => setCreateWizardOpen(true)}
         searchValue={searchValue}
         filterValue={filterValue}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
         loading={loading}
       />
 
       <Box sx={{ mt: 2 }}>
-<CampaignList
+        <CampaignList
           campaigns={filteredCampaigns}
           loading={loading}
+          viewMode={viewMode}
           onCreate={() => setCreateWizardOpen(true)}
           onView={handleViewCampaign}
           onEdit={handleEditCampaign}

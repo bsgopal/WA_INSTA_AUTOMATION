@@ -28,6 +28,26 @@ class OwnerNotificationService {
         return { success: false, reason: 'Owner number not configured' };
       }
 
+      // 1. Never forward to owner if owner is the customer sending the message
+      const cleanOwner = String(ownerPhone).replace(/\D/g, '').slice(-10);
+      const cleanCustomer = String(customer?.phone || '').replace(/\D/g, '').slice(-10);
+      if (cleanOwner && cleanCustomer && cleanOwner === cleanCustomer) {
+        console.log(`[OwnerNotification] Skipping lead alert: owner (${cleanOwner}) is the sender`);
+        return { success: false, reason: 'Owner is sender' };
+      }
+
+      // 2. Cooldown check: max 1 alert per customer every 15 minutes to avoid spamming
+      if (!global._leadAlertCooldowns) {
+        global._leadAlertCooldowns = new Map();
+      }
+      const customerKey = String(customer?._id || cleanCustomer);
+      const lastAlert = global._leadAlertCooldowns.get(customerKey);
+      if (lastAlert && (Date.now() - lastAlert < 15 * 60 * 1000)) {
+        console.log(`[OwnerNotification] Alert cooldown active for customer ${customerKey}. Skipping duplicate forward.`);
+        return { success: true, reason: 'COOLDOWN_ACTIVE' };
+      }
+      global._leadAlertCooldowns.set(customerKey, Date.now());
+
       // Build alert message
       const alertMessage = this.buildAlertMessage(
         customer,

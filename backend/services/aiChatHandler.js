@@ -35,32 +35,63 @@ function getLevenshteinDistance(a, b) {
   return matrix[b.length][a.length];
 }
 
-function fuzzyMatch(text, keyword, threshold = 0.8) {
-  const textLower = text.toLowerCase().trim();
-  const keywordLower = keyword.toLowerCase().trim();
-  if (textLower.includes(keywordLower)) return true;
+/**
+ * Universal text normalizer for keyword and rule matching
+ * Handles all formats: uppercase (TEXT), lowercase (text), titlecase (Text),
+ * mixed case (tExT), WhatsApp markdown (*TEXT*, _text_, ~text~), punctuation, and accents.
+ */
+function normalizeTextForMatching(text) {
+  if (!text) return '';
+  return String(text)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // remove accent marks
+    .replace(/[*_~`]/g, ' ') // strip WhatsApp markdown (*bold*, _italic_, ~strike~, `code`)
+    .toLowerCase()
+    .replace(/[\r\n\t]+/g, ' ') // replace newlines/tabs with spaces
+    .replace(/[^\w\s\u0900-\u0D7F]/g, ' ') // replace punctuation/symbols with spaces while preserving Indic/Unicode characters
+    .replace(/\s+/g, ' ') // collapse multiple spaces
+    .trim();
+}
+
+function fuzzyMatch(text, keyword, threshold = 0.75) {
+  if (!text || !keyword) return false;
   
-  const dist = getLevenshteinDistance(textLower, keywordLower);
-  const maxLen = Math.max(textLower.length, keywordLower.length);
-  if (maxLen > 0) {
-    const similarity = 1 - (dist / maxLen);
-    if (similarity >= threshold) return true;
+  const cleanText = normalizeTextForMatching(text);
+  const cleanKeyword = normalizeTextForMatching(keyword);
+
+  if (!cleanText || !cleanKeyword) return false;
+
+  // 1. Exact match after normalization (e.g. 'TEXT' === 'text', 'Text' === 'TEXT', '*text*' === 'text')
+  if (cleanText === cleanKeyword) return true;
+
+  // 2. Substring match (e.g. 'what is the TEXT format' contains 'text')
+  if (cleanText.includes(cleanKeyword)) return true;
+
+  // 3. Word-level boundary match (e.g. ['hello', 'text', 'please'] has 'text')
+  const textWords = cleanText.split(' ').filter(Boolean);
+  const keywordWords = cleanKeyword.split(' ').filter(Boolean);
+
+  if (textWords.includes(cleanKeyword)) return true;
+
+  for (const tw of textWords) {
+    for (const kw of keywordWords) {
+      if (tw === kw) return true;
+      // Stemming checks: 'pricing' vs 'price', 'prices' vs 'price', 'rates' vs 'rate'
+      if (tw.startsWith(kw) || kw.startsWith(tw)) {
+        if (Math.min(tw.length, kw.length) >= 3) return true;
+      }
+      // Levenshtein distance for typos (e.g. 'prce', 'pirce')
+      const dist = getLevenshteinDistance(tw, kw);
+      const maxLen = Math.max(tw.length, kw.length);
+      if (maxLen > 0 && (1 - (dist / maxLen)) >= threshold) return true;
+    }
   }
-  
-  const textWords = textLower.split(/\s+/).filter(w => w.length > 2);
-  const keywordWords = keywordLower.split(/\s+/).filter(w => w.length > 2);
-  
-  if (keywordWords.length > 0 && textWords.length > 0) {
-    const allWordsMatched = keywordWords.every(kw => {
-      return textWords.some(tw => {
-        if (tw.includes(kw) || kw.includes(tw)) return true;
-        const wDist = getLevenshteinDistance(tw, kw);
-        const wMaxLen = Math.max(tw.length, kw.length);
-        return (1 - (wDist / wMaxLen)) >= threshold;
-      });
-    });
-    if (allWordsMatched) return true;
-  }
+
+  // Entire phrase similarity comparison
+  const fullDist = getLevenshteinDistance(cleanText, cleanKeyword);
+  const fullMaxLen = Math.max(cleanText.length, cleanKeyword.length);
+  if (fullMaxLen > 0 && (1 - (fullDist / fullMaxLen)) >= threshold) return true;
+
   return false;
 }
 
@@ -93,6 +124,105 @@ function detectEmotionAndEnrichText(text) {
   return enriched;
 }
 
+/**
+ * Automatically detects customer emotional state and intent tone
+ */
+function detectCustomerEmotion(messageText, analysis = {}) {
+  const textLower = String(messageText || '').toLowerCase();
+  
+  // 1. Frustrated / Upset / Complaint
+  const angerKeywords = ['bad', 'worst', 'fraud', 'cheated', 'fake', 'horrible', 'disappointed', 'annoying', 'useless', 'waste', 'delay', 'irritated', 'scam', 'terrible', 'pathetic', 'broken', 'angry', 'hate', 'refund', 'complaint', 'why no reply', 'poor service', 'not working'];
+  if (analysis.sentiment === 'NEGATIVE' || angerKeywords.some(kw => textLower.includes(kw)) || analysis.intent === 'complaint') {
+    return {
+      type: 'FRUSTRATED',
+      tone: 'Empathic, Apologetic & Solution-Focused',
+      prefix: '🙏 Namaste. We sincerely apologize for any inconvenience caused.',
+      emojis: '🙏'
+    };
+  }
+
+  // 2. Joyful / Excited / Celebratory (Weddings, Gifts, Anniversaries)
+  const joyKeywords = ['wow', 'awesome', 'beautiful', 'love it', 'super', 'amazing', 'great', 'happy', 'wedding', 'marriage', 'birthday', 'anniversary', 'surprise', 'party', 'festival', 'congrats', 'congratulations', 'yay', 'gorgeous', 'excellent', 'fantastic', 'wonderful', 'loved'];
+  if (analysis.sentiment === 'POSITIVE' || joyKeywords.some(kw => textLower.includes(kw))) {
+    return {
+      type: 'JOYFUL',
+      tone: 'Celebratory, Enthusiastic & Warm',
+      prefix: '🎉 Congratulations & Warmest Wishes! ✨',
+      emojis: '🎉✨💍❤️'
+    };
+  }
+
+  // 3. Urgent / Fast-paced
+  const urgentKeywords = ['urgent', 'asap', 'fast', 'quickly', 'immediately', 'today itself', 'emergency', 'now itself', 'hurry', 'rush', 'express'];
+  if (analysis.urgency === 'high' || urgentKeywords.some(kw => textLower.includes(kw))) {
+    return {
+      type: 'URGENT',
+      tone: 'Direct, Fast & Action-Oriented',
+      prefix: '⚡ Fast Priority Assistance:',
+      emojis: '⚡'
+    };
+  }
+
+  // 4. Confused / Hesitant / Step-by-Step Guidance
+  const confusedKeywords = ['confused', 'dont know', 'how to', 'explain', 'help me', 'guide me', 'which is better', 'not sure', 'suggest', 'recommend', 'difference', 'what should i do'];
+  if (confusedKeywords.some(kw => textLower.includes(kw))) {
+    return {
+      type: 'CONFUSED',
+      tone: 'Reassuring, Clear & Step-by-Step',
+      prefix: '💡 Happy to guide you step-by-step!',
+      emojis: '💡'
+    };
+  }
+
+  // 5. Grateful / Thankful
+  const gratefulKeywords = ['thank you', 'thanks', 'thank u', 'thanks a lot', 'grateful', 'appreciate', 'thankyou'];
+  if (gratefulKeywords.some(kw => textLower.includes(kw))) {
+    return {
+      type: 'GRATEFUL',
+      tone: 'Warm, Courteous & Delightful',
+      prefix: "You're most welcome! 🌸",
+      emojis: '🌸✨'
+    };
+  }
+
+  return {
+    type: 'NEUTRAL_FRIENDLY',
+    tone: 'Helpful, Polite & Professional',
+    prefix: '',
+    emojis: '✨'
+  };
+}
+
+/**
+ * Dynamically calibrates AI response text based on detected emotion
+ */
+function adaptResponseToEmotion(rawResponseText, emotion, customer = {}) {
+  if (!rawResponseText) return '';
+  let text = String(rawResponseText).trim();
+
+  if (emotion.prefix && !text.includes(emotion.prefix)) {
+    if (emotion.type === 'FRUSTRATED') {
+      if (!text.toLowerCase().includes('apologize') && !text.toLowerCase().includes('sorry')) {
+        text = `${emotion.prefix}\n\n${text}`;
+      }
+    } else if (emotion.type === 'JOYFUL') {
+      if (!text.includes('🎉') && !text.includes('✨') && !text.toLowerCase().includes('congratulations')) {
+        text = `${emotion.prefix}\n\n${text}`;
+      }
+    } else if (emotion.type === 'CONFUSED') {
+      if (!text.includes('💡') && !text.toLowerCase().includes('guide')) {
+        text = `${emotion.prefix}\n\n${text}`;
+      }
+    } else if (emotion.type === 'URGENT') {
+      if (!text.includes('⚡') && !text.toLowerCase().includes('priority')) {
+        text = `${emotion.prefix}\n\n${text}`;
+      }
+    }
+  }
+
+  return detectEmotionAndEnrichText(text);
+}
+
 class AIChatHandler {
   isPlaceholderName(name, phoneNumber) {
     const normalizedName = String(name || '').trim().toLowerCase();
@@ -101,16 +231,63 @@ class AIChatHandler {
     return (
       !normalizedName ||
       normalizedName === 'customer' ||
+      normalizedName.startsWith('customer') ||
+      normalizedName.includes('@lid') ||
+      normalizedName.includes('@c.us') ||
+      normalizedName.includes('@s.whatsapp.net') ||
       normalizedName === normalizedPhone ||
-      normalizedName === `+${normalizedPhone}`
+      normalizedName === `+${normalizedPhone}` ||
+      normalizedName.startsWith('+')
     );
   }
 
-  cleanReplyValue(value) {
-    return String(value || '').replace(/\s+/g, ' ').trim();
+  cleanReplyValue(value, customer = {}) {
+    if (!value) return '';
+    let text = String(value);
+    
+    // Extract customer name
+    const rawFirstName = customer.firstName || customer.name || customer.displayName || customer.customFields?.displayName || customer.customFields?.pushName || '';
+    const rawLastName = customer.lastName || '';
+    const fullName = `${rawFirstName} ${rawLastName}`.trim();
+    const displayName = rawFirstName || fullName || '';
+
+    const placeholders = {
+      '[Customer Name]': displayName,
+      '[customer_name]': displayName,
+      '[Customer name]': displayName,
+      '[CustomerName]': displayName,
+      '[customer name]': displayName,
+      '[Name]': displayName,
+      '[name]': displayName,
+      '[First Name]': rawFirstName,
+      '[first_name]': rawFirstName,
+      '{Customer Name}': displayName,
+      '{customer_name}': displayName,
+      '{name}': displayName,
+      '{firstName}': rawFirstName,
+      '{{firstName}}': rawFirstName,
+      '{{lastName}}': rawLastName,
+      '{{fullName}}': fullName,
+      '{{customer_name}}': displayName,
+      '{{Customer Name}}': displayName,
+      '{{name}}': displayName,
+      '{{Name}}': displayName,
+      '{{customer_phone}}': customer.whatsappNumber || customer.phone || '',
+      '{{shop_name}}': process.env.SHOP_NAME || 'Renic'
+    };
+
+    Object.entries(placeholders).forEach(([key, val]) => {
+      const escapedKey = key.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+      text = text.replace(new RegExp(escapedKey, 'gi'), val);
+    });
+
+    return text
+      .replace(/\s+([!?,.:])/g, '$1')
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 
-  buildRuleResponsePayload(rule) {
+  buildRuleResponsePayload(rule, customer = {}) {
     const responseImages = [];
     const buttons = [];
     const listSections = [];
@@ -118,7 +295,7 @@ class AIChatHandler {
     const messageBlocks = Array.isArray(rule?.messageBlocks) ? rule.messageBlocks : [];
 
     const addTextPart = value => {
-      const cleanValue = this.cleanReplyValue(value);
+      const cleanValue = this.cleanReplyValue(value, customer);
       if (cleanValue) {
         textParts.push(detectEmotionAndEnrichText(cleanValue));
       }
@@ -483,10 +660,135 @@ class AIChatHandler {
   }
 
   /**
+   * Check if an incoming message matches any active Workflows (Keywords, Exact Match, Intent)
+   * Highest Priority for Multi-Step Automated Flows
+   */
+  async checkWorkflowTriggers(messageText, analysis, userId, customer = {}) {
+    try {
+      const Workflow = require('../models/Workflow');
+      const workflowEngine = require('./workflowEngine');
+
+      const activeWorkflows = await Workflow.find({
+        userId,
+        status: 'ACTIVE'
+      });
+
+      if (!activeWorkflows || activeWorkflows.length === 0) {
+        return null;
+      }
+
+      const messageTextNorm = normalizeTextForMatching(messageText);
+
+      for (const workflow of activeWorkflows) {
+        let isMatched = false;
+        let matchReason = '';
+
+        const trigger = workflow.trigger || {};
+        let keywords = [];
+
+        // Check trigger.keywords array or string
+        if (Array.isArray(trigger.keywords)) {
+          keywords.push(...trigger.keywords);
+        } else if (typeof trigger.keywords === 'string') {
+          keywords.push(...trigger.keywords.split(',').map(s => s.trim()));
+        }
+
+        // Check trigger.conditions (visual builder & conditional builder)
+        if (trigger.conditions && Array.isArray(trigger.conditions)) {
+          for (const cond of trigger.conditions) {
+            if (cond.field === 'keywords' || cond.field === 'keyword' || cond.field === 'triggerValue' || cond.field === 'intent') {
+              if (typeof cond.value === 'string') {
+                keywords.push(...cond.value.split(',').map(s => s.trim()));
+              }
+            }
+          }
+        }
+
+        // Check trigger.value
+        if (trigger.value && typeof trigger.value === 'string') {
+          keywords.push(...trigger.value.split(',').map(s => s.trim()));
+        }
+
+        // Check visual node triggers (START node or first step)
+        if (workflow.nodes && Array.isArray(workflow.nodes)) {
+          const startNode = workflow.nodes.find(n => n.type === 'START' || n.type === 'KEYWORD');
+          if (startNode?.config?.keywords) {
+            if (Array.isArray(startNode.config.keywords)) {
+              keywords.push(...startNode.config.keywords);
+            } else if (typeof startNode.config.keywords === 'string') {
+              keywords.push(...startNode.config.keywords.split(',').map(s => s.trim()));
+            }
+          }
+        }
+
+        if (workflow.steps && workflow.steps.length > 0) {
+          const firstStep = workflow.steps[0];
+          if (firstStep.config?.keywords) {
+            if (Array.isArray(firstStep.config.keywords)) {
+              keywords.push(...firstStep.config.keywords);
+            } else if (typeof firstStep.config.keywords === 'string') {
+              keywords.push(...firstStep.config.keywords.split(',').map(s => s.trim()));
+            }
+          }
+        }
+
+        // Normalize all keywords for robust case/format insensitivity
+        keywords = keywords.map(kw => normalizeTextForMatching(kw)).filter(Boolean);
+
+        // Keyword Match Check (handles TEXT, text, Text, *text*, etc.)
+        if (keywords.length > 0) {
+          if (keywords.some(kw => messageTextNorm === kw)) {
+            isMatched = true;
+            matchReason = 'EXACT_KEYWORD';
+          } else if (keywords.some(kw => fuzzyMatch(messageText, kw))) {
+            isMatched = true;
+            matchReason = 'FUZZY_KEYWORD';
+          }
+        }
+
+        // Intent Match Check
+        if (!isMatched && analysis && analysis.intent) {
+          const targetIntent = (trigger.event || trigger.intent || '').toLowerCase();
+          if (targetIntent && targetIntent === analysis.intent.toLowerCase()) {
+            isMatched = true;
+            matchReason = 'INTENT_MATCH';
+          }
+        }
+
+        if (isMatched) {
+          console.log(`⚡ Active Workflow matched: "${workflow.name}" (${matchReason}) for message: "${messageText}"`);
+
+          const executionResult = await workflowEngine.executeWorkflow(workflow._id, customer._id, {
+            incomingMessage: messageText,
+            analysis,
+            userId
+          });
+
+          return {
+            success: true,
+            source: 'WORKFLOW',
+            workflowId: workflow._id,
+            workflowName: workflow.name,
+            matchReason,
+            executionResult,
+            bypassResponse: true
+          };
+        }
+      }
+
+      return null;
+    } catch (err) {
+      console.error('Error checking Workflow Triggers in aiChatHandler:', err.message);
+      return null;
+    }
+  }
+
+  /**
    * Check if a message matches any active Response Rules
    * Priority: EXACT_MATCH > KEYWORD > INTENT
+   * Supports all casing and text formats: TEXT, text, Text, *text*, etc.
    */
-  async checkResponseRules(messageText, analysis, userId) {
+  async checkResponseRules(messageText, analysis, userId, customer = {}) {
     try {
       console.log(`🔍 Checking Response Rules for message: "${messageText.substring(0, 50)}..."`);
       
@@ -503,14 +805,14 @@ class AIChatHandler {
       
       console.log(`  Found ${activeRules.length} active rules`);
       
-      const messageTextLower = messageText.toLowerCase().trim();
+      const messageTextNorm = normalizeTextForMatching(messageText);
       let matchedRule = null;
       let matchType = null;
       
-      // 1. Try EXACT_MATCH first (highest priority)
+      // 1. Try EXACT_MATCH first (highest priority) - handles TEXT, text, Text, *text*, etc.
       for (const rule of activeRules.filter(r => r.triggerType === 'EXACT_MATCH')) {
-        const triggerLower = rule.triggerValue.toLowerCase().trim();
-        if (messageTextLower === triggerLower) {
+        const triggerNorm = normalizeTextForMatching(rule.triggerValue);
+        if (messageTextNorm === triggerNorm) {
           matchedRule = rule;
           matchType = 'EXACT_MATCH';
           console.log(`  ✅ EXACT_MATCH rule found: "${rule.name}"`);
@@ -521,17 +823,17 @@ class AIChatHandler {
       // 2. Try KEYWORD matching if no exact match (medium priority)
       if (!matchedRule) {
         for (const rule of activeRules.filter(r => r.triggerType === 'KEYWORD')) {
-          const keywords = rule.triggerValue.split(',').map(kw => kw.toLowerCase().trim());
+          const keywords = rule.triggerValue.split(',').map(kw => normalizeTextForMatching(kw)).filter(Boolean);
           
           // Check if any keyword matches fuzzily in the message
           const hasKeyword = keywords.some(keyword => {
-            return fuzzyMatch(messageTextLower, keyword);
+            return messageTextNorm === keyword || fuzzyMatch(messageText, keyword);
           });
           
           if (hasKeyword) {
             matchedRule = rule;
             matchType = 'KEYWORD';
-            console.log(`  ✅ KEYWORD rule found: "${rule.name}" (fuzzy match)`);
+            console.log(`  ✅ KEYWORD rule found: "${rule.name}" (case/format-insensitive match)`);
             break;
           }
         }
@@ -555,8 +857,8 @@ class AIChatHandler {
       if (matchedRule) {
         console.log(`  ✅ Rule matched via ${matchType}: "${matchedRule.name}"`);
         
-        // Format messageBlocks into response text
-        const responsePayload = this.buildRuleResponsePayload(matchedRule);
+        // Format messageBlocks into response text with customer name personalization
+        const responsePayload = this.buildRuleResponsePayload(matchedRule, customer);
         let responseText = responsePayload.responseText || '';
         let responseImages = [...(responsePayload.responseImages || [])];
         const responseButtons = responsePayload.buttons;
@@ -634,41 +936,58 @@ class AIChatHandler {
       // Construct regex that allows optional non-digits (spaces, dashes, etc.) between numbers, and optional suffix at the end
       const regexPattern = last10Digits.split('').join('[^0-9]*') + '(?:@[a-z.]+)?$';
 
+      const orConditions = [
+        { whatsappNumber: phoneNumber },
+        { whatsappNumber: digitsOnly },
+        { phone: phoneNumber },
+        { phone: digitsOnly },
+        { instagramHandle: phoneNumber },
+        { whatsappNumber: { $regex: regexPattern } },
+        { phone: { $regex: regexPattern } }
+      ];
+
+      if (options.whatsappLid) {
+        orConditions.push({ 'customFields.whatsappLid': options.whatsappLid });
+        orConditions.push({ phone: options.whatsappLid });
+        orConditions.push({ whatsappNumber: options.whatsappLid });
+      }
+
       let customer = await Customer.findOne({
         userId,
-        $or: [
-          { whatsappNumber: phoneNumber },
-          { whatsappNumber: digitsOnly },
-          { phone: phoneNumber },
-          { phone: digitsOnly },
-          { instagramHandle: phoneNumber },
-          { whatsappNumber: { $regex: regexPattern } },
-          { phone: { $regex: regexPattern } }
-        ]
+        $or: orConditions
       });
 
       if (customer) {
-        if (options.whatsappLid || options.pushName) {
+        const resolvedName = options.contactName || options.pushName;
+        if (resolvedName && this.isPlaceholderName(customer.firstName, customer.phone)) {
+          const parts = resolvedName.trim().split(/\s+/);
+          customer.firstName = parts[0] || customer.firstName;
+          customer.lastName = parts.slice(1).join(' ') || customer.lastName;
+        }
+
+        // Upgrade phone from @lid to real phone number if available
+        if (customer.phone.includes('@lid') && phoneNumber && !phoneNumber.includes('@lid')) {
+          customer.phone = phoneNumber;
+          customer.whatsappNumber = phoneNumber;
+        }
+
+        if (options.whatsappLid || options.pushName || options.contactName) {
           customer.customFields = {
             ...(customer.customFields || {}),
             ...(options.whatsappLid ? { whatsappLid: options.whatsappLid } : {}),
-            ...(options.pushName ? { pushName: options.pushName, displayName: options.pushName } : {})
+            ...(options.pushName ? { pushName: options.pushName } : {}),
+            ...(resolvedName ? { displayName: resolvedName } : {})
           };
-
-          if (options.pushName && this.isPlaceholderName(customer.firstName, phoneNumber)) {
-            const parts = options.pushName.trim().split(/\s+/);
-            customer.firstName = parts[0] || customer.firstName;
-            customer.lastName = parts.slice(1).join(' ') || customer.lastName;
-          }
-
-          await customer.save();
         }
+
+        await customer.save();
       }
 
       let initialName = null;
       if (!customer) {
-        if (options.pushName) {
-          const parts = options.pushName.trim().split(/\s+/);
+        const resolvedName = options.contactName || options.pushName;
+        if (resolvedName) {
+          const parts = resolvedName.trim().split(/\s+/);
           initialName = {
             firstName: parts[0] || phoneNumber,
             lastName: parts.slice(1).join(' ') || ''
@@ -701,18 +1020,36 @@ class AIChatHandler {
         tags: ['incoming', 'customer']
       });
 
-      // Step 3: Find or create conversation immediately
+      // Helper to compute clean display title
+      const getCleanDisplayName = (cust) => {
+        const fn = (cust?.firstName || '').trim();
+        const ln = (cust?.lastName || '').trim();
+        const dn = (cust?.customFields?.displayName || cust?.customFields?.pushName || '').trim();
+        if (fn && !fn.includes('@lid') && !fn.startsWith('+') && !fn.toLowerCase().startsWith('customer')) {
+          return `${fn} ${ln}`.trim();
+        }
+        if (dn && !dn.includes('@lid') && !dn.startsWith('+')) {
+          return dn;
+        }
+        const ph = (cust?.phone || '').trim();
+        if (ph && !ph.includes('@lid')) {
+          return ph;
+        }
+        return 'Customer';
+      };
+
+      // Step 3: Find or create conversation immediately (single continuous thread per customer)
       let conversation = await Conversation.findOne({
         customerId: customer._id,
-        userId,
-        status: 'ACTIVE'
-      });
+        userId
+      }).sort({ updatedAt: -1 });
 
       if (!conversation) {
+        const convDisplayName = getCleanDisplayName(customer);
         conversation = await Conversation.create({
           userId,
           customerId: customer._id,
-          title: `Chat with ${customer.firstName} ${customer.lastName}`.trim(),
+          title: `Chat with ${convDisplayName}`.trim(),
           primaryPlatform: channel.toUpperCase(),
           platforms: [{
             type: channel.toUpperCase(),
@@ -730,7 +1067,16 @@ class AIChatHandler {
           }
         });
       } else {
-        conversation.messageCount += 1;
+        if (conversation.title.includes('@lid') || conversation.title.includes('Chat with Customer') || conversation.title.includes('Chat with +')) {
+          const convDisplayName = getCleanDisplayName(customer);
+          if (convDisplayName && convDisplayName !== 'Customer') {
+            conversation.title = `Chat with ${convDisplayName}`.trim();
+          }
+        }
+        if (conversation.status === 'RESOLVED') {
+          conversation.status = 'ACTIVE';
+        }
+        conversation.messageCount = (conversation.messageCount || 0) + 1;
         conversation.lastMessage = {
           content: inboundContent.substring(0, 100),
           sender: 'CUSTOMER',
@@ -823,14 +1169,33 @@ class AIChatHandler {
         leadScore.score = Math.max(leadScore.score, 9.5);
       }
 
-      // Step 8: CHECK RESPONSE RULES FIRST before AI generation
-      console.log('\n🚀 Step 8: Checking Response Rules...');
+      // Step 8: PRIORITY TRIGGER EVALUATION (Workflows -> Response Rules -> AI)
+      console.log('\n🚀 Step 8: Evaluating Automated Flow & Rule Triggers...');
       
+      // 8.1: Check Interactive Button / List selections
       const selectedId = options.interactiveReply?.id || null;
       let ruleMatch = await this.findActionForInteractiveSelection(selectedId, triggerText, userId, customer);
-      
+
+      // 8.2: Check Active Workflows (Workflow Studio Flows)
       if (!ruleMatch) {
-        ruleMatch = await this.checkResponseRules(triggerText, analysis, userId);
+        const workflowMatch = await this.checkWorkflowTriggers(triggerText, analysis, userId, customer);
+        if (workflowMatch) {
+          console.log(`✅ Automated Workflow "${workflowMatch.workflowName}" executed for incoming message. Bypassing other rules.`);
+          return {
+            success: true,
+            customerId: customer._id,
+            inboundMessageId: inboundMessage._id,
+            conversationId: conversation._id,
+            messageType: 'WORKFLOW_TRIGGERED',
+            workflowName: workflowMatch.workflowName,
+            processingTime: new Date()
+          };
+        }
+      }
+      
+      // 8.3: Check Active Response Rules (Response Rule Studio)
+      if (!ruleMatch) {
+        ruleMatch = await this.checkResponseRules(triggerText, analysis, userId, customer);
       }
       
       if (ruleMatch && ruleMatch.bypassResponse) {
@@ -866,25 +1231,81 @@ class AIChatHandler {
       } else {
         // Fall back to AI generation
         console.log('✓ No matching rule, proceeding with AI generation...');
-        
-        // Step 9: Generate AI response (only if no rule matched)
-        // Use smart Gemini language detection from analysis if available
-        const detectedLang = analysis.language || language;
-        if (detectedLang && (!customer.customFields || !customer.customFields.languageSelected)) {
-          if (customer.language !== detectedLang) {
-            customer.language = detectedLang;
-            await customer.save();
+
+        // ── Client Feature 1: Automated Tax Invoice / Bill PDF Request ──
+        const billKeywords = ['invoice', 'bill', 'receipt', 'tax invoice', 'send bill', 'bill copy', 'payment receipt', 'my bill', 'send invoice'];
+        const isInvoiceRequest = billKeywords.some(kw => msgLower.includes(kw)) || analysis.intent === 'INVOICE_REQUEST';
+
+        if (isInvoiceRequest) {
+          try {
+            console.log('📄 AI Invoice Request detected from client:', phoneNumber);
+            const { generateInvoicePDF } = require('./pdfInvoiceService');
+            const pdfData = await generateInvoicePDF({
+              customer: {
+                name: `${customer.firstName} ${customer.lastName}`.trim() || 'Valued Client',
+                phone: customer.whatsappNumber || customer.phone || phoneNumber
+              },
+              grandTotal: customer.totalSpent > 0 ? customer.totalSpent : 2950,
+              subtotal: customer.totalSpent > 0 ? Math.round(customer.totalSpent * 0.82) : 2500,
+              taxAmount: customer.totalSpent > 0 ? Math.round(customer.totalSpent * 0.18) : 450
+            });
+
+            aiResponse = {
+              text: `📄 *Tax Invoice / Bill Receipt*\n\nDear ${customer.firstName || 'Client'}, here is your official Tax Invoice (*#${pdfData.billNumber}*).\n💰 Total: *₹${pdfData.grandTotal.toLocaleString('en-IN')}*\n\nThank you for choosing us! Let us know if you have any questions. ✨`,
+              mediaUrl: pdfData.fileUrl,
+              mediaType: 'document',
+              mediaFileName: pdfData.fileName,
+              source: 'AI_INVOICE_ENGINE'
+            };
+          } catch (invErr) {
+            console.error('Invoice generation failed, falling back to standard AI:', invErr.message);
           }
         }
 
-        const customerLanguage = (customer.customFields && customer.customFields.languageSelected) ? customer.language : detectedLang;
-        aiResponse = await aiMessageAnalyzer.generateResponse(
-          analysis,
-          customer,
-          customerLanguage,
-          triggerText,
-          mediaUrl
-        );
+        // ── Client Feature 2: Negative Sentiment & Frustration Shield ──
+        if (!aiResponse && (analysis.sentiment === 'NEGATIVE' || leadScore.shouldEscalate)) {
+          if (analysis.urgency === 'high' || analysis.intent === 'complaint' || hasHumanRequest) {
+            console.log('🛡️ Frustration / Escalation Shield triggered for customer:', phoneNumber);
+            conversation.status = 'WAITING_FOR_TEAM';
+            conversation.tags = Array.from(new Set([...(conversation.tags || []), 'escalated', 'negative_sentiment', 'priority_support']));
+            await conversation.save();
+
+            aiResponse = {
+              text: `Namaste ${customer.firstName || ''}! 🙏 We truly apologize for any inconvenience caused. We have marked your request as *HIGH PRIORITY* and escalated this conversation directly to our Senior Support Team. A manager will connect with you right away!`,
+              source: 'AI_ESCALATION_SHIELD',
+              escalated: true
+            };
+          }
+        }
+
+        // ── Client Feature 3: Standard Intelligent Natural Language Assistant ──
+        if (!aiResponse) {
+          const detectedLang = analysis.language || language;
+          if (detectedLang && (!customer.customFields || !customer.customFields.languageSelected)) {
+            if (customer.language !== detectedLang) {
+              customer.language = detectedLang;
+              await customer.save();
+            }
+          }
+
+          const customerLanguage = (customer.customFields && customer.customFields.languageSelected) ? customer.language : detectedLang;
+          aiResponse = await aiMessageAnalyzer.generateResponse(
+            analysis,
+            customer,
+            customerLanguage,
+            triggerText,
+            mediaUrl
+          );
+
+          // ── Dynamic Customer Emotion & Sentiment Calibration ──
+          const detectedEmotion = detectCustomerEmotion(triggerText, analysis);
+          console.log(`🎭 Detected Customer Emotion: [${detectedEmotion.type}] (${detectedEmotion.tone}) for message: "${triggerText.substring(0, 40)}"`);
+
+          if (aiResponse && aiResponse.text) {
+            aiResponse.text = adaptResponseToEmotion(aiResponse.text, detectedEmotion, customer);
+            aiResponse.emotion = detectedEmotion.type;
+          }
+        }
       }
 
       // Save scraped products to customer profile if they exist in the response
@@ -907,8 +1328,9 @@ class AIChatHandler {
 
       // Helper to send and log a single message to keep the unified inbox synced
       const sendAndLog = async (text, media = null, type = 'WELCOME', extraOptions = {}) => {
-        const outboundContent = (typeof text === 'string' && text.trim()) ? text.trim() : (media ? '[Image]' : '');
+        const outboundContent = (typeof text === 'string' && text.trim()) ? text.trim() : (media ? '[Media File]' : '');
         let result;
+        const resolvedMediaType = extraOptions.mediaType || (media ? 'image' : null);
         if (channel === 'instagram') {
           const InstagramService = require('./InstagramService');
           result = await InstagramService.sendDirectMessage(
@@ -926,6 +1348,7 @@ class AIChatHandler {
             {
               ...(media ? { mediaUrl: media } : {}),
               ...extraOptions,
+              mediaType: resolvedMediaType,
               userId
             }
           );
@@ -945,7 +1368,7 @@ class AIChatHandler {
           aiModel: process.env.GEMINI_MODEL || 'gemini-flash-latest',
           tags: ['outbound', 'ai_generated'],
           mediaUrl: media,
-          mediaType: media ? 'image' : null,
+          mediaType: resolvedMediaType,
           widgetData: extraOptions
         });
         
@@ -956,10 +1379,10 @@ class AIChatHandler {
           conversationId: conversation._id,
           customerId: customer._id,
           content: outboundContent,
-          messageType: media ? 'IMAGE' : 'TEXT',
+          messageType: resolvedMediaType === 'document' ? 'DOCUMENT' : (media ? 'IMAGE' : 'TEXT'),
           media: media ? {
             url: media,
-            type: 'image'
+            type: resolvedMediaType === 'document' ? 'document' : 'image'
           } : undefined,
           platform: channel.toUpperCase(),
           sender: {
@@ -985,7 +1408,10 @@ class AIChatHandler {
       sentResult = await sendAndLog(aiResponse.text, aiResponse.mediaUrl, 'WELCOME', {
         buttons: aiResponse.buttons,
         list: aiResponse.list,
-        ruleId: aiResponse.ruleId
+        ruleId: aiResponse.ruleId,
+        mediaType: aiResponse.mediaType || (aiResponse.mediaUrl ? 'image' : null),
+        mediaFileName: aiResponse.mediaFileName,
+        mediaMimeType: aiResponse.mediaMimeType || (aiResponse.mediaType === 'document' ? 'application/pdf' : undefined)
       });
       totalMessagesSent = 1;
 

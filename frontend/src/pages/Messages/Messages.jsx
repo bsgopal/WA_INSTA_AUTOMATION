@@ -141,17 +141,17 @@ export default function Messages() {
       </Paper>
 
       {/* Messages Table */}
-      <TableContainer component={Paper} elevation={0}>
+      <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
         <Table>
           <TableHead>
-            <TableRow>
-              <TableCell>Customer</TableCell>
-              <TableCell>Content</TableCell>
-              <TableCell>Channel</TableCell>
-              <TableCell>Status</TableCell>
-              <TableCell>Campaign</TableCell>
-              <TableCell>Sent At</TableCell>
-              <TableCell align="center">Actions</TableCell>
+            <TableRow sx={{ backgroundColor: '#0f172a' }}>
+              <TableCell sx={{ color: '#ffffff', fontWeight: 800, fontSize: '0.85rem' }}>CUSTOMER</TableCell>
+              <TableCell sx={{ color: '#ffffff', fontWeight: 800, fontSize: '0.85rem' }}>CONTENT</TableCell>
+              <TableCell sx={{ color: '#ffffff', fontWeight: 800, fontSize: '0.85rem' }}>CHANNEL</TableCell>
+              <TableCell sx={{ color: '#ffffff', fontWeight: 800, fontSize: '0.85rem' }}>STATUS</TableCell>
+              <TableCell sx={{ color: '#ffffff', fontWeight: 800, fontSize: '0.85rem' }}>CAMPAIGN</TableCell>
+              <TableCell sx={{ color: '#ffffff', fontWeight: 800, fontSize: '0.85rem' }}>SENT AT</TableCell>
+              <TableCell align="center" sx={{ color: '#ffffff', fontWeight: 800, fontSize: '0.85rem' }}>ACTIONS</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -165,69 +165,69 @@ export default function Messages() {
               </TableRow>
             ) : (
               messages.map((message) => (
-                <TableRow key={message._id} hover>
+                <TableRow key={message._id} hover sx={{ '&:hover': { bgcolor: '#f8fafc' } }}>
                   <TableCell>
-                    <Stack direction="row" spacing={2} alignItems="center">
-                      <Avatar sx={{ bgcolor: 'primary.main', width: 32, height: 32 }}>
-                        {message.customerId?.firstName?.[0] || 'U'}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Avatar sx={{ width: 32, height: 32, bgcolor: '#0f172a', color: '#84cc16', fontWeight: 700, fontSize: '0.8rem' }}>
+                        {message.customer?.firstName?.[0] || 'C'}
                       </Avatar>
                       <Box>
-                        <Typography variant="body2" fontWeight={500}>
-                          {message.customerId?.firstName} {message.customerId?.lastName}
+                        <Typography variant="body2" fontWeight={600} color="#0f172a">
+                          {message.customer ? `${message.customer.firstName || ''} ${message.customer.lastName || ''}`.trim() || 'Unknown' : 'Unknown'}
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
-                          {message.customerId?.phone}
+                          {message.customer?.phone}
                         </Typography>
                       </Box>
-                    </Stack>
+                    </Box>
                   </TableCell>
-                  <TableCell>
-                    <Typography
-                      variant="body2"
-                      sx={{
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                        maxWidth: 300
-                      }}
-                    >
+                  <TableCell sx={{ maxWidth: 300 }}>
+                    <Typography variant="body2" noWrap color="#334155">
                       {message.content}
                     </Typography>
                   </TableCell>
                   <TableCell>
-                    <Chip label={message.channel} size="small" />
+                    <Chip
+                      label={message.channel.toUpperCase()}
+                      size="small"
+                      sx={{
+                        fontWeight: 700,
+                        fontSize: '0.7rem',
+                        bgcolor: message.channel === 'whatsapp' ? '#f0fdf4' : '#faf5ff',
+                        color: message.channel === 'whatsapp' ? '#16a34a' : '#9333ea',
+                        border: `1px solid ${message.channel === 'whatsapp' ? '#bbf7d0' : '#e9d5ff'}`
+                      }}
+                    />
                   </TableCell>
                   <TableCell>
                     <Chip
                       label={message.status}
                       size="small"
                       color={getStatusColor(message.status)}
+                      sx={{ fontWeight: 700, fontSize: '0.7rem' }}
                     />
                   </TableCell>
                   <TableCell>
-                    <Typography variant="caption">
-                      {message.campaignId?.name || 'Direct'}
-                    </Typography>
+                    {message.campaign ? (
+                      <Typography variant="body2" color="#0f172a" fontWeight={500}>{message.campaign.name}</Typography>
+                    ) : (
+                      <Typography variant="caption" color="text.secondary">-</Typography>
+                    )}
                   </TableCell>
                   <TableCell>
-                    <Typography variant="caption">
-                      {formatDate(message.sentAt)}
+                    <Typography variant="body2" color="text.secondary" fontSize="0.8rem">
+                      {new Date(message.createdAt).toLocaleString()}
                     </Typography>
                   </TableCell>
                   <TableCell align="center">
-                    <Stack direction="row" spacing={0.5} justifyContent="center">
-                      <IconButton size="small" color="primary">
-                        <VisibilityIcon fontSize="small" />
-                      </IconButton>
+                    <Stack direction="row" spacing={1} justifyContent="center">
                       <IconButton
                         size="small"
-                        color="secondary"
                         onClick={() => handleAIReply(message)}
+                        title="AI Reply Suggestions"
+                        sx={{ color: '#0f172a', bgcolor: '#f1f5f9', '&:hover': { bgcolor: '#84cc16', color: '#0f172a' } }}
                       >
                         <AutoAwesomeIcon fontSize="small" />
-                      </IconButton>
-                      <IconButton size="small">
-                        <ReplyIcon fontSize="small" />
                       </IconButton>
                     </Stack>
                   </TableCell>
@@ -249,38 +249,135 @@ export default function Messages() {
       </Box>
 
       {/* AI Reply Dialog */}
-      <Dialog open={openAIDialog} onClose={() => setOpenAIDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}><AutoAwesomeIcon color="primary" /><Typography variant="h6">AI Reply Suggestions</Typography></Stack><AIProviderStatus compact sx={{ mb: 2 }} />
-        </DialogTitle>
-        <DialogContent>
-          {selectedMessage && (
-            <Box mb={3}>
-              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                Original Message:
+      <Dialog
+        open={openAIDialog}
+        onClose={() => setOpenAIDialog(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: '16px',
+            overflow: 'hidden',
+            boxShadow: '0 25px 50px -12px rgba(15,23,42,0.3)'
+          }
+        }}
+      >
+        <DialogTitle
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            bgcolor: '#0f172a',
+            color: '#ffffff',
+            py: 2,
+            px: 3
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Box
+              sx={{
+                width: 36,
+                height: 36,
+                borderRadius: '8px',
+                bgcolor: '#84cc16',
+                color: '#0f172a',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <AutoAwesomeIcon />
+            </Box>
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 800, color: '#ffffff', lineHeight: 1.2 }}>
+                AI Reply Suggestions
               </Typography>
-              <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
-                <Typography variant="body2">{selectedMessage.content}</Typography>
+              <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                Context-aware smart customer responses
+              </Typography>
+            </Box>
+          </Box>
+          <Button
+            onClick={() => setOpenAIDialog(false)}
+            sx={{ color: '#94a3b8', textTransform: 'none', fontWeight: 600, minWidth: 'auto', p: 0.5, '&:hover': { color: '#ffffff' } }}
+          >
+            ✕
+          </Button>
+        </DialogTitle>
+
+        <DialogContent sx={{ p: 3, bgcolor: '#f8fafc' }}>
+          <AIProviderStatus compact sx={{ mb: 2 }} />
+
+          {selectedMessage && (
+            <Box mb={2.5}>
+              <Typography variant="caption" sx={{ fontWeight: 800, color: '#64748b', textTransform: 'uppercase', display: 'block', mb: 0.5 }}>
+                Original Customer Message:
+              </Typography>
+              <Paper elevation={0} sx={{ p: 2, bgcolor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '10px' }}>
+                <Typography variant="body2" sx={{ color: '#0f172a' }}>{selectedMessage.content}</Typography>
               </Paper>
             </Box>
           )}
 
-          <Typography variant="subtitle2" gutterBottom>
-            Suggested Replies:
+          <Typography variant="caption" sx={{ fontWeight: 800, color: '#64748b', textTransform: 'uppercase', display: 'block', mb: 1 }}>
+            Recommended Smart Responses:
           </Typography>
-          <Stack spacing={2}>
+          <Stack spacing={1.5}>
             {aiReplies.map((reply, index) => (
-              <Paper key={index} sx={{ p: 2, cursor: 'pointer', '&:hover': { bgcolor: 'action.hover' } }}>
-                <Typography variant="caption" color="primary" fontWeight={500} gutterBottom>
-                  {reply.type.toUpperCase()}
-                </Typography>
-                <Typography variant="body2">{reply.text}</Typography>
+              <Paper
+                key={index}
+                elevation={0}
+                sx={{
+                  p: 2,
+                  borderRadius: '10px',
+                  border: '1px solid #e2e8f0',
+                  bgcolor: '#ffffff',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s',
+                  '&:hover': { borderColor: '#84cc16', bgcolor: 'rgba(132,204,22,0.03)' }
+                }}
+                onClick={() => {
+                  navigator.clipboard.writeText(reply.text);
+                  alert('Copied response to clipboard!');
+                }}
+              >
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                  <Chip
+                    label={reply.type.toUpperCase()}
+                    size="small"
+                    sx={{
+                      height: 20,
+                      fontSize: '0.65rem',
+                      fontWeight: 800,
+                      bgcolor: '#0f172a',
+                      color: '#84cc16'
+                    }}
+                  />
+                  <Typography variant="caption" sx={{ color: '#16a34a', fontWeight: 700 }}>
+                    Click to copy 📋
+                  </Typography>
+                </Box>
+                <Typography variant="body2" sx={{ color: '#334155', lineHeight: 1.4 }}>{reply.text}</Typography>
               </Paper>
             ))}
           </Stack>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenAIDialog(false)}>Close</Button>
+        <DialogActions sx={{ p: 2.5, bgcolor: '#ffffff', borderTop: '1px solid #e2e8f0' }}>
+          <Button
+            onClick={() => setOpenAIDialog(false)}
+            variant="contained"
+            sx={{
+              backgroundColor: '#0f172a',
+              color: '#ffffff',
+              textTransform: 'none',
+              fontWeight: 700,
+              borderRadius: '8px',
+              px: 3,
+              '&:hover': { backgroundColor: '#1e293b' }
+            }}
+          >
+            Close
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>

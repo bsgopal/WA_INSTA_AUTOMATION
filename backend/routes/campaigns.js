@@ -59,6 +59,21 @@ const campaignMediaUpload = multer({
   }
 });
 
+// ============ GET ACTIVE DISPATCH ENGINE (META vs DOCKER) ============
+router.get('/dispatch-engine', async (req, res) => {
+  try {
+    const ShopConfig = require('../models/ShopConfig');
+    const shop = await ShopConfig.findOne({ userId: req.userId || req.user?._id || process.env.DEFAULT_USER_ID }) || await ShopConfig.findOne({});
+    res.json({
+      success: true,
+      whatsappSenderMode: (shop?.whatsappSenderMode || (shop?.metaApiEnabled ? 'META' : 'DOCKER')).toUpperCase(),
+      dockerThrottleSeconds: shop?.dockerThrottleSeconds || 6
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // ============ UPLOAD CAMPAIGN MEDIA ============
 router.post('/media/upload', campaignMediaUpload.single('file'), async (req, res) => {
   try {
@@ -248,8 +263,13 @@ router.post('/', [
       estimatedReach = await Customer.countDocuments(query);
     }
 
+    const ShopConfig = require('../models/ShopConfig');
+    const shop = await ShopConfig.findOne({ userId: req.user.id }) || await ShopConfig.findOne({});
+    const effectiveSenderMode = (req.body.senderMode || shop?.whatsappSenderMode || (shop?.metaApiEnabled ? 'META' : 'DOCKER')).toUpperCase();
+
     const campaign = new Campaign({
       ...campaignBody,
+      senderMode: effectiveSenderMode,
       userId: req.user.id,
       estimatedReach,
       status: 'DRAFT'
@@ -520,6 +540,12 @@ router.post('/:id/manual-send', async (req, res) => {
     let failCount = 0;
     let processedCount = 0;
 
+    // Resolve dispatch mode (Meta Cloud API vs Docker WAHA)
+    const ShopConfig = require('../models/ShopConfig');
+    const shop = await ShopConfig.findOne({ userId: req.user.id }) || await ShopConfig.findOne({});
+    const senderMode = (campaign.senderMode || shop?.whatsappSenderMode || (shop?.metaApiEnabled ? 'META' : 'DOCKER')).toUpperCase();
+    const isDockerMode = senderMode === 'DOCKER';
+
     // Resolve the Meta template once for the whole batch and fetch its real
     // body-parameter count so the send payload always matches the template.
     const hasMedia = !!(mediaUrl || mediaPreviewData);
@@ -528,7 +554,7 @@ router.post('/:id/manual-send', async (req, res) => {
     let templateLang;
     let bodyParamCount;
 
-    if (!isDirectMediaSend) {
+    if (!isDockerMode && !isDirectMediaSend) {
       resolvedTemplateName = campaign.metaTemplateName || campaign.messageTemplate?.name;
       if (!resolvedTemplateName || !/^[a-z0-9_-]+$/.test(resolvedTemplateName)) {
         resolvedTemplateName = hasMedia ? 'sales_promotion' : 'message';
@@ -545,6 +571,9 @@ router.post('/:id/manual-send', async (req, res) => {
       console.log(`📨 Manual Send template resolution: ${resolvedTemplateName} (${templateLang}) expects ${bodyParamCount} body param(s)`);
     } else {
       templateLang = campaign.metaTemplateLanguage || campaign.messageTemplate?.language || campaign.language || 'en_US';
+      if (isDockerMode) {
+        console.log(`🐳 Manual Send: Docker WAHA engine active for campaign ${campaign.name}`);
+      }
     }
 
     // Persist the target count so the UI counters reflect this manual send
@@ -569,18 +598,37 @@ router.post('/:id/manual-send', async (req, res) => {
       }
     });
 
+    const recipientResults = [];
+
     for (const customer of customers) {
+      const destinationNumber = customer.whatsappNumber || customer.phone;
+      const customerFullName = `${customer.firstName || ''} ${customer.lastName || ''}`.trim() || destinationNumber || 'Unknown Customer';
+
+      if (!destinationNumber) {
+        failCount++;
+        recipientResults.push({
+          customerId: customer._id,
+          customerName: customerFullName,
+          phoneNumber: 'Missing Phone',
+          status: 'FAILED',
+          error: 'No phone or WhatsApp number available',
+          sentAt: null
+        });
+        continue;
+      }
+
       try {
-        const destinationNumber = customer.whatsappNumber || customer.phone;
-        if (!destinationNumber) {
-          failCount++;
-          continue;
+        processedCount++;
+        let customerContent = content;
+        const custLang = customer.language || 'en';
+        if (campaign.messageTemplate?.translations?.[custLang]) {
+          customerContent = campaign.messageTemplate.translations[custLang];
+        } else if (campaign.translations?.[custLang]) {
+          customerContent = campaign.translations[custLang];
         }
 
-        processedCount++;
-
         const finalContent = await VariableInterpolationService.interpolateVariables(
-          content,
+          customerContent,
           req.user.id,
           { customer }
         );
@@ -612,12 +660,12 @@ router.post('/:id/manual-send', async (req, res) => {
           ...mediaPayload,
           ...(buttons ? { buttons } : {}),
           userId: req.user.id,
-          // Bulk campaign sends must always use the Meta Cloud API configuration
-          forceMeta: true
+          forceMeta: !isDockerMode,
+          forceWaha: isDockerMode
         };
 
-        if (!isDirectMediaSend) {
-          // Use the resolved template and the real parameter count for every customer
+        if (!isDockerMode && !isDirectMediaSend) {
+          // Use the resolved template and the real parameter count for every customer (Meta only)
           sendOptions.templateName = resolvedTemplateName;
           sendOptions.templateLanguage = templateLang;
           sendOptions.templateParams = MetaService.buildTemplateParams(bodyParamCount, finalContent);
@@ -625,11 +673,16 @@ router.post('/:id/manual-send', async (req, res) => {
 
         const result = await WhatsAppService.sendMessage(destinationNumber, finalContent, sendOptions);
 
+        if (isDockerMode) {
+          const throttleSecs = shop?.dockerThrottleSeconds || 6;
+          await new Promise(r => setTimeout(r, throttleSecs * 1000));
+        }
+
         console.log(`📬 Campaign Manual Send Result for ${destinationNumber}:`, result);
 
         const ShopConfig = require('../models/ShopConfig');
-        const shop = await ShopConfig.findOne({ userId: req.user.id });
-        const displayNum = shop?.metaDisplayPhoneNumber || shop?.contactPhone || '';
+        const currentShop = await ShopConfig.findOne({ userId: req.user.id }) || shop;
+        const displayNum = currentShop?.metaDisplayPhoneNumber || currentShop?.contactPhone || '';
 
         const placeholderContent = finalContent || (hasMedia ? `[${mediaType || 'Media'}]` : '');
         const placeholderOriginalContent = content || (hasMedia ? `[${mediaType || 'Media'}]` : '');
@@ -637,8 +690,18 @@ router.post('/:id/manual-send', async (req, res) => {
         if (result && result.success) {
           successCount++;
           customer.lastMessageSentDate = new Date();
-          customer.messagesSentCount++;
+          customer.messagesSentCount = (customer.messagesSentCount || 0) + 1;
           await customer.save();
+
+          recipientResults.push({
+            customerId: customer._id,
+            customerName: customerFullName,
+            phoneNumber: destinationNumber,
+            status: 'SENT',
+            error: null,
+            sentAt: new Date(),
+            externalMessageId: result.externalMessageId
+          });
 
           // Log campaign sent message to Unified Inbox Conversation
           try {
@@ -659,13 +722,23 @@ router.post('/:id/manual-send', async (req, res) => {
           }
         } else {
           failCount++;
-          console.warn(`Campaign manual send failed for customer ${customer._id}:`, result?.error || result?.failureReason);
+          const errReason = result?.error || result?.failureReason || 'Dispatch failed';
+          recipientResults.push({
+            customerId: customer._id,
+            customerName: customerFullName,
+            phoneNumber: destinationNumber,
+            status: 'FAILED',
+            error: errReason,
+            sentAt: null
+          });
+          console.warn(`Campaign manual send failed for customer ${customer._id}:`, errReason);
         }
 
         const message = new Message({
           userId: req.user.id,
           customerId: customer._id,
           campaignId: campaign._id,
+          templateId: campaign.templateId || campaign.messageTemplate?._id || (typeof campaign.messageTemplate === 'string' || typeof campaign.messageTemplate === 'object' ? campaign.messageTemplate : null),
           content: placeholderContent,
           originalContent: placeholderOriginalContent,
           channel,
@@ -680,18 +753,21 @@ router.post('/:id/manual-send', async (req, res) => {
           mediaMimeType,
           clickUrl: campaign.buttonUrl || null,
           widgetData: buttons ? { buttons } : null
-          // NOTE: NOT storing mediaPreviewData to avoid large document sizes
         });
 
         await message.save();
       } catch (innerError) {
         console.error(`Error sending manual message to customer ${customer._id}:`, innerError);
         failCount++;
+        recipientResults.push({
+          customerId: customer._id,
+          customerName: customerFullName,
+          phoneNumber: destinationNumber,
+          status: 'FAILED',
+          error: innerError.message || 'Error occurred during dispatch',
+          sentAt: null
+        });
       }
-    }
-
-    if (successCount === 0) {
-      console.warn(`⚠️  Manual send had no successes. FailCount: ${failCount}`);
     }
 
     // Update campaign counters so the UI metrics (Sent/Failed) increase correctly
@@ -705,23 +781,16 @@ router.post('/:id/manual-send', async (req, res) => {
 
     console.log(`✅ Campaign stats updated after manual send. Targets: ${campaign.totalTargets}, Sent: ${campaign.totalSent}, Failed: ${campaign.totalFailed}`);
 
-    if (successCount === 0) {
-      console.warn(`⚠️  Manual send had no successes. FailCount: ${failCount}`);
-      return res.status(200).json({
-        success: false,
-        message: `Manual send failed for all selected customers. Failed: ${failCount}`,
-        successCount,
-        failCount,
-        partialSuccess: false
-      });
-    }
-
     res.json({
-      success: true,
-      message: `Manual send completed. Sent: ${successCount}, Failed: ${failCount}`,
+      success: successCount > 0,
+      message: successCount > 0
+        ? `Manual send completed. Sent: ${successCount}, Failed: ${failCount}`
+        : `Manual send failed for all selected customers. Failed: ${failCount}`,
       successCount,
       failCount,
-      partialSuccess: failCount > 0
+      totalCount: customers.length,
+      partialSuccess: successCount > 0 && failCount > 0,
+      recipients: recipientResults
     });
   } catch (error) {
     console.error('❌ Manual Send Error:', error);

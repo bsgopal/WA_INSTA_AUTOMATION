@@ -307,7 +307,7 @@ const ConditionalWorkflowBuilder = () => {
   }
 
   return (
-    <Box sx={{ height: '100vh', width: '100%', display: 'flex', flexDirection: 'column', p: 1, bgcolor: '#0F172A' }}>
+    <Box sx={{ height: '100vh', width: '100%', display: 'flex', flexDirection: 'column', p: 0, m: 0, bgcolor: '#0F172A', overflow: 'hidden' }}>
       <SapDmProcessDesigner
         isWorkflow={true}
         initialData={{

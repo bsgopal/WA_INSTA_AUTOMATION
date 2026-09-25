@@ -108,6 +108,12 @@ const executeStep = async (step, customer, context, workflow) => {
       case 'QUICK_REPLY':
         return await executeSendMessage(step, customer, context);
 
+      case 'IF_ELSE':
+        return await executeIfElse(step, customer, context);
+
+      case 'PARALLEL_SPLIT':
+        return await executeParallelSplit(step, customer, context);
+
       case 'WAIT':
         return await executeWait(step, context);
 
@@ -122,6 +128,12 @@ const executeStep = async (step, customer, context, workflow) => {
 
       case 'AI_ACTION':
         return await executeAIAction(step, customer, context);
+
+      case 'WEBHOOK':
+        return await executeWebhook(step, customer, context);
+
+      case 'ASK_DATA':
+        return await executeAskData(step, customer, context);
 
       default:
         return { success: false, error: 'Unknown step type' };
@@ -143,10 +155,10 @@ const executeSendMessage = async (step, customer, context) => {
     const AIChatHandler = require('./aiChatHandler');
 
     let channel = step.config?.channel || 'whatsapp';
-    let template = step.config?.template || step.config?.message || '';
+    let template = step.config?.template || step.config?.message || step.config?.value || '';
     let mediaUrl = step.config?.mediaUrl || null;
-    let buttons = null;
-    let list = null;
+    let buttons = step.config?.buttons || null;
+    let list = step.config?.list || null;
     let ruleId = step.config?.ruleId || (step.type === 'RESPONSE_RULE' ? step.id || step.config?.id : null);
     let templateId = step.config?.templateId || (step.type === 'SEND_TEMPLATE' ? step.id || step.config?.id : null);
     let quickReplyId = step.config?.quickReplyId || (step.type === 'QUICK_REPLY' ? step.id || step.config?.id : null);
@@ -207,19 +219,20 @@ const executeSendMessage = async (step, customer, context) => {
       result = { success: true, externalMessageId: 'simulated_id' };
     } else {
       if (channel === 'whatsapp') {
+        const targetNumber = customer.whatsappNumber || customer.phone;
         result = await WhatsAppService.sendMessage(
-          customer.whatsappNumber,
+          targetNumber,
           personalizedMessage,
           {
             mediaUrl,
             buttons,
             list,
-            forceMeta: true
+            userId: customer.userId
           }
         );
       } else if (channel === 'instagram') {
         result = await InstagramService.sendDirectMessage(
-          customer.instagramHandle,
+          customer.instagramHandle || customer.phone,
           personalizedMessage,
           { mediaUrl }
         );
@@ -227,7 +240,7 @@ const executeSendMessage = async (step, customer, context) => {
     }
 
     return {
-      success: result?.success || false,
+      success: result?.success !== false,
       data: {
         messageSent: true,
         messageId: result?.externalMessageId || 'simulated_id',
@@ -239,6 +252,155 @@ const executeSendMessage = async (step, customer, context) => {
     };
   } catch (error) {
     return { success: false, error: error.message };
+  }
+};
+
+/**
+ * Execute IF_ELSE conditional gateway step
+ */
+const executeIfElse = async (step, customer, context) => {
+  try {
+    const config = step.config || {};
+    const variable = config.variable || 'customer_tag';
+    const operator = config.operator || '=';
+    const targetValue = String(config.value || '').trim().toLowerCase();
+
+    let actualValue = '';
+    if (variable === 'customer_tag' || variable === 'tag') {
+      actualValue = (customer.tags || []).join(' ').toLowerCase();
+    } else if (variable === 'city') {
+      actualValue = String(customer.city || customer.customFields?.city || '').toLowerCase();
+    } else if (variable === 'order_count') {
+      actualValue = String(customer.ordersCount || customer.totalOrders || 0);
+    } else if (variable === 'last_message') {
+      actualValue = String(context.incomingMessage || '').toLowerCase();
+    } else {
+      actualValue = String(customer[variable] || customer.customFields?.[variable] || '').toLowerCase();
+    }
+
+    let conditionMet = false;
+    if (operator === '=') {
+      conditionMet = actualValue.includes(targetValue) || actualValue === targetValue;
+    } else if (operator === '!=') {
+      conditionMet = !actualValue.includes(targetValue);
+    } else if (operator === 'contains') {
+      conditionMet = actualValue.includes(targetValue);
+    } else if (operator === '>') {
+      conditionMet = Number(actualValue) > Number(targetValue);
+    }
+
+    const branchToExecute = conditionMet ? config.trueBranch : config.falseBranch;
+    let branchResult = null;
+    if (branchToExecute && (branchToExecute.message || branchToExecute.template)) {
+      const msg = branchToExecute.message || branchToExecute.template;
+      const personalized = await aiSmartFeatures.personalizeMessage(msg, customer, context);
+      const res = await WhatsAppService.sendMessage(customer.whatsappNumber || customer.phone, personalized, {
+        userId: customer.userId
+      });
+      branchResult = { messageSent: true, messageText: personalized, res };
+    }
+
+    return {
+      success: true,
+      conditionMet,
+      data: {
+        branch: conditionMet ? 'TRUE_BRANCH' : 'FALSE_BRANCH',
+        result: branchResult
+      }
+    };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+};
+
+/**
+ * Execute PARALLEL_SPLIT concurrent actions step
+ */
+const executeParallelSplit = async (step, customer, context) => {
+  try {
+    const config = step.config || {};
+    const branchA = config.branchA;
+    const branchB = config.branchB;
+
+    const promises = [];
+
+    // Parallel Action A
+    if (branchA && branchA.message) {
+      promises.push((async () => {
+        const msg = await aiSmartFeatures.personalizeMessage(branchA.message, customer, context);
+        return WhatsAppService.sendMessage(customer.whatsappNumber || customer.phone, msg, {
+          userId: customer.userId
+        });
+      })());
+    }
+
+    // Parallel Action B
+    if (branchB && branchB.message) {
+      promises.push((async () => {
+        if (branchB.actionType === 'WEBHOOK' || branchB.webhookUrl) {
+          const fetch = require('node-fetch');
+          return fetch(branchB.webhookUrl || 'https://httpbin.org/post', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ customer, context, action: branchB.label, message: branchB.message })
+          });
+        } else {
+          const msg = await aiSmartFeatures.personalizeMessage(branchB.message, customer, context);
+          return WhatsAppService.sendMessage(customer.whatsappNumber || customer.phone, msg, {
+            userId: customer.userId
+          });
+        }
+      })());
+    }
+
+    const results = await Promise.allSettled(promises);
+
+    return {
+      success: true,
+      data: {
+        parallelActionsExecuted: results.length,
+        results
+      }
+    };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+};
+
+/**
+ * Execute WEBHOOK step
+ */
+const executeWebhook = async (step, customer, context) => {
+  try {
+    const fetch = require('node-fetch');
+    const url = step.config?.url || step.config?.webhookUrl;
+    if (!url) return { success: true, data: { skipped: true } };
+
+    const res = await fetch(url, {
+      method: step.config?.method || 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ customer, context, timestamp: new Date() })
+    });
+
+    return { success: res.ok, data: { status: res.status } };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+};
+
+/**
+ * Execute ASK_DATA step
+ */
+const executeAskData = async (step, customer, context) => {
+  try {
+    const question = step.config?.question || 'Please share your details:';
+    const personalized = await aiSmartFeatures.personalizeMessage(question, customer, context);
+    await WhatsAppService.sendMessage(customer.whatsappNumber || customer.phone, personalized, {
+      userId: customer.userId
+    });
+    return { success: true, data: { asked: question } };
+  } catch (err) {
+    return { success: false, error: err.message };
   }
 };
 

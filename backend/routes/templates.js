@@ -425,6 +425,23 @@ router.post('/ai/optimize', [
   }
 });
 
+router.post('/translate', [
+  body('text').notEmpty().withMessage('Source text is required').trim(),
+  body('targetLanguages').optional().isArray()
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+    const { text, targetLanguages = ['hi', 'ta', 'te', 'kn', 'ml', 'mr', 'gu', 'bn', 'pa', 'or', 'as', 'ur'] } = req.body;
+    const result = await GeminiService.translateText(text, targetLanguages);
+    res.json(result);
+  } catch (error) {
+    console.error('Template Translate Error:', error);
+    res.status(500).json({ error: 'Failed to translate template content' });
+  }
+});
+
 // ============ CRUD ============
 router.get('/', async (req, res) => {
   try {
@@ -460,6 +477,8 @@ router.post('/', [
     const template = new Template({
       name: req.body.name,
       content: req.body.content,
+      language: req.body.language || 'en',
+      translations: req.body.translations || {},
       category: normalizeCategory(req.body.category),
       supportedChannels: req.body.supportedChannels || ['whatsapp', 'instagram'],
       userId: req.userId || req.user._id,
@@ -517,15 +536,126 @@ router.put('/:id', async (req, res) => {
   }
 });
 
+// ============ GET TEMPLATE USAGE TRACKING ============
+router.get('/:id/usage', async (req, res) => {
+  try {
+    const templateId = req.params.id;
+    const userId = req.userId || req.user._id;
+
+    const Campaign = require('../models/Campaign');
+    const Workflow = require('../models/Workflow');
+    const ResponseRule = require('../models/ResponseRule');
+    const QuickReply = require('../models/QuickReply');
+
+    // 1. Search in Campaigns
+    const campaigns = await Campaign.find({
+      userId,
+      $or: [
+        { messageTemplate: templateId },
+        { 'messageTemplate._id': templateId },
+        { templateId: templateId }
+      ]
+    }).select('name type status targetAudience createdAt').lean();
+
+    // 2. Search in Workflows
+    const workflows = await Workflow.find({
+      userId,
+      $or: [
+        { 'steps.config.templateId': templateId },
+        { 'steps.config.template': templateId }
+      ]
+    }).select('name status trigger createdAt').lean();
+
+    // 3. Search in Response Rules
+    const responseRules = await ResponseRule.find({
+      userId,
+      $or: [
+        { templateId: templateId },
+        { responseTemplate: templateId }
+      ]
+    }).select('name trigger keywords matchType isActive').lean();
+
+    // 4. Search in Quick Replies
+    const quickReplies = await QuickReply.find({
+      userId,
+      templateId: templateId
+    }).select('text shortcut category').lean();
+
+    const totalUsages = campaigns.length + workflows.length + responseRules.length + quickReplies.length;
+
+    res.json({
+      success: true,
+      templateId,
+      inUse: totalUsages > 0,
+      totalUsages,
+      usages: {
+        campaigns,
+        workflows,
+        responseRules,
+        quickReplies
+      }
+    });
+  } catch (error) {
+    console.error('Get Template Usage Error:', error);
+    res.status(500).json({ error: 'Failed to check template usage', details: error.message });
+  }
+});
+
 router.delete('/:id', async (req, res) => {
   try {
+    const templateId = req.params.id;
+    const userId = req.userId || req.user._id;
+    const cascade = req.query.cascade === 'true' || req.body.cascade === true;
+
     const template = await Template.findOneAndDelete({
-      _id: req.params.id,
-      userId: req.userId || req.user._id
+      _id: templateId,
+      userId
     });
 
     if (!template) return res.status(404).json({ error: 'Template not found' });
-    res.json({ message: 'Template deleted successfully' });
+
+    let cleanedStats = { campaigns: 0, workflows: 0, responseRules: 0, quickReplies: 0 };
+
+    // Cascade remove or nullify references across associated resources
+    try {
+      const Campaign = require('../models/Campaign');
+      const Workflow = require('../models/Workflow');
+      const ResponseRule = require('../models/ResponseRule');
+      const QuickReply = require('../models/QuickReply');
+
+      const campRes = await Campaign.updateMany(
+        { userId, $or: [{ messageTemplate: templateId }, { templateId: templateId }] },
+        { $unset: { messageTemplate: 1, templateId: 1 } }
+      );
+      cleanedStats.campaigns = campRes.modifiedCount || 0;
+
+      const wfRes = await Workflow.updateMany(
+        { userId, 'steps.config.templateId': templateId },
+        { $unset: { 'steps.$[elem].config.templateId': 1 } },
+        { arrayFilters: [{ 'elem.config.templateId': templateId }] }
+      );
+      cleanedStats.workflows = wfRes.modifiedCount || 0;
+
+      const ruleRes = await ResponseRule.updateMany(
+        { userId, $or: [{ templateId: templateId }, { responseTemplate: templateId }] },
+        { $unset: { templateId: 1, responseTemplate: 1 } }
+      );
+      cleanedStats.responseRules = ruleRes.modifiedCount || 0;
+
+      const qrRes = await QuickReply.updateMany(
+        { userId, templateId: templateId },
+        { $unset: { templateId: 1 } }
+      );
+      cleanedStats.quickReplies = qrRes.modifiedCount || 0;
+    } catch (cleanErr) {
+      console.warn('Cascade template references cleanup note:', cleanErr.message);
+    }
+
+    res.json({
+      success: true,
+      message: 'Template deleted and cleaned up from references successfully',
+      cleanedStats
+    });
   } catch (error) {
     console.error('Delete Template Error:', error);
     res.status(500).json({ error: 'Failed to delete template' });
@@ -592,6 +722,206 @@ router.post('/:id/interpolate', [
   } catch (error) {
     console.error('Interpolation Error:', error);
     res.status(500).json({ error: 'Failed to interpolate template' });
+  }
+});
+
+// ============ TEMPLATE DELIVERY LOGS & RESEND ============
+
+// GET /api/templates/:id/logs - Get all messages sent using this template
+router.get('/:id/logs', async (req, res) => {
+  try {
+    const userId = req.userId || req.user?.id || req.user?._id;
+    const templateId = req.params.id;
+
+    let template = await Template.findOne({ _id: templateId, userId });
+    if (!template) {
+      template = await Template.findById(templateId);
+    }
+
+    if (!template) {
+      return res.status(404).json({ error: 'Template not found' });
+    }
+
+    require('../models/Customer');
+    const Campaign = require('../models/Campaign');
+    const Message = require('../models/Message');
+
+    // Find all campaigns that use this template
+    const campaigns = await Campaign.find({
+      $or: [
+        { messageTemplate: templateId },
+        { messageTemplate: String(templateId) },
+        { 'messageTemplate._id': templateId },
+        { templateId: templateId },
+        { 'messageTemplate.name': template.name },
+        { messageContent: template.content },
+        { 'messageTemplate.content': template.content },
+        { name: template.name }
+      ]
+    }).select('_id name');
+
+    const campaignIds = campaigns.map(c => c._id);
+
+    // Find messages sent via these campaigns OR directly referencing this template
+    const query = {
+      $or: [
+        { campaignId: { $in: campaignIds } },
+        { templateId: templateId },
+        { templateId: String(templateId) },
+        { 'template._id': templateId },
+        { originalContent: template.content },
+        ...(template.mediaUrl ? [{ mediaUrl: template.mediaUrl }] : [])
+      ]
+    };
+
+    const messages = await Message.find(query)
+      .populate('customerId', 'firstName lastName phone whatsappNumber email rfmSegment')
+      .populate('campaignId', 'name')
+      .sort({ createdAt: -1 })
+      .limit(200);
+
+    const totalSent = messages.filter(m => m.status === 'SENT' || m.status === 'DELIVERED' || m.status === 'READ').length;
+    const totalFailed = messages.filter(m => m.status === 'FAILED').length;
+    const totalDelivered = messages.filter(m => m.status === 'DELIVERED' || m.status === 'READ').length;
+
+    res.json({
+      success: true,
+      template: {
+        _id: template._id,
+        name: template.name,
+        category: template.category,
+        type: template.type,
+        content: template.content,
+        mediaUrl: template.mediaUrl,
+        mediaType: template.mediaType
+      },
+      stats: {
+        total: messages.length,
+        sent: totalSent,
+        delivered: totalDelivered,
+        failed: totalFailed
+      },
+      logs: messages.map(m => {
+        const cust = m.customerId || {};
+        const destPhone = cust.whatsappNumber || cust.phone || m.businessPhoneNumber || '—';
+        const custName = `${cust.firstName || ''} ${cust.lastName || ''}`.trim() || destPhone;
+        return {
+          _id: m._id,
+          messageId: m._id,
+          customerId: cust._id || null,
+          customerName: custName,
+          phoneNumber: destPhone,
+          rfmSegment: cust.rfmSegment || 'GENERAL',
+          campaignName: m.campaignId?.name || 'Direct / Broadcast',
+          content: m.content || m.originalContent || template.content,
+          status: m.status,
+          failureReason: m.failureReason || null,
+          mediaUrl: m.mediaUrl || null,
+          mediaType: m.mediaType || null,
+          sentAt: m.sentAt || m.createdAt,
+          createdAt: m.createdAt
+        };
+      })
+    });
+  } catch (error) {
+    console.error('Fetch Template Logs Error:', error);
+    res.status(500).json({ error: 'Failed to fetch template delivery logs' });
+  }
+});
+
+// POST /api/templates/:id/resend-customer/:customerId - Resend template to a single customer
+router.post('/:id/resend-customer/:customerId', async (req, res) => {
+  try {
+    const userId = req.userId || req.user?.id || req.user?._id;
+    const { id: templateId, customerId } = req.params;
+
+    const template = await Template.findOne({ _id: templateId, userId });
+    if (!template) return res.status(404).json({ error: 'Template not found' });
+
+    const Customer = require('../models/Customer');
+    const customer = await Customer.findOne({ _id: customerId, userId });
+    if (!customer) return res.status(404).json({ error: 'Customer not found' });
+
+    const destinationNumber = customer.whatsappNumber || customer.phone;
+    if (!destinationNumber) {
+      return res.status(400).json({ error: 'Customer does not have a valid phone number' });
+    }
+
+    const finalContent = await VariableInterpolationService.interpolateVariables(
+      template.content,
+      userId,
+      { customer }
+    );
+
+    const ShopConfig = require('../models/ShopConfig');
+    const shop = await ShopConfig.findOne({ userId }) || await ShopConfig.findOne({});
+    const senderMode = (shop?.whatsappSenderMode || (shop?.metaApiEnabled ? 'META' : 'DOCKER')).toUpperCase();
+    const isDockerMode = senderMode === 'DOCKER';
+
+    const sendOptions = {
+      userId,
+      forceMeta: !isDockerMode,
+      forceWaha: isDockerMode,
+      mediaUrl: template.mediaUrl || null,
+      mediaType: template.mediaType || null,
+      mediaPreviewData: template.mediaPreviewData || null,
+      mediaFileName: template.mediaFileName || 'template-media'
+    };
+
+    const WhatsAppService = require('../services/WhatsAppService');
+    const result = await WhatsAppService.sendMessage(destinationNumber, finalContent, sendOptions);
+
+    const Message = require('../models/Message');
+    const displayNum = shop?.metaDisplayPhoneNumber || shop?.contactPhone || '';
+
+    const newMsg = new Message({
+      userId,
+      customerId: customer._id,
+      content: finalContent,
+      originalContent: template.content,
+      channel: 'whatsapp',
+      status: result?.status || (result?.success ? 'SENT' : 'FAILED'),
+      sentAt: result?.success ? new Date() : null,
+      failureReason: result?.failureReason || result?.error || null,
+      externalMessageId: result?.externalMessageId || null,
+      businessPhoneNumber: displayNum,
+      messageType: 'MANUAL',
+      mediaUrl: template.mediaUrl || null,
+      mediaType: template.mediaType || null
+    });
+    await newMsg.save();
+
+    if (result && result.success) {
+      customer.lastMessageSentDate = new Date();
+      customer.messagesSentCount = (customer.messagesSentCount || 0) + 1;
+      await customer.save();
+
+      // Log conversation thread
+      try {
+        const aiChatHandler = require('../services/aiChatHandler');
+        await aiChatHandler.logOutboundMessage(
+          userId,
+          customer._id,
+          finalContent,
+          'whatsapp',
+          result.externalMessageId,
+          template.mediaUrl,
+          { businessPhoneNumber: displayNum }
+        );
+      } catch (logErr) {
+        console.warn('Failed to log conversation for resend:', logErr.message);
+      }
+    }
+
+    res.json({
+      success: result?.success || false,
+      message: result?.success ? 'Message resent successfully!' : `Resend failed: ${result?.error || result?.failureReason}`,
+      status: result?.success ? 'SENT' : 'FAILED',
+      error: result?.error || result?.failureReason || null
+    });
+  } catch (error) {
+    console.error('Template Resend Customer Error:', error);
+    res.status(500).json({ error: error.message || 'Failed to resend message' });
   }
 });
 

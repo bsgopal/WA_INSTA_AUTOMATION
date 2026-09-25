@@ -1,0 +1,6 @@
+2026/09/25-16:09:07.094 5dc Reusing MANIFEST /app/.sessions/webjs/default/session-default/Default/Local Storage/leveldb/MANIFEST-000001
+2026/09/25-16:09:07.100 5dc Recovering log #37
+2026/09/25-16:09:07.102 5dc Reusing old log /app/.sessions/webjs/default/session-default/Default/Local Storage/leveldb/000037.log 
+2026/09/25-16:20:59.951 5dc Level-0 table #40: started
+2026/09/25-16:20:59.958 5dc Level-0 table #40: 12423 bytes OK
+2026/09/25-16:20:59.966 5dc Delete type=0 #37

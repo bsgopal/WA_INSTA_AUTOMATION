@@ -24,6 +24,7 @@ import BrushIcon from '@mui/icons-material/Brush';
 import InfoIcon from '@mui/icons-material/Info';
 import SupportAgentIcon from '@mui/icons-material/SupportAgent';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import apiClient from '../../api/client';
 import CustomSnackbar from '../../components/Snackbar';
 import AIProviderStatus from '../../components/AIProviderStatus';
@@ -32,7 +33,7 @@ import { API_ORIGIN } from '../../api/base';
 // Helper to resolve backend media URLs
 const backendUrl = API_ORIGIN;
 
-// Parser to turn raw message content or widget metadata into structured cards
+// Parser to turn raw message content or widget metadata into structured cards (only for real interactive widgets/catalogs)
 const parseMessageCard = (messageOrContent, isOutbound, isAI) => {
   const content = typeof messageOrContent === 'string' ? messageOrContent : (messageOrContent?.content || '');
   const widgetData = typeof messageOrContent === 'object'
@@ -45,10 +46,10 @@ const parseMessageCard = (messageOrContent, isOutbound, isAI) => {
   if (widgetButtons.length > 0 || widgetList) {
     return {
       type: 'widget',
-      title: widgetList?.title || (widgetButtons.length > 0 ? '⚡ Interactive Reply' : '📋 Interactive Reply'),
+      title: widgetList?.title || (widgetButtons.length > 0 ? '⚡ Interactive Options' : '📋 Quick Menu'),
       headerBg: isOutbound
-        ? 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)'
-        : 'linear-gradient(135deg, #78909c 0%, #546e7a 100%)',
+        ? 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)'
+        : 'linear-gradient(135deg, #475569 0%, #334155 100%)',
       icon: isOutbound ? 'ai' : 'customer',
       body: content,
       buttons: widgetButtons.map(btn => ({
@@ -129,76 +130,31 @@ const parseMessageCard = (messageOrContent, isOutbound, isAI) => {
     };
   }
 
-  // 2. Otherwise, check for normal card formatting (Metadata grids and Buttons)
-  const buttons = [];
-  const bodyLines = [];
+  // 2. Check for explicit standalone action buttons [Button text]
   const standaloneButtons = [];
-  
   for (const line of lines) {
-    const trimmed = line.trim();
-    const optionMatch = trimmed.match(/^\s*\*?([1-9])\*?\.\s*(.+)$/);
-    const btnMatch = trimmed.match(/^\[(.+?)\]$/) || trimmed.match(/^\[Button:\s*(.+?)\]$/);
-    
-    if (optionMatch) {
-      const id = optionMatch[1];
-      const text = optionMatch[2].replace(/\*/g, '').replace(/\[.+?\]/g, '').trim();
-      buttons.push({ id, text });
-    } else if (btnMatch) {
-      standaloneButtons.push({ id: btnMatch[1], text: btnMatch[1] });
-    } else {
-      bodyLines.push(line);
+    const btnMatch = line.trim().match(/^\[(?:Button:\s*)?(.+?)\]$/);
+    if (btnMatch) {
+      standaloneButtons.push({ text: btnMatch[1], value: btnMatch[1] });
     }
   }
 
-  const finalButtons = [...buttons, ...standaloneButtons];
-  const bodyText = bodyLines.join('\n').trim();
-
-  // Determine card category/style based on keywords
-  let title = '📢 Store Update';
-  let headerBg = 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)';
-  let icon = 'info';
-
-  if (!isOutbound) {
-    title = '💬 Customer Inquiry';
-    headerBg = 'linear-gradient(135deg, #78909c 0%, #546e7a 100%)';
-    icon = 'customer';
-  } else {
-    const lowerContent = content.toLowerCase();
-    if (lowerContent.includes('rate') || lowerContent.includes('price') || lowerContent.includes('gold') || lowerContent.includes('silver') || lowerContent.includes('platinum')) {
-      title = '💵 Today\'s Live Metal Rates';
-      headerBg = 'linear-gradient(135deg, #fbc02d 0%, #f57f17 100%)';
-      icon = 'gold';
-    } else if (lowerContent.includes('delivery') || lowerContent.includes('shipping') || lowerContent.includes('track') || lowerContent.includes('pickup') || lowerContent.includes('refund')) {
-      title = lowerContent.includes('refund') ? '💰 Refund Status' : '📦 Shipment Tracking';
-      headerBg = 'linear-gradient(135deg, #43a047 0%, #2e7d32 100%)';
-      icon = 'delivery';
-    } else if (lowerContent.includes('custom') || lowerContent.includes('design') || lowerContent.includes('make') || lowerContent.includes('bespoke')) {
-      title = '💎 Custom Jewelry Design';
-      headerBg = 'linear-gradient(135deg, #8e24aa 0%, #6a1b9a 100%)';
-      icon = 'custom';
-    } else if (lowerContent.includes('complaint') || lowerContent.includes('sorry') || lowerContent.includes('apologize') || lowerContent.includes('issue')) {
-title = '⚠️ Support Assistance';
-      headerBg = 'linear-gradient(135deg, #e53935 0%, #c62828 100%)';
-      icon = 'complaint';
-    } else if (lowerContent.includes('welcome') || lowerContent.includes('namaste') || lowerContent.includes('hello')) {
-      title = '👋 Greeting & Introduction';
-      headerBg = 'linear-gradient(135deg, #00acc1 0%, #00838f 100%)';
-      icon = 'welcome';
-    } else if (isAI) {
-      title = '🤖 Assistant Smart Response';
-      headerBg = 'linear-gradient(135deg, #673ab7 0%, #512da8 100%)';
-      icon = 'ai';
-    }
+  if (standaloneButtons.length > 0) {
+    const cleanBody = lines.filter(l => !l.trim().match(/^\[(?:Button:\s*)?(.+?)\]$/)).join('\n').trim();
+    return {
+      type: 'widget',
+      title: '⚡ Quick Actions',
+      headerBg: isOutbound
+        ? 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)'
+        : 'linear-gradient(135deg, #475569 0%, #334155 100%)',
+      icon: isOutbound ? 'ai' : 'customer',
+      body: cleanBody,
+      buttons: standaloneButtons
+    };
   }
 
-  return {
-    type: 'ticket',
-    title,
-    headerBg,
-    icon,
-    body: bodyText,
-    buttons: finalButtons
-  };
+  // Normal text messages render as clean WhatsApp chat bubbles (return null)
+  return null;
 };
 
 const formatActionTypeLabel = (actionType, fallback = 'Quick Reply') => {
@@ -265,27 +221,58 @@ export default function Conversations() {
   
   const [conversations, setConversations] = useState([]);
 
+  const formatPhoneDisplay = (phone) => {
+    if (!phone) return '';
+    const str = String(phone).trim();
+    if (str.includes('@lid')) return '';
+    let cleaned = str.replace(/@c\.us|@s\.whatsapp\.net/g, '').replace(/\D/g, '');
+    if (!cleaned || (cleaned.length > 13 && !cleaned.startsWith('91'))) return '';
+    if (cleaned.length === 12 && cleaned.startsWith('91')) {
+      return `+91 ${cleaned.slice(2, 7)} ${cleaned.slice(7)}`;
+    }
+    if (cleaned.length === 10) {
+      return `+91 ${cleaned.slice(0, 5)} ${cleaned.slice(5)}`;
+    }
+    return '+' + cleaned;
+  };
+
   const getDisplayName = (cust, conv) => {
     if (!cust) return conv?.title || 'Unknown Customer';
     const firstName = (cust.firstName || '').trim();
     const lastName = (cust.lastName || '').trim();
     const phone = (cust.phone || '').trim();
+    const pushName = (cust.customFields?.displayName || cust.customFields?.pushName || '').trim();
     
-    const isPlaceholder = firstName.toLowerCase().startsWith('customer') || 
+    const isPlaceholder = !firstName || 
+                          firstName.toLowerCase().startsWith('customer') || 
                           firstName.includes('@lid') || 
                           lastName.includes('@lid') ||
+                          firstName.includes('@c.us') ||
                           firstName.startsWith('+') ||
                           firstName === phone;
                           
     if (!isPlaceholder && (firstName || lastName)) {
       return `${firstName} ${lastName}`.trim();
     }
-    
-    let cleaned = phone.replace(/@c\.us|@lid/g, '').replace(/\D/g, '');
-    if (cleaned.length > 0) {
-      return '+' + cleaned;
+
+    if (pushName && !pushName.includes('@lid') && !pushName.startsWith('+')) {
+      return pushName;
     }
-    return phone || conv?.title || 'Unknown Customer';
+
+    const formattedPhone = formatPhoneDisplay(phone);
+    if (formattedPhone) {
+      return formattedPhone;
+    }
+
+    if (pushName) {
+      return pushName;
+    }
+
+    if (conv?.title && !conv.title.includes('@lid') && !conv.title.includes('Chat with Customer') && !conv.title.startsWith('Chat with +')) {
+      return conv.title.replace(/^Chat with\s+/i, '');
+    }
+
+    return 'WhatsApp Customer';
   };
 
   const getAvatarInitial = (cust, conv) => {
@@ -314,6 +301,44 @@ export default function Conversations() {
     whatsapp: 0,
     instagram: 0
   });
+  const [smartReplies, setSmartReplies] = useState([]);
+  const [smartRepliesLoading, setSmartRepliesLoading] = useState(false);
+
+  const fetchSmartReplies = async (customText = null) => {
+    const targetText = customText || [...messages].reverse().find(m => m.sender?.type === 'CUSTOMER')?.content;
+    if (!targetText || !targetText.trim()) {
+      setSnackbar({ open: true, message: 'No customer message found to generate suggestions for.', severity: 'info' });
+      return;
+    }
+    try {
+      setSmartRepliesLoading(true);
+      const res = await apiClient.post('/ai/smart-replies', {
+        messageText: targetText,
+        customerContext: {
+          segment: selectedConversation?.customerId?.rfmSegment || 'REGULAR',
+          customerName: getDisplayName(selectedConversation?.customerId, selectedConversation)
+        }
+      });
+      if (Array.isArray(res.data?.replies) && res.data.replies.length > 0) {
+        setSmartReplies(res.data.replies);
+      } else {
+        setSmartReplies([
+          { type: 'professional', text: 'Thank you for reaching out. How can I assist you with your order?' },
+          { type: 'friendly', text: 'Hi! Glad to connect with you. What details do you need?' },
+          { type: 'brief', text: 'Hello! Checking this right away for you.' }
+        ]);
+      }
+    } catch (err) {
+      console.error('Failed to fetch smart replies:', err);
+      setSmartReplies([
+        { type: 'professional', text: 'Thank you for contacting us. How can we assist you today?' },
+        { type: 'friendly', text: 'Hi there! We are happy to help you with that.' },
+        { type: 'brief', text: 'Sure! Let me check that for you right now.' }
+      ]);
+    } finally {
+      setSmartRepliesLoading(false);
+    }
+  };
 
   const fetchWhatsappStatus = async () => {
     try {
@@ -749,117 +774,130 @@ export default function Conversations() {
   };
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 120px)', mt: -2, width: '100%' }}>
-      {/* Sleek KPI Summary Bar */}
-      <Paper
-        elevation={0}
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 85px)', mt: 0, width: '100%' }}>
+      {/* Sleek Space-Saving Header Ribbon */}
+      <Box
         sx={{
-          p: 1.5,
-          mb: 2,
-          background: 'rgba(255, 255, 255, 0.7)',
-          backdropFilter: 'blur(20px)',
-          border: '1px solid #e8eef7',
-          borderRadius: 3,
+          px: 2,
+          py: 1,
+          mb: 1.5,
+          bgcolor: '#ffffff',
+          border: '1px solid #e2e8f0',
+          borderRadius: '12px',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
           flexWrap: 'wrap',
-          gap: 2
+          gap: 1.5,
+          boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
         }}
       >
-        <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
-          <ForumIcon color="primary" />
-          <Typography variant="h6" sx={{ fontWeight: 700, color: 'text.primary', fontSize: '1.1rem' }}>
-            Unified Conversations
-          </Typography>
+        <Stack direction="row" spacing={1.2} alignItems="center">
+          <Box sx={{
+            width: 32, height: 32, borderRadius: '8px',
+            bgcolor: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}>
+            <ForumIcon sx={{ color: '#84cc16', fontSize: 18 }} />
+          </Box>
+          <Box>
+            <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#0f172a', fontSize: '0.98rem', lineHeight: 1.2 }}>
+              Conversations
+            </Typography>
+            <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.68rem', fontWeight: 600 }}>
+              Live customer messaging & omnichannel chat
+            </Typography>
+          </Box>
         </Stack>
 
-        <Stack direction="row" spacing={3} sx={{ flexWrap: 'wrap' }}>
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ flexWrap: 'wrap' }}>
           {[
-            { label: 'Total', value: stats.total, color: '#1976d2' },
-            { label: 'Active', value: stats.active, color: '#2196f3' },
-            { label: 'Pending', value: stats.pending, color: '#ff9800' },
-            { label: 'Resolved', value: stats.resolved, color: '#4caf50' },
-            { label: 'WhatsApp', value: stats.whatsapp, color: '#25D366' },
-            { label: 'Instagram', value: stats.instagram, color: '#E1306C' }
+            { label: 'Total', value: stats.total, color: '#0f172a', bg: '#f1f5f9' },
+            { label: 'Active', value: stats.active, color: '#0369a1', bg: '#e0f2fe' },
+            { label: 'Pending', value: stats.pending, color: '#c2410c', bg: '#ffedd5' },
+            { label: 'Resolved', value: stats.resolved, color: '#15803d', bg: '#dcfce7' },
+            { label: 'WhatsApp', value: stats.whatsapp, color: '#16a34a', bg: '#ecfdf5' }
           ].map((item, idx) => (
-            <Box key={idx} sx={{ textAlign: 'center' }}>
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', fontWeight: 500 }}>
-                {item.label}
-              </Typography>
-              <Typography variant="body1" sx={{ fontWeight: 700, color: item.color }}>
-                {item.value || 0}
-              </Typography>
-            </Box>
+            <Chip
+              key={idx}
+              label={
+                <Box component="span" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <span style={{ color: '#64748b', fontWeight: 600 }}>{item.label}:</span>
+                  <strong style={{ color: item.color, fontWeight: 800 }}>{item.value || 0}</strong>
+                </Box>
+              }
+              size="small"
+              sx={{
+                bgcolor: item.bg,
+                border: '1px solid rgba(0,0,0,0.06)',
+                height: 24,
+                fontSize: '0.72rem'
+              }}
+            />
           ))}
+
+          <Tooltip title="Refresh Conversations">
+            <IconButton size="small" onClick={() => { fetchConversations(); fetchStats(); }} sx={{ ml: 0.5, bgcolor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+              <RefreshIcon sx={{ fontSize: 16, color: '#475569' }} />
+            </IconButton>
+          </Tooltip>
         </Stack>
+      </Box>
 
-        <IconButton size="small" onClick={() => { fetchConversations(); fetchStats(); }} title="Refresh Inbox">
-          <RefreshIcon fontSize="small" />
-        </IconButton>
-      </Paper>
-
-      {/* Flex container taking full remaining height */}
-      <Box sx={{ display: 'flex', gap: 2.5, flexGrow: 1, height: 'calc(100% - 60px)', minHeight: 0, width: '100%' }}>
+      {/* Main Conversation & Chat Split View taking 100% remaining height */}
+      <Box sx={{ display: 'flex', gap: 1.5, flexGrow: 1, minHeight: 0, width: '100%' }}>
         {/* Left Side: Conversations List */}
-        <Box sx={{ width: { xs: '100%', md: '340px' }, minWidth: { md: '340px' }, height: '100%', display: 'flex', flexDirection: 'column' }}>
+        <Box sx={{ width: { xs: '100%', md: '350px' }, minWidth: { md: '350px' }, height: '100%', display: 'flex', flexDirection: 'column' }}>
           <Paper
             elevation={0}
             sx={{
               height: '100%',
               display: 'flex',
               flexDirection: 'column',
-              borderRadius: '8px',
-              border: '1px solid #e0e0e0',
+              borderRadius: '12px',
+              border: '1px solid #e2e8f0',
               overflow: 'hidden',
-              background: '#ffffff'
+              background: '#ffffff',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
             }}
           >
-            {/* WhatsApp Profile / Connection Header */}
-            <Box sx={{ p: 1.8, px: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', bgcolor: '#f0f2f5', borderBottom: '1px solid #e0e0e0' }}>
-              <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
-                <Avatar sx={{ bgcolor: '#128C7E', width: 36, height: 36 }}>
-                  <ChatIcon sx={{ fontSize: 20 }} />
-                </Avatar>
-                <Box>
-                  <Typography variant="body2" sx={{ fontWeight: 700, fontSize: '0.82rem', color: '#303030' }}>
-                    {whatsappStatus?.phoneNumber ? whatsappStatus.phoneNumber : (whatsappStatus?.status === 'META_API' ? 'Meta Business API' : 'WhatsApp (QR Mode)')}
-                  </Typography>
-                  <Typography variant="caption" sx={{ display: 'block', color: whatsappStatus?.authenticated ? '#25D366' : '#f44336', fontWeight: 700, fontSize: '0.68rem' }}>
-                    {whatsappStatus?.authenticated ? '● Active Connection' : '○ Disconnected'}
-                  </Typography>
-                </Box>
-              </Stack>
-            </Box>
-
             {/* Search and Filters Header */}
-            <Box sx={{ p: 2, borderBottom: '1px solid #e0e0e0', bgcolor: '#ffffff' }}>
+            <Box sx={{ p: 1.5, borderBottom: '1px solid #e2e8f0', bgcolor: '#ffffff' }}>
               <TextField
-                placeholder="Search by name or content..."
+                placeholder="Search by customer name or number..."
                 size="small"
                 fullWidth
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                sx={{ mb: 2 }}
+                sx={{ mb: 1 }}
                 slotProps={{
                   input: {
                     startAdornment: (
                       <InputAdornment position="start">
-                        <SearchIcon sx={{ color: 'text.secondary' }} />
+                        <SearchIcon sx={{ color: '#94a3b8', fontSize: 18 }} />
                       </InputAdornment>
                     ),
-                    sx: { borderRadius: 2, bgcolor: '#ffffff' }
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <Tooltip title={whatsappStatus?.authenticated ? 'WhatsApp Live & Connected' : 'WhatsApp Disconnected'}>
+                          <Box sx={{
+                            width: 8, height: 8, borderRadius: '50%',
+                            bgcolor: whatsappStatus?.authenticated ? '#16a34a' : '#dc2626',
+                            boxShadow: whatsappStatus?.authenticated ? '0 0 6px #16a34a' : 'none'
+                          }} />
+                        </Tooltip>
+                      </InputAdornment>
+                    ),
+                    sx: { borderRadius: '8px', bgcolor: '#f8fafc', fontSize: '0.82rem', height: 36 }
                   }
                 }}
               />
-              <Stack direction="row" spacing={1.5}>
+              <Stack direction="row" spacing={1}>
                 <FormControl size="small" fullWidth>
-                  <InputLabel>Status</InputLabel>
                   <Select
                     value={statusFilter}
-                    label="Status"
+                    displayEmpty
                     onChange={(e) => setStatusFilter(e.target.value)}
-                    sx={{ borderRadius: 2 }}
+                    sx={{ borderRadius: '8px', height: 32, fontSize: '0.78rem', bgcolor: '#f8fafc' }}
                   >
                     <MenuItem value="">All Statuses</MenuItem>
                     <MenuItem value="ACTIVE">Active</MenuItem>
@@ -870,12 +908,11 @@ export default function Conversations() {
                   </Select>
                 </FormControl>
                 <FormControl size="small" fullWidth>
-                  <InputLabel>Platform</InputLabel>
                   <Select
                     value={platformFilter}
-                    label="Platform"
+                    displayEmpty
                     onChange={(e) => setPlatformFilter(e.target.value)}
-                    sx={{ borderRadius: 2 }}
+                    sx={{ borderRadius: '8px', height: 32, fontSize: '0.78rem', bgcolor: '#f8fafc' }}
                   >
                     <MenuItem value="">All Channels</MenuItem>
                     <MenuItem value="WHATSAPP">WhatsApp</MenuItem>
@@ -886,15 +923,15 @@ export default function Conversations() {
             </Box>
 
             {/* Scrollable Conversation List */}
-            <Box sx={{ flexGrow: 1, overflowY: 'auto', p: 1 }}>
+            <Box sx={{ flexGrow: 1, overflowY: 'auto', p: 0 }}>
               {loading ? (
                 <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '200px' }}>
-                  <CircularProgress size={30} />
+                  <CircularProgress size={26} sx={{ color: '#0f172a' }} />
                 </Box>
               ) : conversations.length === 0 ? (
                 <Box sx={{ textAlign: 'center', py: 8, px: 2 }}>
-                  <ChatIcon sx={{ fontSize: 40, color: 'text.disabled', mb: 1.5 }} />
-                  <Typography variant="body2" color="text.secondary">
+                  <ChatIcon sx={{ fontSize: 36, color: '#cbd5e1', mb: 1 }} />
+                  <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.82rem', fontWeight: 600 }}>
                     No conversations match filters.
                   </Typography>
                 </Box>
@@ -904,7 +941,7 @@ export default function Conversations() {
                     const isSelected = selectedConversation?._id === conv._id;
                     const cust = conv.customerId;
                     const isWA = conv.primaryPlatform === 'WHATSAPP';
-                    const brandColor = isWA ? '#25D366' : '#E1306C';
+                    const brandColor = isWA ? '#16a34a' : '#E1306C';
                     const rfm = getSegmentColor(cust?.rfmSegment);
 
                     return (
@@ -913,134 +950,129 @@ export default function Conversations() {
                         onClick={() => handleSelectConversation(conv)}
                         sx={{
                           borderRadius: 0,
-                          borderBottom: '1px solid #f2f2f2',
-                          p: 1.5,
-                          px: 2,
-                          transition: 'all 0.2s',
-                          bgcolor: isSelected ? '#efeae2' : 'transparent',
+                          borderBottom: '1px solid #f1f5f9',
+                          p: 1.25,
+                          px: 1.5,
+                          transition: 'all 0.15s ease',
+                          bgcolor: isSelected ? '#f1f5f9' : '#ffffff',
+                          borderLeft: isSelected ? '3px solid #0f172a' : '3px solid transparent',
                           '&:hover': {
-                            bgcolor: isSelected ? '#efeae2' : '#f5f6f6'
+                            bgcolor: isSelected ? '#f1f5f9' : '#f8fafc'
                           }
                         }}
                       >
-                        <ListItemAvatar>
+                        <ListItemAvatar sx={{ minWidth: 44 }}>
                           <Badge
                             overlap="circular"
                             anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
                             badgeContent={
                               <Box
                                 sx={{
-                                  width: 18,
-                                  height: 18,
+                                  width: 14,
+                                  height: 14,
                                   borderRadius: '50%',
                                   bgcolor: '#ffffff',
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
-                                  boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
+                                  boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
                                 }}
                               >
                                 {isWA ? (
-                                  <PhoneIcon sx={{ fontSize: 10, color: brandColor }} />
+                                  <PhoneIcon sx={{ fontSize: 9, color: brandColor }} />
                                 ) : (
-                                  <CameraIcon sx={{ fontSize: 10, color: brandColor }} />
-                                ) }
+                                  <CameraIcon sx={{ fontSize: 9, color: brandColor }} />
+                                )}
                               </Box>
                             }
                           >
-                            <Avatar sx={{ bgcolor: isWA ? '#e8f5e9' : '#fce4ec', color: brandColor, fontWeight: 700 }}>
+                            <Avatar sx={{
+                              bgcolor: isWA ? '#ecfdf5' : '#fce4ec',
+                              color: brandColor,
+                              fontWeight: 800,
+                              width: 36,
+                              height: 36,
+                              fontSize: '0.85rem'
+                            }}>
                               {getAvatarInitial(cust, conv)}
                             </Avatar>
                           </Badge>
                         </ListItemAvatar>
-                        <Box sx={{ flexGrow: 1, minWidth: 0, ml: 1.5 }}>
+                        <Box sx={{ flexGrow: 1, minWidth: 0, ml: 1 }}>
                           <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
-                            <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <Typography variant="body2" sx={{
+                              fontWeight: 700,
+                              color: '#0f172a',
+                              fontSize: '0.84rem',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              maxWidth: 160
+                            }}>
                               {getDisplayName(cust, conv)}
                             </Typography>
-                            <Typography variant="caption" color="text.secondary" sx={{ flexShrink: 0, ml: 1 }}>
+                            <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.68rem', fontWeight: 600 }}>
                               {formatTime(conv.lastMessage?.timestamp)}
                             </Typography>
                           </Stack>
-                          <Stack spacing={0.5} sx={{ mt: 0.5 }}>
-                            <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
-                              <Typography
-                                variant="caption"
-                                color="text.secondary"
-                                noWrap
-                                sx={{ display: 'block', maxWidth: '170px' }}
-                              >
-                                {conv.lastMessage?.content || 'No messages yet'}
-                              </Typography>
-                              {conv.businessPhoneNumber && (
-                                <Typography variant="caption" sx={{ fontSize: '0.62rem', color: '#128C7E', fontWeight: 700, bgcolor: '#e8f5e9', px: 0.5, py: 0.1, borderRadius: 0.5 }}>
-                                  {conv.businessPhoneNumber}
-                                </Typography>
-                              )}
-                            </Stack>
-                            <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap', gap: 0.5 }}>
-                              {conv.status === 'WAITING_FOR_TEAM' ? (
-                                <Chip
-                                  label="Escalated"
-                                  size="small"
-                                  sx={{
-                                    height: 16,
-                                    fontSize: '0.65rem',
-                                    fontWeight: 700,
-                                    backgroundColor: '#ffebee',
-                                    color: '#d32f2f',
-                                    border: '1px solid #ffcdd2',
-                                    animation: 'pulseRed 2s infinite',
-                                    '@keyframes pulseRed': {
-                                      '0%': { boxShadow: '0 0 0 0 rgba(211, 47, 47, 0.4)' },
-                                      '70%': { boxShadow: '0 0 0 6px rgba(211, 47, 47, 0)' },
-                                      '100%': { boxShadow: '0 0 0 0 rgba(211, 47, 47, 0)' }
-                                    }
-                                  }}
-                                />
-                              ) : (
-                                <Chip
-                                  label={conv.status}
-                                  size="small"
-                                  sx={{
-                                    height: 16,
-                                    fontSize: '0.65rem',
-                                    fontWeight: 700,
-                                    backgroundColor: conv.status === 'ACTIVE' ? 'success.50' : 'grey.100',
-                                    color: conv.status === 'ACTIVE' ? 'success.main' : 'text.secondary',
-                                    border: 'none'
-                                  }}
-                                />
-                              )}
-                              {conv.leadScore !== undefined && (
-                                <Chip
-                                  label={`Score: ${conv.leadScore}/10`}
-                                  size="small"
-                                  sx={{
-                                    height: 16,
-                                    fontSize: '0.65rem',
-                                    fontWeight: 700,
-                                    backgroundColor: conv.leadScore >= 6.5 ? 'secondary.50' : 'grey.100',
-                                    color: conv.leadScore >= 6.5 ? 'secondary.main' : 'text.secondary',
-                                    border: 'none'
-                                  }}
-                                />
-                              )}
-                              {rfm && (
-                                <Chip
-                                  label={rfm.label}
-                                  size="small"
-                                  sx={{
-                                    height: 16,
-                                    fontSize: '0.65rem',
-                                    fontWeight: 700,
-                                    bgcolor: rfm.bg,
-                                    color: rfm.text,
-                                    border: `1px solid ${rfm.border}`
-                                  }}
-                                />
-                              )}
-                            </Stack>
+
+                          <Typography
+                            variant="caption"
+                            sx={{
+                              color: '#64748b',
+                              fontSize: '0.74rem',
+                              display: 'block',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              mt: 0.2
+                            }}
+                          >
+                            {conv.lastMessage?.content || 'No messages yet'}
+                          </Typography>
+
+                          <Stack direction="row" spacing={0.5} sx={{ mt: 0.5, alignItems: 'center' }}>
+                            {conv.status === 'WAITING_FOR_TEAM' ? (
+                              <Chip
+                                label="Escalated"
+                                size="small"
+                                sx={{
+                                  height: 16,
+                                  fontSize: '0.62rem',
+                                  fontWeight: 800,
+                                  backgroundColor: '#fef2f2',
+                                  color: '#dc2626',
+                                  border: '1px solid #fecaca'
+                                }}
+                              />
+                            ) : (
+                              <Chip
+                                label={conv.status || 'ACTIVE'}
+                                size="small"
+                                sx={{
+                                  height: 16,
+                                  fontSize: '0.62rem',
+                                  fontWeight: 700,
+                                  backgroundColor: conv.status === 'ACTIVE' ? '#ecfdf5' : '#f1f5f9',
+                                  color: conv.status === 'ACTIVE' ? '#15803d' : '#64748b',
+                                  border: '1px solid rgba(0,0,0,0.06)'
+                                }}
+                              />
+                            )}
+                            {rfm && (
+                              <Chip
+                                label={rfm.label}
+                                size="small"
+                                sx={{
+                                  height: 16,
+                                  fontSize: '0.62rem',
+                                  fontWeight: 700,
+                                  bgcolor: rfm.bg,
+                                  color: rfm.text,
+                                  border: `1px solid ${rfm.border}`
+                                }}
+                              />
+                            )}
                           </Stack>
                         </Box>
                       </ListItemButton>
@@ -1052,7 +1084,7 @@ export default function Conversations() {
           </Paper>
         </Box>
 
-        {/* Right Side: Chat Window (Stretches to fill all remaining width) */}
+        {/* Right Side: Chat Window */}
         <Box sx={{ flexGrow: 1, height: '100%', display: 'flex', flexDirection: 'column', minWidth: 0 }}>
           {selectedConversation ? (
             <Paper
@@ -1061,148 +1093,141 @@ export default function Conversations() {
                 height: '100%',
                 display: 'flex',
                 flexDirection: 'column',
-                borderRadius: '8px',
-                border: '1px solid #e0e0e0',
+                borderRadius: '12px',
+                border: '1px solid #e2e8f0',
                 overflow: 'hidden',
-                background: '#efeae2'
+                background: '#f0f2f5',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
               }}
             >
-              {/* Chat Window Header */}
-              <Box sx={{ p: 2, borderBottom: '1px solid #e0e0e0', bgcolor: '#f0f2f5' }}>
-                <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
-                    <Avatar sx={{ bgcolor: selectedConversation.primaryPlatform === 'WHATSAPP' ? '#128C7E' : '#E1306C', color: '#ffffff', fontWeight: 700 }}>
-                      {getAvatarInitial(selectedConversation.customerId, selectedConversation)}
-                    </Avatar>
-                    <Box>
-                      <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                        <Typography variant="h6" sx={{ fontWeight: 700, fontSize: '0.95rem', color: '#303030' }}>
-                          {getDisplayName(selectedConversation.customerId, selectedConversation)}
-                        </Typography>
-                        {selectedConversation.customerId?.rfmSegment && (
-                          <Chip
-                            label={selectedConversation.customerId.rfmSegment}
-                            size="small"
-                            sx={{
-                              height: 18,
-                              fontSize: '0.65rem',
-                              fontWeight: 700,
-                              ...getSegmentColor(selectedConversation.customerId.rfmSegment)
-                            }}
-                          />
-                        )}
-                        {selectedConversation.customerId?.totalSpent > 0 && (
-                          <Chip
-                            label={`Spent: ₹${selectedConversation.customerId.totalSpent.toLocaleString()}`}
-                            size="small"
-                            variant="outlined"
-                            sx={{ height: 18, fontSize: '0.65rem', fontWeight: 500, borderColor: '#e0e0e0', bgcolor: '#ffffff' }}
-                          />
-                        )}
-                      </Stack>
-                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
-                        {selectedConversation.customerId?.phone} | Channel: {selectedConversation.primaryPlatform === 'WHATSAPP' ? `WhatsApp ${selectedConversation.businessPhoneNumber ? `(via ${selectedConversation.businessPhoneNumber})` : ''}` : selectedConversation.primaryPlatform}
+              {/* Sleek WhatsApp Header (52px) */}
+              <Box sx={{
+                p: 1.2, px: 2,
+                borderBottom: '1px solid #e2e8f0',
+                bgcolor: '#ffffff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexShrink: 0
+              }}>
+                <Stack direction="row" spacing={1.5} alignItems="center">
+                  <Avatar sx={{
+                    bgcolor: selectedConversation.primaryPlatform === 'WHATSAPP' ? '#16a34a' : '#E1306C',
+                    color: '#ffffff',
+                    fontWeight: 800,
+                    width: 38,
+                    height: 38,
+                    fontSize: '0.9rem'
+                  }}>
+                    {getAvatarInitial(selectedConversation.customerId, selectedConversation)}
+                  </Avatar>
+                  <Box>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <Typography sx={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a' }}>
+                        {getDisplayName(selectedConversation.customerId, selectedConversation)}
                       </Typography>
-                    </Box>
-                  </Stack>
-
-                  <Stack direction="row" spacing={2.5} sx={{ alignItems: 'center' }}>
-                    {/* AI Autopilot Switch */}
-                    <FormControlLabel
-                      control={
-                        <Switch
-                          checked={selectedConversation.autoReplyEnabled !== false}
-                          onChange={(e) => handleToggleAutoReply(e.target.checked)}
-                          color="secondary"
+                      {selectedConversation.customerId?.rfmSegment && (
+                        <Chip
+                          label={selectedConversation.customerId.rfmSegment}
                           size="small"
+                          sx={{
+                            height: 18,
+                            fontSize: '0.65rem',
+                            fontWeight: 800,
+                            ...getSegmentColor(selectedConversation.customerId.rfmSegment)
+                          }}
                         />
-                      }
-                      label={
-                        <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
-                          <SmartToyIcon
-                            sx={{
-                              fontSize: 16,
-                              color: selectedConversation.autoReplyEnabled !== false ? 'secondary.main' : 'text.disabled'
-                            }}
-                          />
-                          <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.75rem' }}>
-                            Autopilot
-                          </Typography>
-                        </Stack>
-                      }
-                      sx={{ mr: 0.5 }}
-                    />
+                      )}
+                    </Stack>
+                    <Typography variant="caption" sx={{ fontSize: '0.72rem', color: '#64748b', display: 'block' }}>
+                      {formatPhoneDisplay(selectedConversation.customerId?.phone)
+                        ? `${formatPhoneDisplay(selectedConversation.customerId?.phone)} · `
+                        : ''}WhatsApp Chat
+                    </Typography>
+                  </Box>
+                </Stack>
 
-                    <FormControl size="small" sx={{ width: 130 }}>
-                      <InputLabel>Status</InputLabel>
-                      <Select
-                        value={selectedConversation.status}
-                        label="Status"
-                        onChange={(e) => handleUpdateStatus(e.target.value)}
-                        sx={{ borderRadius: 2, height: 32, fontSize: '0.8rem' }}
-                      >
-                        <MenuItem value="ACTIVE">Active</MenuItem>
-                        <MenuItem value="PENDING">Pending</MenuItem>
-                        <MenuItem value="RESOLVED">Resolved</MenuItem>
-                        <MenuItem value="WAITING_FOR_CUSTOMER">Waiting (Cust)</MenuItem>
-                        <MenuItem value="WAITING_FOR_TEAM">Waiting (Team)</MenuItem>
-                      </Select>
-                    </FormControl>
+                <Stack direction="row" spacing={1.5} alignItems="center">
+                  {/* AI Autopilot Switch */}
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={selectedConversation.autoReplyEnabled !== false}
+                        onChange={(e) => handleToggleAutoReply(e.target.checked)}
+                        color="success"
+                        size="small"
+                      />
+                    }
+                    label={
+                      <Stack direction="row" spacing={0.4} alignItems="center">
+                        <SmartToyIcon sx={{ fontSize: 14, color: selectedConversation.autoReplyEnabled !== false ? '#16a34a' : '#94a3b8' }} />
+                        <Typography sx={{ fontWeight: 700, fontSize: '0.74rem', color: '#334155' }}>
+                          Autopilot
+                        </Typography>
+                      </Stack>
+                    }
+                    sx={{ mr: 0 }}
+                  />
 
-                    <Tooltip title="Actions">
-                      <IconButton size="small">
-                        <MoreVertIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                  </Stack>
+                  <FormControl size="small" sx={{ width: 125 }}>
+                    <Select
+                      value={selectedConversation.status}
+                      onChange={(e) => handleUpdateStatus(e.target.value)}
+                      sx={{ borderRadius: '8px', height: 30, fontSize: '0.76rem', bgcolor: '#f8fafc' }}
+                    >
+                      <MenuItem value="ACTIVE">Active</MenuItem>
+                      <MenuItem value="PENDING">Pending</MenuItem>
+                      <MenuItem value="RESOLVED">Resolved</MenuItem>
+                      <MenuItem value="WAITING_FOR_CUSTOMER">Waiting (Cust)</MenuItem>
+                      <MenuItem value="WAITING_FOR_TEAM">Waiting (Team)</MenuItem>
+                    </Select>
+                  </FormControl>
                 </Stack>
               </Box>
 
-              {/* Warning Banner if Autopilot is paused/escalated */}
+              {/* Compact Escalation Notice Banner */}
               {(selectedConversation.autoReplyEnabled === false || selectedConversation.status === 'WAITING_FOR_TEAM') && (
-                <Paper
-                  elevation={0}
+                <Box
                   sx={{
-                    p: 1.5,
-                    px: 3,
-                    bgcolor: '#fff9c4',
-                    borderBottom: '1px solid #fff59d',
-                    borderRadius: 0,
+                    px: 2,
+                    py: 0.75,
+                    bgcolor: '#fffbeb',
+                    borderBottom: '1px solid #fef3c7',
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
-                    gap: 2
+                    gap: 1.5,
+                    flexShrink: 0
                   }}
                 >
-                  <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
-                    <ReportProblemIcon sx={{ color: '#f57f17' }} />
-                    <Typography variant="body2" sx={{ fontWeight: 600, color: '#f57f17', fontSize: '0.82rem' }}>
-                      AI Autopilot Paused — This conversation is escalated for admin takeover.
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <ReportProblemIcon sx={{ color: '#d97706', fontSize: 16 }} />
+                    <Typography sx={{ fontWeight: 700, color: '#92400e', fontSize: '0.76rem' }}>
+                      AI Autopilot Paused — escalated for admin takeover.
                     </Typography>
                   </Stack>
                   <Button
                     variant="contained"
                     size="small"
-                    color="warning"
                     onClick={() => handleToggleAutoReply(true)}
                     sx={{
-                      fontSize: '0.72rem',
-                      fontWeight: 700,
-                      borderRadius: 2,
+                      fontSize: '0.7rem',
+                      fontWeight: 800,
+                      borderRadius: '6px',
                       textTransform: 'none',
-                      bgcolor: '#f57f17',
-                      px: 2,
-                      py: 0.5,
-                      '&:hover': { bgcolor: '#e65100' }
+                      bgcolor: '#d97706',
+                      height: 24,
+                      px: 1.5,
+                      '&:hover': { bgcolor: '#b45309' }
                     }}
                   >
                     Resume Autopilot
                   </Button>
-                </Paper>
+                </Box>
               )}
 
               {/* Chat Message Stream */}
-              <Box sx={{ flexGrow: 1, overflowY: 'auto', p: 3, bgcolor: '#efeae2', backgroundImage: 'url("https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png")', backgroundRepeat: 'repeat', backgroundBlendMode: 'multiply' }}>
+              <Box sx={{ flexGrow: 1, overflowY: 'auto', p: 3, bgcolor: '#f0f2f5' }}>
                 {messagesLoading ? (
                   <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
                     <CircularProgress size={35} />
@@ -1594,18 +1619,41 @@ export default function Conversations() {
                                 sx={{
                                   p: 1.5,
                                   px: 2,
-                                  borderRadius: isOutbound ? '8px 0px 8px 8px' : '0px 8px 8px 8px',
-                                  background: isOutbound
-                                    ? '#d9fdd3'
-                                    : '#ffffff',
-                                  color: '#303030',
-                                  border: 'none',
-                                  boxShadow: '0 1px 0.5px rgba(0,0,0,0.13)'
+                                  borderRadius: isOutbound ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
+                                  background: isOutbound ? '#dcf8c6' : '#ffffff',
+                                  color: '#0f172a',
+                                  border: isOutbound ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
+                                  boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
+                                  maxWidth: '100%'
                                 }}
                               >
-                                <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
-                                  {msg.content}
-                                </Typography>
+                                {(msg.media?.url || msg.mediaUrl) && (
+                                  <Box
+                                    component="img"
+                                    src={(msg.media?.url || msg.mediaUrl).startsWith('http') ? (msg.media?.url || msg.mediaUrl) : `${backendUrl}${msg.media?.url || msg.mediaUrl}`}
+                                    alt="Media"
+                                    sx={{
+                                      maxWidth: '100%',
+                                      maxHeight: 280,
+                                      borderRadius: 2,
+                                      mb: msg.content ? 1 : 0,
+                                      display: 'block'
+                                    }}
+                                  />
+                                )}
+                                {msg.content && (
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      whiteSpace: 'pre-wrap',
+                                      lineHeight: 1.5,
+                                      fontSize: '0.92rem',
+                                      color: isOutbound ? '#0f172a' : '#1e293b',
+                                      wordBreak: 'break-word'
+                                    }}
+                                    dangerouslySetInnerHTML={{ __html: formatMarkdown(msg.content) }}
+                                  />
+                                )}
                               </Paper>
                             )}
                             
@@ -1642,7 +1690,66 @@ export default function Conversations() {
               {/* Chat Input Footer */}
               <Divider sx={{ borderColor: '#e0e0e0' }} />
               <Box sx={{ p: 2, bgcolor: '#f0f2f5' }}>
-                <AIProviderStatus compact sx={{ mb: 1.5 }} />
+                <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.25 }}>
+                  <AIProviderStatus compact />
+                  <Button
+                    size="small"
+                    startIcon={smartRepliesLoading ? <CircularProgress size={14} sx={{ color: '#0f172a' }} /> : <AutoAwesomeIcon sx={{ fontSize: 16, color: '#84cc16' }} />}
+                    onClick={() => fetchSmartReplies()}
+                    disabled={smartRepliesLoading}
+                    sx={{
+                      textTransform: 'none',
+                      fontWeight: 700,
+                      fontSize: '0.75rem',
+                      height: 28,
+                      borderRadius: '14px',
+                      color: '#0f172a',
+                      bgcolor: '#ffffff',
+                      border: '1px solid #cbd5e1',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                      '&:hover': { bgcolor: '#f8fafc', borderColor: '#84cc16' }
+                    }}
+                  >
+                    AI Suggestions
+                  </Button>
+                </Stack>
+
+                {/* AI Smart Suggested Replies Bar */}
+                {smartReplies.length > 0 && (
+                  <Box sx={{ mb: 1.5, p: 1, bgcolor: '#ffffff', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                    <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 0.5 }}>
+                      <Typography variant="caption" sx={{ fontWeight: 800, color: '#475569', fontSize: '0.7rem' }}>
+                        💡 Click an AI suggestion to insert:
+                      </Typography>
+                      <Chip
+                        label="Dismiss"
+                        size="small"
+                        onClick={() => setSmartReplies([])}
+                        sx={{ height: 18, fontSize: '0.62rem', cursor: 'pointer', bgcolor: '#f1f5f9' }}
+                      />
+                    </Stack>
+                    <Stack direction="row" spacing={1} sx={{ overflowX: 'auto', pb: 0.25 }}>
+                      {smartReplies.map((rep, idx) => (
+                        <Chip
+                          key={idx}
+                          label={`${rep.type === 'professional' ? '💼 Professional' : rep.type === 'friendly' ? '😊 Friendly' : '⚡ Quick'}: ${rep.text}`}
+                          onClick={() => setNewMessage(rep.text)}
+                          clickable
+                          size="small"
+                          sx={{
+                            maxWidth: 360,
+                            fontWeight: 600,
+                            fontSize: '0.75rem',
+                            bgcolor: rep.type === 'professional' ? 'rgba(37,99,235,0.08)' : rep.type === 'friendly' ? 'rgba(132,204,22,0.12)' : 'rgba(245,158,11,0.1)',
+                            color: rep.type === 'professional' ? '#1d4ed8' : rep.type === 'friendly' ? '#4d7c0f' : '#b45309',
+                            border: '1px solid',
+                            borderColor: rep.type === 'professional' ? 'rgba(37,99,235,0.2)' : rep.type === 'friendly' ? 'rgba(132,204,22,0.3)' : 'rgba(245,158,11,0.25)'
+                          }}
+                        />
+                      ))}
+                    </Stack>
+                  </Box>
+                )}
                 <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
                   <TextField
                     fullWidth

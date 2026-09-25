@@ -3,7 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { Box, CircularProgress } from '@mui/material';
 import useAuthStore from './store/authStore';
 
-const DashboardLayout = lazy(() => import('./components/layout/DashboardLayout'));
+import DashboardLayout from './components/layout/DashboardLayout';
 const Dashboard = lazy(() => import('./pages/Dashboard/Dashboard'));
 const Login = lazy(() => import('./pages/Auth/Login'));
 const ResetPassword = lazy(() => import('./pages/Auth/ResetPassword'));
@@ -30,19 +30,6 @@ const ProtectedRoute = ({ children }) => {
 };
 
 function App() {
-  const user = useAuthStore((state) => state.user);
-
-  const hasAccess = (path) => {
-    const role = user?.role;
-    if (role === 'PLATFORM_OWNER' || role === 'ADMIN') return true;
-    
-    // Restrict manager/user
-    if (path.startsWith('/workflows') || path === '/response-rules' || path === '/ai-features' || path === '/settings') {
-      return false;
-    }
-    return true;
-  };
-
   return (
     <Suspense
       fallback={
@@ -59,7 +46,7 @@ function App() {
           path="/workflows/create"
           element={
             <ProtectedRoute>
-              {hasAccess('/workflows/create') ? <ConditionalWorkflowBuilder /> : <Navigate to="/" replace />}
+              <ConditionalWorkflowBuilder />
             </ProtectedRoute>
           }
         />
@@ -67,7 +54,7 @@ function App() {
           path="/workflows/:id"
           element={
             <ProtectedRoute>
-              {hasAccess('/workflows/:id') ? <ConditionalWorkflowBuilder /> : <Navigate to="/" replace />}
+              <ConditionalWorkflowBuilder />
             </ProtectedRoute>
           }
         />
@@ -89,10 +76,11 @@ function App() {
           <Route path="catalog" element={<Catalog />} />
           <Route path="messages" element={<Messages />} />
           <Route path="analytics" element={<Analytics />} />
-          <Route path="workflows" element={hasAccess('/workflows') ? <Workflows /> : <Navigate to="/" replace />} />
-          <Route path="response-rules" element={hasAccess('/response-rules') ? <ResponseRules /> : <Navigate to="/" replace />} />
-          <Route path="ai-features" element={hasAccess('/ai-features') ? <AIFeatures /> : <Navigate to="/" replace />} />
-          <Route path="settings" element={hasAccess('/settings') ? <Settings /> : <Navigate to="/" replace />} />
+          <Route path="workflows" element={<Workflows />} />
+          <Route path="response-rules" element={<ResponseRules />} />
+          <Route path="rules" element={<Navigate to="/response-rules" replace />} />
+          <Route path="ai-features" element={<AIFeatures />} />
+          <Route path="settings" element={<Settings />} />
         </Route>
       </Routes>
     </Suspense>

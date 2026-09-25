@@ -106,6 +106,15 @@ const sendMessage = async (to, message, options = {}) => {
 
 const sendBulkMessages = async (recipients, messageTemplate, options = {}) => {
   const userId = options.userId || process.env.DEFAULT_USER_ID;
+  const ShopConfig = require('../models/ShopConfig');
+  const shop = await ShopConfig.findOne({ userId }) || await ShopConfig.findOne({});
+  const senderMode = (options.forceWaha ? 'DOCKER' : options.forceMeta ? 'META' : (shop?.whatsappSenderMode || 'META')).toUpperCase();
+
+  if (senderMode === 'DOCKER') {
+    const throttleDelay = (shop?.dockerThrottleSeconds || 6) * 1000;
+    return WAHAService.sendBulkMessages(recipients, messageTemplate, { ...options, throttleDelay });
+  }
+
   if (await isMetaConfigured(userId)) {
     return MetaService.sendBulkMessages(recipients, messageTemplate, { ...options, userId });
   }

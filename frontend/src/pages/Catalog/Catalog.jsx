@@ -15,7 +15,9 @@ import {
   Storefront as StoreIcon,
   AutoAwesome as SparklesIcon,
   Inventory as InventoryIcon,
-  TrendingUp as TrendIcon
+  TrendingUp as TrendIcon,
+  Save as SaveIcon,
+  Verified as VerifiedIcon
 } from '@mui/icons-material';
 import apiClient from '../../api/client';
 import { API_ORIGIN } from '../../api/base';
@@ -42,22 +44,21 @@ const formatINR = (value) => {
 };
 
 // Component to render product image with an elegant, premium fallback if it doesn't load
-function ProductImage({ src, name, category }) {
+function ProductImage({ src, name, category, height = 200 }) {
   const [error, setError] = useState(false);
 
-  // SVG representation for jewelry categories
   const getCategoryIcon = () => {
     switch (category) {
       case 'RINGS':
         return (
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ width: 48, height: 48, color: '#FFD700' }}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ width: 44, height: 44, color: '#FFD700' }}>
             <circle cx="12" cy="14" r="6" />
             <path d="M12 2l3 3-3 3-3-3z" strokeLinejoin="round" />
           </svg>
         );
       case 'NECKLACES':
         return (
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ width: 48, height: 48, color: '#FFD700' }}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ width: 44, height: 44, color: '#FFD700' }}>
             <path d="M6 3c0 8 3 13 6 13s6-5 6-13" />
             <path d="M12 16v4M10 20h4" />
             <circle cx="12" cy="3" r="1" fill="currentColor" />
@@ -67,21 +68,21 @@ function ProductImage({ src, name, category }) {
         );
       case 'BANGLES':
         return (
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ width: 48, height: 48, color: '#FFD700' }}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ width: 44, height: 44, color: '#FFD700' }}>
             <ellipse cx="12" cy="12" rx="9" ry="5" />
             <ellipse cx="12" cy="12" rx="6" ry="3.3" />
           </svg>
         );
       case 'EARRINGS':
         return (
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ width: 48, height: 48, color: '#FFD700' }}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ width: 44, height: 44, color: '#FFD700' }}>
             <path d="M8 5c0 3-1 6-1 9 0 2.5 2 4.5 5 4.5s5-2 5-4.5c0-3-1-6-1-9M12 3v2" />
             <circle cx="12" cy="18.5" r="1.5" fill="currentColor" />
           </svg>
         );
       default:
         return (
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ width: 48, height: 48, color: '#FFD700' }}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ width: 44, height: 44, color: '#FFD700' }}>
             <path d="M12 3v18M3 12h18" />
             <path d="M12 3l9 9-9 9-9-9z" />
           </svg>
@@ -104,14 +105,13 @@ function ProductImage({ src, name, category }) {
     }
   };
 
-  // Resolve full backend URL if relative path
   const fullUrl = src && src.startsWith('/') ? `${API_ORIGIN}${src}` : src;
 
   if (error || !src) {
     return (
       <Box
         sx={{
-          height: 200,
+          height: height,
           background: getGradient(),
           display: 'flex',
           flexDirection: 'column',
@@ -133,7 +133,7 @@ function ProductImage({ src, name, category }) {
         }}
       >
         {getCategoryIcon()}
-        <Typography variant="caption" sx={{ letterSpacing: '2px', fontWeight: 600, opacity: 0.8, textTransform: 'uppercase', mt: 1 }}>
+        <Typography variant="caption" sx={{ letterSpacing: '2px', fontWeight: 600, opacity: 0.8, textTransform: 'uppercase', mt: 0.5, fontSize: '0.7rem' }}>
           {category}
         </Typography>
       </Box>
@@ -141,7 +141,7 @@ function ProductImage({ src, name, category }) {
   }
 
   return (
-    <Box sx={{ height: 200, overflow: 'hidden', position: 'relative' }}>
+    <Box sx={{ height: height, overflow: 'hidden', position: 'relative' }}>
       <img
         src={fullUrl}
         alt={name}
@@ -189,11 +189,50 @@ export default function Catalog() {
     imageUrl: ''
   });
 
+  // 1-Click Product Presets
+  const productPresets = [
+    {
+      label: '💍 Solitaire Ring',
+      name: 'Princess Cut Solitaire Diamond Ring',
+      category: 'RINGS',
+      price: '85000',
+      description: 'Certified 1.02 Carat VVS1 Clarity Natural Diamond set in 18K Hallmarked Yellow Gold. Hand-finished prong setting with lifetime buyback guarantee.',
+      keywords: 'diamond, solitaire, ring, engagement, 18k gold, certified',
+      imageUrl: ''
+    },
+    {
+      label: '📿 Kundan Choker',
+      name: 'Royal Heritage Kundan Choker Set',
+      category: 'NECKLACES',
+      price: '145000',
+      description: 'Traditional Rajasthani Kundan bridal choker crafted in pure 22K Hallmarked Gold. Embellished with uncut Polki stones, natural pearls, and matching jhumkas.',
+      keywords: 'kundan, choker, bridal, necklace, 22k gold, polki, royal',
+      imageUrl: ''
+    },
+    {
+      label: '⭕ Bridal Bangles',
+      name: 'Traditional Filigree Kada Bangles (Pair)',
+      category: 'BANGLES',
+      price: '98000',
+      description: 'Pair of handcrafted 22K BIS Hallmarked solid gold Kada bangles featuring intricate antique filigree and ruby floral motifs.',
+      keywords: 'bangles, kada, bridal, gold, 22k, filigree, wedding',
+      imageUrl: ''
+    },
+    {
+      label: '💎 Emerald Drops',
+      name: 'Colombian Emerald & Diamond Chandbali Earrings',
+      category: 'EARRINGS',
+      price: '62000',
+      description: 'Stunning teardrop Colombian green emeralds accented by round brilliant cut diamonds in 18K Rose Gold for evening celebrations.',
+      keywords: 'earrings, emerald, diamond, chandbali, rose gold, 18k',
+      imageUrl: ''
+    }
+  ];
+
   useEffect(() => {
     fetchCatalog();
   }, [selectedCategory]);
 
-  // Handle Search Input Change with simple debouncer or trigger on enter/click
   const handleSearchKeyPress = (e) => {
     if (e.key === 'Enter') {
       fetchCatalog();
@@ -204,7 +243,7 @@ export default function Catalog() {
     try {
       setLoading(true);
       const params = {
-        limit: 120, // Fetch all seeded items
+        limit: 120,
         category: selectedCategory === 'ALL' ? '' : selectedCategory
       };
       if (searchQuery.trim()) {
@@ -245,6 +284,18 @@ export default function Catalog() {
       });
     }
     setOpenDialog(true);
+  };
+
+  const handleApplyPreset = (preset) => {
+    setFormData({
+      name: preset.name,
+      category: preset.category,
+      price: preset.price,
+      description: preset.description,
+      keywords: preset.keywords,
+      imageUrl: preset.imageUrl
+    });
+    setSnackbar({ open: true, message: `Loaded "${preset.label}" sample!`, severity: 'success' });
   };
 
   const handleSaveItem = async () => {
@@ -302,97 +353,110 @@ export default function Catalog() {
     }
   };
 
-  // Stats calculation
   const getCategoryCount = (cat) => {
     return items.filter(item => item.category === cat).length;
   };
 
   return (
     <Box sx={{ width: '100%', flexGrow: 1, pb: 4 }}>
-      
-      {/* Header section with Premium Gold/Metal accents */}
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', mb: 3 }}>
+      {/* SLEEK COMPACT HEADER BAR */}
+      <Card
+        elevation={0}
+        sx={{
+          p: 1.75,
+          mb: 1.5,
+          borderRadius: '12px',
+          bgcolor: '#ffffff',
+          border: '1px solid #e2e8f0',
+          display: 'flex',
+          flexDirection: { xs: 'column', md: 'row' },
+          alignItems: { xs: 'stretch', md: 'center' },
+          justifyContent: 'space-between',
+          gap: 1.5
+        }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+          <Box
+            sx={{
+              width: 38,
+              height: 38,
+              borderRadius: '10px',
+              bgcolor: 'rgba(132, 204, 22, 0.15)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#4d7c0f'
+            }}
+          >
+            <StoreIcon sx={{ fontSize: 22 }} />
+          </Box>
+          <Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography variant="h6" sx={{ fontWeight: 800, fontSize: '1.05rem', color: '#0f172a', lineHeight: 1.2 }}>
+                Product Catalog & Collections
+              </Typography>
+              <Chip
+                label="Digital Showcase"
+                size="small"
+                sx={{
+                  bgcolor: 'rgba(132, 204, 22, 0.15)',
+                  color: '#4d7c0f',
+                  fontWeight: 700,
+                  fontSize: '0.68rem',
+                  height: 20
+                }}
+              />
+            </Box>
+            {/* Inline Stat Pills */}
+            <Stack direction="row" spacing={0.8} sx={{ mt: 0.5, flexWrap: 'wrap' }}>
+              <Chip
+                label={`Total: ${totalItems}`}
+                size="small"
+                sx={{ height: 20, fontSize: '0.7rem', fontWeight: 700, bgcolor: '#f1f5f9', color: '#334155' }}
+              />
+              <Chip
+                label={`Rings & Necklaces: ${getCategoryCount('RINGS') + getCategoryCount('NECKLACES')}`}
+                size="small"
+                sx={{ height: 20, fontSize: '0.7rem', fontWeight: 700, bgcolor: 'rgba(59, 130, 246, 0.12)', color: '#1d4ed8' }}
+              />
+              <Chip
+                label={`Bangles & Earrings: ${getCategoryCount('BANGLES') + getCategoryCount('EARRINGS')}`}
+                size="small"
+                sx={{ height: 20, fontSize: '0.7rem', fontWeight: 700, bgcolor: 'rgba(34, 197, 94, 0.12)', color: '#15803d' }}
+              />
+              <Chip
+                label={`Custom: ${getCategoryCount('CUSTOM') + getCategoryCount('OTHER')}`}
+                size="small"
+                sx={{ height: 20, fontSize: '0.7rem', fontWeight: 700, bgcolor: 'rgba(233, 30, 99, 0.12)', color: '#be185d' }}
+              />
+            </Stack>
+          </Box>
+        </Box>
+
         <Button
           variant="contained"
-          startIcon={<AddIcon />}
-          size="small"
+          startIcon={<AddIcon sx={{ fontSize: 18 }} />}
           onClick={() => handleOpenDialog()}
-          disableElevation
+          size="small"
           sx={{
-            px: 1.5,
-            py: 0.5,
-            height: '28px',
-            borderRadius: '4px',
+            backgroundColor: '#84cc16',
+            color: '#0f172a',
             textTransform: 'none',
-            fontWeight: 500,
-            fontSize: '0.8125rem',
-            background: 'linear-gradient(135deg, #d4af37 0%, #aa7c11 100%)',
-            color: '#ffffff',
-            '&:hover': {
-              background: 'linear-gradient(135deg, #e5c158 0%, #c59b27 100%)',
-            }
+            fontWeight: 800,
+            fontSize: '0.825rem',
+            borderRadius: '8px',
+            px: 2,
+            height: '34px',
+            boxShadow: '0 2px 8px rgba(132, 204, 22, 0.3)',
+            '&:hover': { backgroundColor: '#65a30d', color: '#ffffff' }
           }}
         >
           Add Product
         </Button>
-      </Box>
+      </Card>
 
-      {/* Stats row */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} sm={6} md={3}>
-          <Paper elevation={0} sx={{ p: 2.5, display: 'flex', alignItems: 'center', gap: 2, border: '1px solid rgba(0,0,0,0.06)', borderRadius: '12px' }}>
-            <Avatar sx={{ bgcolor: 'rgba(218,165,32,0.1)', color: '#d4af37', width: 48, height: 48 }}>
-              <InventoryIcon />
-            </Avatar>
-            <Box>
-              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500 }}>Total Products</Typography>
-              <Typography variant="h5" sx={{ fontWeight: 700 }}>{totalItems}</Typography>
-            </Box>
-          </Paper>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Paper elevation={0} sx={{ p: 2.5, display: 'flex', alignItems: 'center', gap: 2, border: '1px solid rgba(0,0,0,0.06)', borderRadius: '12px' }}>
-            <Avatar sx={{ bgcolor: 'rgba(30,144,255,0.1)', color: 'dodgerblue', width: 48, height: 48 }}>
-              <CategoryIcon />
-            </Avatar>
-            <Box>
-              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500 }}>Rings & Necklaces</Typography>
-              <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                {getCategoryCount('RINGS') + getCategoryCount('NECKLACES')}
-              </Typography>
-            </Box>
-          </Paper>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Paper elevation={0} sx={{ p: 2.5, display: 'flex', alignItems: 'center', gap: 2, border: '1px solid rgba(0,0,0,0.06)', borderRadius: '12px' }}>
-            <Avatar sx={{ bgcolor: 'rgba(76,175,80,0.1)', color: '#4caf50', width: 48, height: 48 }}>
-              <TrendIcon />
-            </Avatar>
-            <Box>
-              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500 }}>Bangles & Earrings</Typography>
-              <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                {getCategoryCount('BANGLES') + getCategoryCount('EARRINGS')}
-              </Typography>
-            </Box>
-          </Paper>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Paper elevation={0} sx={{ p: 2.5, display: 'flex', alignItems: 'center', gap: 2, border: '1px solid rgba(0,0,0,0.06)', borderRadius: '12px' }}>
-            <Avatar sx={{ bgcolor: 'rgba(233,30,99,0.1)', color: '#e91e63', width: 48, height: 48 }}>
-              <SparklesIcon />
-            </Avatar>
-            <Box>
-              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500 }}>Bespoke / Custom</Typography>
-              <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                {getCategoryCount('CUSTOM') + getCategoryCount('OTHER')}
-              </Typography>
-            </Box>
-          </Paper>
-        </Grid>
-      </Grid>
-
-      {/* Filter and search bar */}
-      <Paper elevation={0} sx={{ p: 2, mb: 4, display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap', border: '1px solid rgba(0,0,0,0.05)', borderRadius: '12px' }}>
+      {/* FILTER AND SEARCH BAR */}
+      <Paper elevation={0} sx={{ p: 2, mb: 3, display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap', border: '1px solid #e2e8f0', borderRadius: '12px', bgcolor: '#ffffff' }}>
         <TextField
           size="small"
           placeholder="Search items by name, description or keywords..."
@@ -403,7 +467,7 @@ export default function Catalog() {
           InputProps={{
             startAdornment: (
               <InputAdornment position="start">
-                <SearchIcon sx={{ color: 'text.secondary' }} />
+                <SearchIcon sx={{ color: '#94a3b8' }} />
               </InputAdornment>
             ),
           }}
@@ -411,11 +475,19 @@ export default function Catalog() {
         <Button 
           variant="outlined" 
           onClick={fetchCatalog}
-          sx={{ textTransform: 'none', px: 3, border: '1px solid rgba(0,0,0,0.15)', color: 'text.primary', '&:hover': { borderColor: 'primary.main' } }}
+          sx={{
+            textTransform: 'none',
+            fontWeight: 700,
+            px: 3,
+            borderColor: '#0f172a',
+            color: '#0f172a',
+            borderRadius: '8px',
+            '&:hover': { bgcolor: '#0f172a', color: '#ffffff' }
+          }}
         >
           Search
         </Button>
-        <Box sx={{ borderLeft: '1px solid rgba(0,0,0,0.1)', height: 32, mx: 1, display: { xs: 'none', sm: 'block' } }} />
+        <Box sx={{ borderLeft: '1px solid #e2e8f0', height: 32, mx: 1, display: { xs: 'none', sm: 'block' } }} />
         
         {/* Category Horizontal Filter Chips */}
         <Stack direction="row" spacing={1} sx={{ overflowX: 'auto', py: 0.5, maxWidth: '100%' }}>
@@ -424,14 +496,16 @@ export default function Catalog() {
               key={cat.value}
               label={cat.label}
               onClick={() => setSelectedCategory(cat.value)}
-              variant={selectedCategory === cat.value ? 'filled' : 'outlined'}
-              color={selectedCategory === cat.value ? 'primary' : 'default'}
               sx={{
-                fontWeight: selectedCategory === cat.value ? 600 : 500,
+                fontWeight: selectedCategory === cat.value ? 800 : 600,
+                fontSize: '0.8rem',
                 cursor: 'pointer',
+                bgcolor: selectedCategory === cat.value ? '#0f172a' : '#f1f5f9',
+                color: selectedCategory === cat.value ? '#84cc16' : '#475569',
+                border: `1px solid ${selectedCategory === cat.value ? '#0f172a' : '#cbd5e1'}`,
                 transition: 'all 0.2s',
                 '&:hover': {
-                  backgroundColor: selectedCategory === cat.value ? 'primary.main' : 'rgba(0,0,0,0.04)'
+                  bgcolor: selectedCategory === cat.value ? '#0f172a' : '#e2e8f0'
                 }
               }}
             />
@@ -442,22 +516,37 @@ export default function Catalog() {
       {/* Loading state */}
       {loading ? (
         <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: 300, gap: 2 }}>
-          <CircularProgress size={50} sx={{ color: 'primary.main' }} />
+          <CircularProgress size={50} sx={{ color: '#84cc16' }} />
           <Typography variant="body2" color="text.secondary">Fetching collections...</Typography>
         </Box>
       ) : items.length === 0 ? (
-        <Paper elevation={0} sx={{ p: 8, textAlign: 'center', border: '1px dashed rgba(0,0,0,0.15)', borderRadius: '12px' }}>
-          <StoreIcon sx={{ fontSize: 60, color: 'text.disabled', mb: 2 }} />
-          <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>No products found</Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 400, mx: 'auto', mb: 3 }}>
-            There are no products matching your search or category filters. Try adding a new item or clearing your filter.
+        <Paper elevation={0} sx={{ p: 8, textAlign: 'center', border: '1px dashed #cbd5e1', borderRadius: '16px', bgcolor: '#ffffff' }}>
+          <StoreIcon sx={{ fontSize: 60, color: '#94a3b8', mb: 2 }} />
+          <Typography variant="h6" gutterBottom sx={{ fontWeight: 800, color: '#0f172a' }}>
+            No jewelry products found
           </Typography>
-          <Button variant="outlined" onClick={() => { setSearchQuery(''); setSelectedCategory('ALL'); }} sx={{ textTransform: 'none' }}>
-            Clear Filters
+          <Typography variant="body2" color="text.secondary" mb={3} sx={{ maxWidth: 450, mx: 'auto' }}>
+            Try clearing your search query, choosing another collection tab, or click below to add a new product to your showcase.
+          </Typography>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => handleOpenDialog()}
+            sx={{
+              backgroundColor: '#84cc16',
+              color: '#0f172a',
+              textTransform: 'none',
+              fontWeight: 800,
+              borderRadius: '8px',
+              px: 3,
+              '&:hover': { backgroundColor: '#65a30d' }
+            }}
+          >
+            Add New Product
           </Button>
         </Paper>
       ) : (
-        /* Grid of Product Cards */
+        /* PRODUCT GRID */
         <Grid container spacing={3}>
           {items.map((item) => (
             <Grid item xs={12} sm={6} md={4} lg={3} key={item._id}>
@@ -467,15 +556,15 @@ export default function Catalog() {
                   height: '100%',
                   display: 'flex',
                   flexDirection: 'column',
-                  border: '1px solid rgba(0,0,0,0.06)',
-                  borderRadius: '12px',
-                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                  position: 'relative',
+                  borderRadius: '16px',
+                  border: '1px solid #e2e8f0',
                   overflow: 'hidden',
+                  position: 'relative',
+                  transition: 'all 0.25s ease',
                   '&:hover': {
-                    transform: 'translateY(-6px)',
-                    boxShadow: '0 12px 24px rgba(0,0,0,0.08)',
-                    borderColor: 'rgba(212,175,55,0.4)',
+                    transform: 'translateY(-4px)',
+                    boxShadow: '0 12px 24px rgba(15,23,42,0.08)',
+                    borderColor: '#84cc16',
                     '& .card-actions-hover': {
                       opacity: 1,
                       transform: 'translateY(0)'
@@ -483,70 +572,72 @@ export default function Catalog() {
                   }
                 }}
               >
-                {/* Product Image Fallback component */}
-                <ProductImage src={item.imageUrl} name={item.name} category={item.category} />
+                {/* Product Image */}
+                <ProductImage
+                  src={item.imageUrl}
+                  name={item.name}
+                  category={item.category}
+                />
 
-                {/* Card Info */}
-                <CardContent sx={{ flexGrow: 1, p: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <CardContent sx={{ flexGrow: 1, p: 2.5, display: 'flex', flexDirection: 'column' }}>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1}>
                     <Chip
-                      label={item.category}
+                      label={CATEGORIES.find(c => c.value === item.category)?.label || item.category}
                       size="small"
                       sx={{
-                        fontSize: '10px',
+                        fontSize: '0.7rem',
                         fontWeight: 700,
-                        height: 20,
-                        backgroundColor: 
-                          item.category === 'RINGS' ? 'rgba(156,39,176,0.08)' :
-                          item.category === 'NECKLACES' ? 'rgba(33,150,243,0.08)' :
-                          item.category === 'BANGLES' ? 'rgba(76,175,80,0.08)' :
-                          item.category === 'EARRINGS' ? 'rgba(233,30,99,0.08)' : 'rgba(0,0,0,0.05)',
-                        color: 
-                          item.category === 'RINGS' ? '#9c27b0' :
-                          item.category === 'NECKLACES' ? '#2196f3' :
-                          item.category === 'BANGLES' ? '#4caf50' :
-                          item.category === 'EARRINGS' ? '#e91e63' : '#666',
-                        border: '1px solid currentColor'
+                        backgroundColor: '#f1f5f9',
+                        color: '#0f172a'
                       }}
                     />
-                    <Typography 
-                      variant="subtitle1" 
-                      sx={{ fontWeight: 800, color: 'primary.main', fontSize: '1.1rem' }}
-                    >
-                      {formatINR(item.price)}
+                    <Typography variant="caption" sx={{ color: '#16a34a', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 0.3 }}>
+                      <VerifiedIcon sx={{ fontSize: 13 }} /> BIS 916
                     </Typography>
-                  </Box>
+                  </Stack>
 
-                  <Typography 
-                    variant="subtitle2" 
-                    sx={{ fontWeight: 600, fontSize: '0.95rem', lineHeight: 1.3, mt: 0.5, color: 'text.primary', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical' }}
+                  <Typography
+                    variant="subtitle1"
+                    sx={{
+                      fontWeight: 800,
+                      color: '#0f172a',
+                      fontSize: '1rem',
+                      lineHeight: 1.3,
+                      mb: 1
+                    }}
                   >
                     {item.name}
                   </Typography>
 
-                  <Typography 
-                    variant="caption" 
+                  <Typography
+                    variant="body2"
                     color="text.secondary"
-                    sx={{ overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', lineHeight: 1.4, flexGrow: 1 }}
+                    sx={{
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      fontSize: '0.8rem',
+                      lineHeight: 1.5,
+                      mb: 2,
+                      flexGrow: 1
+                    }}
                   >
                     {item.description}
                   </Typography>
 
-                  {item.keywords && (
-                    <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                      {item.keywords.split(',').slice(0, 3).map((kw, idx) => (
-                        <Chip
-                          key={idx}
-                          label={kw.trim()}
-                          size="small"
-                          sx={{ fontSize: '9px', height: 16, backgroundColor: 'rgba(0,0,0,0.03)', color: 'text.secondary' }}
-                        />
-                      ))}
-                    </Box>
-                  )}
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', pt: 1, borderTop: '1px solid #f1f5f9' }}>
+                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                      PRICE
+                    </Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
+                      {formatINR(item.price)}
+                    </Typography>
+                  </Box>
                 </CardContent>
 
-                {/* Hover Actions Bar */}
+                {/* Floating Edit/Delete Action Overlay */}
                 <Box
                   className="card-actions-hover"
                   sx={{
@@ -558,20 +649,21 @@ export default function Catalog() {
                     transition: 'all 0.2s ease',
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: 1,
-                    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                    gap: 0.8,
+                    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                    backdropFilter: 'blur(4px)',
                     borderRadius: '8px',
                     p: 0.5,
-                    boxShadow: '0 4px 10px rgba(0,0,0,0.1)'
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
                   }}
                 >
                   <Tooltip title="Edit Product">
-                    <IconButton size="small" onClick={() => handleOpenDialog(item)} sx={{ color: 'info.main', '&:hover': { bgcolor: 'rgba(2,136,209,0.08)' } }}>
+                    <IconButton size="small" onClick={() => handleOpenDialog(item)} sx={{ color: '#0f172a', '&:hover': { bgcolor: '#f1f5f9' } }}>
                       <EditIcon fontSize="small" />
                     </IconButton>
                   </Tooltip>
                   <Tooltip title="Delete Product">
-                    <IconButton size="small" onClick={() => confirmDeleteItem(item._id)} sx={{ color: 'error.main', '&:hover': { bgcolor: 'rgba(211,47,47,0.08)' } }}>
+                    <IconButton size="small" onClick={() => confirmDeleteItem(item._id)} sx={{ color: '#ef4444', '&:hover': { bgcolor: '#fee2e2' } }}>
                       <DeleteIcon fontSize="small" />
                     </IconButton>
                   </Tooltip>
@@ -582,135 +674,311 @@ export default function Catalog() {
         </Grid>
       )}
 
-      {/* CREATE & EDIT DIALOG */}
+      {/* ELEVATED 2-COLUMN CREATE & EDIT DIALOG */}
       <Dialog 
         open={openDialog} 
         onClose={() => setOpenDialog(false)}
-        maxWidth="sm"
+        maxWidth="md"
         fullWidth
         PaperProps={{
-          sx: { borderRadius: '16px', p: 1 }
+          sx: {
+            borderRadius: '16px',
+            overflow: 'hidden',
+            boxShadow: '0 25px 50px -12px rgba(15,23,42,0.3)'
+          }
         }}
       >
-        <DialogTitle sx={{ fontWeight: 700, pb: 1 }}>
-          {editingId ? '✍️ Edit Catalog Item' : '✨ Add New Product'}
+        {/* Obsidian Slate Header */}
+        <DialogTitle
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            bgcolor: '#0f172a',
+            color: '#ffffff',
+            py: 2,
+            px: 3
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Box
+              sx={{
+                width: 36,
+                height: 36,
+                borderRadius: '8px',
+                bgcolor: '#84cc16',
+                color: '#0f172a',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <SparklesIcon />
+            </Box>
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 800, color: '#ffffff', lineHeight: 1.2 }}>
+                {editingId ? 'Edit Product Item' : 'Add New Product'}
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                Jewelry catalog item with AI search matching
+              </Typography>
+            </Box>
+          </Box>
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            <Button
+              onClick={() => setOpenDialog(false)}
+              sx={{ color: '#94a3b8', textTransform: 'none', fontWeight: 600, '&:hover': { color: '#ffffff' } }}
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="contained"
+              startIcon={<SaveIcon />}
+              onClick={handleSaveItem}
+              sx={{
+                backgroundColor: '#84cc16',
+                color: '#0f172a',
+                textTransform: 'none',
+                fontWeight: 800,
+                borderRadius: '8px',
+                px: 2.5,
+                '&:hover': { backgroundColor: '#65a30d' }
+              }}
+            >
+              {editingId ? 'Update Product' : 'Save Product'}
+            </Button>
+          </Stack>
         </DialogTitle>
-        <DialogContent>
-          <Stack spacing={2.5} sx={{ mt: 1 }}>
-            <TextField
-              label="Product Name"
-              required
-              fullWidth
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              placeholder="e.g. Royal Kundan Bangle"
-            />
 
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={6}>
-                <FormControl fullWidth>
-                  <InputLabel>Category</InputLabel>
-                  <Select
-                    value={formData.category}
-                    label="Category"
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                  >
-                    {CATEGORIES.filter(c => c.value !== 'ALL').map((cat) => (
-                      <MenuItem key={cat.value} value={cat.value}>
-                        {cat.label}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  label="Price (INR ₹)"
-                  required
-                  type="number"
-                  fullWidth
-                  value={formData.price}
-                  onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                  placeholder="e.g. 75000"
-                  InputProps={{
-                    startAdornment: <InputAdornment position="start">₹</InputAdornment>,
-                  }}
-                />
-              </Grid>
+        <DialogContent sx={{ p: 3, bgcolor: '#f8fafc' }}>
+          {/* 1-Click Product Presets */}
+          {!editingId && (
+            <Box sx={{ mb: 3, p: 2, bgcolor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px' }}>
+              <Typography variant="caption" sx={{ fontWeight: 800, color: '#64748b', textTransform: 'uppercase', display: 'block', mb: 1 }}>
+                ⚡ Quick Sample Presets (Click to Auto-fill):
+              </Typography>
+              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                {productPresets.map((preset, i) => (
+                  <Chip
+                    key={i}
+                    label={preset.label}
+                    onClick={() => handleApplyPreset(preset)}
+                    clickable
+                    sx={{
+                      fontWeight: 700,
+                      fontSize: '0.8rem',
+                      bgcolor: '#f1f5f9',
+                      border: '1px solid #cbd5e1',
+                      '&:hover': { bgcolor: '#84cc16', color: '#0f172a', borderColor: '#84cc16' }
+                    }}
+                  />
+                ))}
+              </Stack>
+            </Box>
+          )}
+
+          <Grid container spacing={3}>
+            {/* Left Column: Form Controls */}
+            <Grid item xs={12} md={7}>
+              <Paper elevation={0} sx={{ p: 2.5, borderRadius: '12px', border: '1px solid #e2e8f0', bgcolor: '#ffffff' }}>
+                <Stack spacing={2}>
+                  <TextField
+                    label="Product Name *"
+                    fullWidth
+                    size="small"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="e.g. Royal Kundan Bangle"
+                  />
+
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} sm={6}>
+                      <FormControl fullWidth size="small">
+                        <InputLabel>Category</InputLabel>
+                        <Select
+                          value={formData.category}
+                          label="Category"
+                          onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                        >
+                          {CATEGORIES.filter(c => c.value !== 'ALL').map((cat) => (
+                            <MenuItem key={cat.value} value={cat.value}>
+                              {cat.label}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        label="Price (INR ₹) *"
+                        type="number"
+                        fullWidth
+                        size="small"
+                        value={formData.price}
+                        onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                        placeholder="e.g. 75000"
+                        InputProps={{
+                          startAdornment: <InputAdornment position="start">₹</InputAdornment>,
+                        }}
+                      />
+                    </Grid>
+                  </Grid>
+
+                  <TextField
+                    label="Detailed Description *"
+                    multiline
+                    rows={4}
+                    fullWidth
+                    size="small"
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    placeholder="Provide a detailed description of the jewelry item, certifying purity (BIS Hallmark 916), metal weight, design origin, and lifetime warranty details."
+                  />
+
+                  <TextField
+                    label="Keywords (Comma separated)"
+                    fullWidth
+                    size="small"
+                    value={formData.keywords}
+                    onChange={(e) => setFormData({ ...formData, keywords: e.target.value })}
+                    placeholder="e.g. gold, ring, bridal, kundan, royal"
+                    helperText="Keywords used by AI to find and recommend this product"
+                  />
+
+                  <TextField
+                    label="Image URL Path (Optional)"
+                    fullWidth
+                    size="small"
+                    value={formData.imageUrl}
+                    onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
+                    placeholder="e.g. /uploads/catalog/gold_diamond_ring.jpg"
+                    helperText="Leave empty to use automatic premium category fallback gradient"
+                  />
+                </Stack>
+              </Paper>
             </Grid>
 
-            <TextField
-              label="Description"
-              required
-              multiline
-              rows={4}
-              fullWidth
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder="Provide a stunning and detailed description of the jewelry item, certifying purity (e.g. BIS Hallmark 916), metal weight, design origin, and lifetime warranty details."
-            />
+            {/* Right Column: Live WhatsApp Catalog Card Simulation */}
+            <Grid item xs={12} md={5}>
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 2.5,
+                  borderRadius: '16px',
+                  border: '1px solid #e2e8f0',
+                  bgcolor: '#ffffff',
+                  position: 'sticky',
+                  top: 20
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#0f172a' }}>
+                    📱 WhatsApp Card Preview
+                  </Typography>
+                  <Chip
+                    label="CUSTOMER VIEW"
+                    size="small"
+                    sx={{ bgcolor: '#84cc16', color: '#0f172a', fontWeight: 800, fontSize: '0.65rem' }}
+                  />
+                </Box>
 
-            <TextField
-              label="Keywords (Comma separated)"
-              fullWidth
-              value={formData.keywords}
-              onChange={(e) => setFormData({ ...formData, keywords: e.target.value })}
-              placeholder="e.g. gold, ring, bridal, kundan, royal"
-              helperText="Keywords are used by the AI to match items during conversation"
-            />
+                {/* Simulated WhatsApp Product Card */}
+                <Box
+                  sx={{
+                    borderRadius: '14px',
+                    border: '1px solid #cbd5e1',
+                    overflow: 'hidden',
+                    bgcolor: '#ffffff',
+                    boxShadow: '0 6px 16px rgba(0,0,0,0.06)'
+                  }}
+                >
+                  <ProductImage
+                    src={formData.imageUrl}
+                    name={formData.name || 'Product Image'}
+                    category={formData.category}
+                    height={160}
+                  />
 
-            <TextField
-              label="Image URL Path"
-              fullWidth
-              value={formData.imageUrl}
-              onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-              placeholder="e.g. /uploads/catalog/gold_diamond_ring.jpg"
-              helperText="Optional. Leave blank to automatically use standard premium fallback"
-            />
-          </Stack>
+                  <Box sx={{ p: 2 }}>
+                    <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1}>
+                      <Chip
+                        label={formData.category}
+                        size="small"
+                        sx={{ fontSize: '0.65rem', fontWeight: 800, bgcolor: '#f1f5f9', color: '#0f172a' }}
+                      />
+                      <Typography variant="caption" sx={{ color: '#16a34a', fontWeight: 800, fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: 0.3 }}>
+                        <VerifiedIcon sx={{ fontSize: 12 }} /> BIS 916
+                      </Typography>
+                    </Stack>
+
+                    <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#0f172a', mb: 0.5 }}>
+                      {formData.name || 'Sample Product Name'}
+                    </Typography>
+
+                    <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mb: 1.5, maxHeight: 40, overflow: 'hidden' }}>
+                      {formData.description || 'Description will appear here as formatted in the product sheet...'}
+                    </Typography>
+
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', pt: 1, borderTop: '1px solid #f1f5f9' }}>
+                      <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 700 }}>
+                        PRICE:
+                      </Typography>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 900, color: '#0f172a' }}>
+                        ₹{formData.price ? Number(formData.price).toLocaleString('en-IN') : '0'}
+                      </Typography>
+                    </Box>
+                  </Box>
+
+                  {/* Simulated Action Button in WhatsApp */}
+                  <Box sx={{ p: 1.5, bgcolor: '#f8fafc', borderTop: '1px solid #e2e8f0', textAlign: 'center' }}>
+                    <Button
+                      fullWidth
+                      size="small"
+                      variant="contained"
+                      sx={{
+                        bgcolor: '#25D366',
+                        color: '#ffffff',
+                        fontWeight: 700,
+                        textTransform: 'none',
+                        fontSize: '0.8rem',
+                        borderRadius: '8px',
+                        '&:hover': { bgcolor: '#128C7E' }
+                      }}
+                    >
+                      💬 Inquire on WhatsApp
+                    </Button>
+                  </Box>
+                </Box>
+              </Paper>
+            </Grid>
+          </Grid>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setOpenDialog(false)} color="inherit" sx={{ textTransform: 'none', fontWeight: 600 }}>
-            Cancel
-          </Button>
-          <Button 
-            onClick={handleSaveItem} 
-            variant="contained"
-            disableElevation
-            sx={{ 
-              textTransform: 'none', 
-              fontWeight: 600, 
-              borderRadius: '8px',
-              background: 'linear-gradient(135deg, #d4af37 0%, #aa7c11 100%)',
-              '&:hover': {
-                background: 'linear-gradient(135deg, #e5c158 0%, #c59b27 100%)',
-              }
-            }}
-          >
-            Save Item
-          </Button>
-        </DialogActions>
       </Dialog>
 
       {/* DELETE CONFIRMATION DIALOG */}
       <Dialog 
         open={deleteConfirmOpen} 
         onClose={() => setDeleteConfirmOpen(false)}
-        PaperProps={{
-          sx: { borderRadius: '12px' }
-        }}
+        PaperProps={{ sx: { borderRadius: '16px', overflow: 'hidden' } }}
       >
-        <DialogTitle sx={{ fontWeight: 700 }}>⚠️ Delete Catalog Item?</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" color="text.secondary">
+        <DialogTitle sx={{ bgcolor: '#0f172a', color: '#ffffff', py: 2, px: 3, fontWeight: 800 }}>
+          ⚠️ Delete Catalog Item?
+        </DialogTitle>
+        <DialogContent sx={{ p: 3 }}>
+          <Typography variant="body2" sx={{ color: '#475569', mt: 1 }}>
             Are you sure you want to delete this jewelry item from the catalog? This action is permanent and cannot be undone.
           </Typography>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setDeleteConfirmOpen(false)} color="inherit" sx={{ textTransform: 'none', fontWeight: 600 }}>
+        <DialogActions sx={{ p: 2.5, bgcolor: '#f8fafc', borderTop: '1px solid #e2e8f0' }}>
+          <Button onClick={() => setDeleteConfirmOpen(false)} sx={{ color: '#64748b', textTransform: 'none', fontWeight: 600 }}>
             Cancel
           </Button>
-          <Button onClick={handleDeleteItem} color="error" variant="contained" disableElevation sx={{ textTransform: 'none', fontWeight: 600, borderRadius: '8px' }}>
+          <Button
+            onClick={handleDeleteItem}
+            variant="contained"
+            color="error"
+            sx={{ textTransform: 'none', fontWeight: 800, borderRadius: '8px', px: 2.5 }}
+          >
             Delete Product
           </Button>
         </DialogActions>

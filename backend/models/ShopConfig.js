@@ -37,6 +37,23 @@ const shopConfigSchema = new mongoose.Schema({
   metaForwardReplies: { type: Boolean, default: false },
   metaHandoffMessage: { type: String, default: 'Hi {name}! You replied to our promotional number. Our support team will now continue this chat with you on this number. How can we help you?' },
   metaAutoReplyMessage: { type: String, default: 'Hi {name}, how can I help you?' },
+  oauthConfig: {
+    clientId: { type: String, default: '' },
+    clientSecret: { type: String, default: '' },
+    verified: { type: Boolean, default: false },
+    lastVerifiedAt: { type: Date, default: null }
+  },
+  oauthEnforced: { type: Boolean, default: false },
+  screenPermissions: { type: mongoose.Schema.Types.Mixed, default: {} },
+  whatsappSenderMode: {
+    type: String,
+    enum: ['META', 'DOCKER'],
+    default: 'META'
+  },
+  dockerThrottleSeconds: {
+    type: Number,
+    default: 6
+  },
   faqs: [faqSchema]
 }, { timestamps: true });
 

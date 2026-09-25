@@ -59,9 +59,8 @@ exports.login = async (req, res) => {
       console.error('License check error on login:', licenseErr.message);
     }
 
-    // Generate token
-    // For ADMIN role, require an OTP sent to registered email before finalizing login
-    if (user.role === 'ADMIN') {
+    // For ADMIN role, only require OTP if explicitly configured via REQUIRE_ADMIN_OTP=true
+    if (user.role === 'ADMIN' && process.env.REQUIRE_ADMIN_OTP === 'true') {
       try {
         const crypto = require('crypto');
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -94,18 +93,18 @@ exports.login = async (req, res) => {
 
         console.log(`[ADMIN LOGIN OTP] User: ${user.email} | OTP: ${otp} | emailSent: ${emailSent}`);
 
-    // Don't return token yet — require OTP verification via /verify-login-otp
-    user.password = undefined;
-    return res.status(200).json({ success: true, requiresOtp: true, emailSent, email: user.email });
+        // Don't return token yet — require OTP verification via /verify-login-otp
+        user.password = undefined;
+        return res.status(200).json({ success: true, requiresOtp: true, emailSent, email: user.email });
       } catch (err) {
         console.error('Failed to generate admin login OTP:', err.message);
       }
     }
 
-    // Generate token for non-admin users
+    // Generate token for non-admin / platform owner users
     const token = jwt.sign(
       { id: user._id, role: user.role },
-      process.env.JWT_SECRET || 'fallback_secret',
+      process.env.JWT_SECRET || 'renic_secret_key_2026',
       { expiresIn: process.env.JWT_EXPIRE || '30d' }
     );
 

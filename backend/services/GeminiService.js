@@ -207,6 +207,106 @@ class GeminiService {
   }
 
   /**
+   * Translate text into multiple Indian languages while preserving {{variables}}
+   */
+  async translateText(text, targetLanguages = ['hi', 'ta', 'te', 'kn', 'ml', 'mr', 'gu', 'bn', 'pa', 'or']) {
+    if (!text || !text.trim()) {
+      return { success: true, translations: {} };
+    }
+
+    const languageNames = {
+      hi: 'Hindi (हिंदी)',
+      ta: 'Tamil (தமிழ்)',
+      te: 'Telugu (తెలుగు)',
+      kn: 'Kannada (ಕನ್ನಡ)',
+      ml: 'Malayalam (മലയാളം)',
+      mr: 'Marathi (मराठी)',
+      gu: 'Gujarati (ગુજરાતી)',
+      bn: 'Bengali (বাংলা)',
+      pa: 'Punjabi (ਪੰਜਾਬੀ)',
+      or: 'Odia (ଓଡ଼ିଆ)',
+      as: 'Assamese (অসমীয়া)',
+      ur: 'Urdu (اردو)',
+      sa: 'Sanskrit (संस्कृतम्)',
+      en: 'English'
+    };
+
+    const targetList = targetLanguages.map(code => `${code}: ${languageNames[code] || code}`).join(', ');
+
+    const prompt = `You are an expert multilingual Indian translator for WhatsApp e-commerce and business marketing messages.
+Translate the following message into the requested Indian languages.
+
+CRITICAL INSTRUCTIONS:
+1. Do NOT translate or modify any variable placeholders enclosed in double curly braces like {{firstName}}, {{customer_name}}, {{phone}}, {{order_id}}, {{discount}}, {{shopName}}, etc. Keep them EXACTLY as they are.
+2. Maintain all emojis, formatting like *bold*, _italics_, bullet points, and links.
+3. Use natural, respectful, and culturally accurate Indian business language.
+4. Output STRICTLY a valid JSON object where keys are the 2-letter language codes and values are the translated text strings.
+
+Source Text:
+"""
+${text}
+"""
+
+Target Languages to translate to:
+${targetList}
+
+Respond ONLY with valid JSON in this exact structure:
+{
+  "hi": "translated hindi text...",
+  "ta": "translated tamil text...",
+  "te": "translated telugu text..."
+}`;
+
+    try {
+      if (!process.env.GEMINI_API_KEY) {
+        throw new Error('GEMINI_API_KEY not configured');
+      }
+
+      const result = await this.generateContentWithRetry(prompt);
+      let responseText = result.response.text().trim();
+
+      // Clean markdown json blocks if present
+      if (responseText.startsWith('```')) {
+        responseText = responseText.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
+      }
+
+      const translations = JSON.parse(responseText);
+      return {
+        success: true,
+        translations
+      };
+    } catch (err) {
+      console.warn('Gemini translate fallback triggered:', err.message);
+
+      // Fallback: create basic greeting translations for common phrases
+      const fallbackTranslations = {};
+      for (const lang of targetLanguages) {
+        if (lang === 'en') {
+          fallbackTranslations.en = text;
+        } else if (lang === 'ta') {
+          fallbackTranslations.ta = text.replace(/Hello|Hi/gi, 'வணக்கம்').replace(/Thank you|Thanks/gi, 'நன்றி');
+        } else if (lang === 'hi') {
+          fallbackTranslations.hi = text.replace(/Hello|Hi/gi, 'नमस्ते').replace(/Thank you|Thanks/gi, 'धन्यवाद');
+        } else if (lang === 'te') {
+          fallbackTranslations.te = text.replace(/Hello|Hi/gi, 'నమస్కారం').replace(/Thank you|Thanks/gi, 'ధన్యవాదాలు');
+        } else if (lang === 'kn') {
+          fallbackTranslations.kn = text.replace(/Hello|Hi/gi, 'ನಮಸ್ಕಾರ').replace(/Thank you|Thanks/gi, 'ಧನ್ಯವಾದಗಳು');
+        } else if (lang === 'ml') {
+          fallbackTranslations.ml = text.replace(/Hello|Hi/gi, 'നമസ്കാരം').replace(/Thank you|Thanks/gi, 'നന്ദി');
+        } else {
+          fallbackTranslations[lang] = text;
+        }
+      }
+
+      return {
+        success: false,
+        warning: 'AI translation unavailable, using fallback',
+        translations: fallbackTranslations
+      };
+    }
+  }
+
+  /**
    * Check API quota status
    */
   async checkQuotaStatus() {

@@ -351,16 +351,40 @@ const personalizeMessage = async (template, customer, context = {}) => {
   try {
     let personalized = template;
 
-    // Basic placeholder replacement
+    // Extract best customer name
+    const rawFirstName = customer.firstName || customer.name || customer.displayName || customer.customFields?.displayName || customer.customFields?.pushName || '';
+    const rawLastName = customer.lastName || '';
+    const fullName = `${rawFirstName} ${rawLastName}`.trim();
+    const displayName = rawFirstName || fullName || '';
+
+    // Standard variable mapping
     const placeholders = {
-      '{{firstName}}': customer.firstName || '',
-      '{{lastName}}': customer.lastName || '',
-      '{{fullName}}': `${customer.firstName} ${customer.lastName}`.trim(),
-      '{{customer_name}}': `${customer.firstName} ${customer.lastName}`.trim() || customer.firstName || '',
+      // Bracket formats (e.g. [Customer Name], [Name], etc.)
+      '[Customer Name]': displayName,
+      '[customer_name]': displayName,
+      '[Customer name]': displayName,
+      '[CustomerName]': displayName,
+      '[customer name]': displayName,
+      '[Name]': displayName,
+      '[name]': displayName,
+      '[First Name]': rawFirstName,
+      '[first_name]': rawFirstName,
+      '{Customer Name}': displayName,
+      '{customer_name}': displayName,
+      '{name}': displayName,
+      '{firstName}': rawFirstName,
+      // Curly double brackets
+      '{{firstName}}': rawFirstName,
+      '{{lastName}}': rawLastName,
+      '{{fullName}}': fullName,
+      '{{customer_name}}': displayName,
+      '{{Customer Name}}': displayName,
+      '{{name}}': displayName,
+      '{{Name}}': displayName,
       '{{customer_phone}}': customer.whatsappNumber || customer.phone || '',
       '{{selected_item}}': context.selectedItemTitle || customer.customFields?.selectedItemTitle || '',
       '{{selected_description}}': context.selectedItemDescription || customer.customFields?.selectedItemDescription || '',
-      '{{shop_name}}': process.env.SHOP_NAME || 'Kanalli',
+      '{{shop_name}}': process.env.SHOP_NAME || 'Renic',
       '{{current_date}}': new Date().toLocaleDateString(),
       '{{loyaltyTier}}': customer.loyaltyTier || 'BRONZE',
       '{{loyaltyPoints}}': customer.loyaltyPoints || 0,
@@ -371,10 +395,15 @@ const personalizeMessage = async (template, customer, context = {}) => {
     };
 
     Object.entries(placeholders).forEach(([key, value]) => {
-      // Escape regex special chars
       const escapedKey = key.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-      personalized = personalized.replace(new RegExp(escapedKey, 'g'), value);
+      personalized = personalized.replace(new RegExp(escapedKey, 'gi'), value);
     });
+
+    // Clean up spacing around punctuation if name was blank (e.g. "Namaste  !" -> "Namaste!")
+    personalized = personalized
+      .replace(/\s+([!?,.:])/g, '$1')
+      .replace(/  +/g, ' ')
+      .trim();
 
     // AI-powered personalization for dynamic content
     if (template.includes('{{ai_recommendation}}')) {

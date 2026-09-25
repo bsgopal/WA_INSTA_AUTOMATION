@@ -23,8 +23,18 @@ async function executeCampaign(campaign, customers) {
       campaign.totalTargets = customers.length;
     }
 
-    const batchSize = campaign.batchSize || 100;
-    const throttleDelay = campaign.throttleDelay || 1000;
+    // Check tenant WhatsApp Dispatch Engine (META vs DOCKER)
+    const ShopConfig = require('../models/ShopConfig');
+    const shop = await ShopConfig.findOne({ userId: campaign.userId }) || await ShopConfig.findOne({});
+    const senderMode = (campaign.senderMode || shop?.whatsappSenderMode || (shop?.metaApiEnabled ? 'META' : 'DOCKER')).toUpperCase();
+    const isDockerMode = senderMode === 'DOCKER';
+
+    // Anti-ban delay: In Docker mode, enforce client's configured delay or default 6 seconds (6000ms)
+    const activeThrottleDelay = isDockerMode
+      ? ((shop?.dockerThrottleSeconds || 6) * 1000)
+      : (campaign.throttleDelay || 1000);
+
+    const batchSize = campaign.batchSize || (isDockerMode ? 20 : 100);
     const mediaUrl = campaign.messageTemplate?.mediaUrl || campaign.mediaUrl || null;
     const mediaPreviewData = campaign.messageTemplate?.mediaPreviewData || campaign.mediaPreviewData || null;
     const mediaType = (campaign.messageTemplate?.mediaType
@@ -39,25 +49,33 @@ async function executeCampaign(campaign, customers) {
       actionType: 'URL'
     }] : null;
 
-    console.log(`[CampaignService] Starting execution of campaign ${campaign.name} (${campaign._id}) for ${customers.length} target customers.`);
+    console.log(`[CampaignService] Starting execution of campaign ${campaign.name} (${campaign._id}) for ${customers.length} target customers. [Engine: ${senderMode}, Throttle: ${activeThrottleDelay}ms]`);
 
-    // Resolve the Meta template once for the whole batch and fetch its real
-    // body-parameter count so the send payload always matches the template.
+    // Resolve the Meta template only when using Meta Cloud API.
+    // Docker WAHA sends custom interpolated content directly with media.
     const hasMedia = !!(mediaUrl || mediaPreviewData);
-    let resolvedTemplateName = campaign.metaTemplateName || campaign.messageTemplate?.name;
-    if (!resolvedTemplateName || !/^[a-z0-9_-]+$/.test(resolvedTemplateName)) {
-      resolvedTemplateName = hasMedia ? 'sales_promotion' : 'message';
+    let resolvedTemplateName = null;
+    let templateLang = 'en_US';
+    let bodyParamCount = 0;
+
+    if (!isDockerMode) {
+      resolvedTemplateName = campaign.metaTemplateName || campaign.messageTemplate?.name;
+      if (!resolvedTemplateName || !/^[a-z0-9_-]+$/.test(resolvedTemplateName)) {
+        resolvedTemplateName = hasMedia ? 'sales_promotion' : 'message';
+      }
+      templateLang = campaign.metaTemplateLanguage || campaign.messageTemplate?.language || campaign.language || 'en_US';
+      bodyParamCount = await MetaService.getTemplateBodyParamCount(
+        campaign.userId,
+        resolvedTemplateName,
+        templateLang
+      );
+      if (bodyParamCount === null || bodyParamCount === undefined) {
+        bodyParamCount = hasMedia ? 0 : 1;
+      }
+      console.log(`[CampaignService] Meta Template resolution: ${resolvedTemplateName} (${templateLang}) expects ${bodyParamCount} body param(s)`);
+    } else {
+      console.log(`[CampaignService] 🐳 Docker WAHA mode active for campaign ${campaign.name}. Using ${activeThrottleDelay / 1000}s anti-ban delay per message.`);
     }
-    const templateLang = campaign.metaTemplateLanguage || campaign.messageTemplate?.language || campaign.language || 'en_US';
-    let bodyParamCount = await MetaService.getTemplateBodyParamCount(
-      campaign.userId,
-      resolvedTemplateName,
-      templateLang
-    );
-    if (bodyParamCount === null || bodyParamCount === undefined) {
-      bodyParamCount = hasMedia ? 0 : 1;
-    }
-    console.log(`[CampaignService] Template resolution: ${resolvedTemplateName} (${templateLang}) expects ${bodyParamCount} body param(s)`);
 
     for (let i = 0; i < customers.length; i += batchSize) {
       // Check if campaign is still running/active
@@ -103,12 +121,12 @@ async function executeCampaign(campaign, customers) {
               ...mediaPayload,
               ...(buttons ? { buttons } : {}),
               userId: campaign.userId,
-              // Bulk campaign sends must always use the Meta Cloud API configuration
-              forceMeta: true
+              forceMeta: !isDockerMode,
+              forceWaha: isDockerMode
             };
 
-            if (!isDirectMediaSend) {
-              // Use the resolved template and the real parameter count for every customer
+            if (!isDockerMode && !isDirectMediaSend) {
+              // Use the resolved template and the real parameter count for every customer (Meta only)
               sendOptions.templateName = resolvedTemplateName;
               sendOptions.templateLanguage = templateLang;
               sendOptions.templateParams = MetaService.buildTemplateParams(bodyParamCount, personalizedContent);
@@ -184,8 +202,8 @@ async function executeCampaign(campaign, customers) {
             }
           }
 
-          // Throttle to prevent rate limit
-          await new Promise(resolve => setTimeout(resolve, throttleDelay));
+          // Throttle to prevent rate limit (6s in Docker mode, 1s in Meta mode)
+          await new Promise(resolve => setTimeout(resolve, activeThrottleDelay));
         } catch (error) {
           console.error(`[CampaignService] Error sending message to customer ${customer._id}:`, error);
           campaign.totalFailed++;

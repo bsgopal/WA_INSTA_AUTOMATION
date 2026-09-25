@@ -4,8 +4,8 @@ import {
   Typography, Box, Paper, Button, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, Chip, IconButton, TextField,
   InputAdornment, Menu, MenuItem, Dialog, DialogTitle, DialogContent,
-  DialogActions, Stack, Avatar, CircularProgress,
-  FormControl, InputLabel, Select, Alert, Checkbox, Pagination
+  DialogActions, Stack, Avatar, CircularProgress, Grid,
+  FormControl, InputLabel, Select, Alert, Checkbox, Pagination, Tooltip
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import AddIcon from '@mui/icons-material/Add';
@@ -16,11 +16,15 @@ import UploadIcon from '@mui/icons-material/Upload';
 import PeopleIcon from '@mui/icons-material/People';
 import StarIcon from '@mui/icons-material/Star';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import RemoveIcon from '@mui/icons-material/Remove';
+import CloseIcon from '@mui/icons-material/Close';
 import CustomSnackbar from '../../components/Snackbar';
 import apiClient from '../../api/client';
+import { useBackgroundMessaging } from '../../context/BackgroundMessagingContext';
 
 export default function Customers() {
   const navigate = useNavigate();
+  const { startBackgroundJob, showTopToast } = useBackgroundMessaging();
   const [customers, setCustomers] = useState([]);
 
   const getDisplayName = (cust) => {
@@ -232,26 +236,50 @@ export default function Customers() {
   };
 
   const handleSaveCustomer = async () => {
-    if (!formData.firstName || !formData.phone) {
+    const rawPhone = (formData.phone || '').trim();
+    const rawWhatsapp = (formData.whatsappNumber || '').trim();
+    const effectivePhone = rawPhone || rawWhatsapp;
+    const effectiveWhatsapp = rawWhatsapp || rawPhone;
+
+    if (!formData.firstName?.trim()) {
       setSnackbar({
         open: true,
-        message: 'Please fill in all required fields',
+        message: 'Please enter customer First Name',
         severity: 'warning'
       });
       return;
     }
 
+    if (!effectivePhone) {
+      setSnackbar({
+        open: true,
+        message: 'Please enter a Phone Number or WhatsApp Number',
+        severity: 'warning'
+      });
+      return;
+    }
+
+    const payload = {
+      ...formData,
+      firstName: formData.firstName.trim(),
+      lastName: (formData.lastName || '').trim(),
+      email: (formData.email || '').trim() || undefined,
+      phone: effectivePhone,
+      whatsappNumber: effectiveWhatsapp,
+      language: formData.language || 'en'
+    };
+
     try {
       setSubmitting(true);
       if (editingId) {
-        await apiClient.put(`/customers/${editingId}`, formData);
+        await apiClient.put(`/customers/${editingId}`, payload);
         setSnackbar({
           open: true,
           message: 'Customer updated successfully!',
           severity: 'success'
         });
       } else {
-        await apiClient.post('/customers', formData);
+        await apiClient.post('/customers', payload);
         setSnackbar({
           open: true,
           message: 'Customer added successfully!',
@@ -343,34 +371,39 @@ export default function Customers() {
     const template = templates.find(t => t._id === selectedTemplateId);
     if (!template) return;
 
-    try {
-      setBulkSending(true);
-      const res = await apiClient.post('/messages/bulk-send', {
-        customerIds: selectAllAcrossPages ? [] : selectedCustomerIds,
-        sendToAll: selectAllAcrossPages,
-        content: template.content,
-        channel: bulkChannel
-      });
+    const count = selectAllAcrossPages ? (totalCustomersCount || customers.length) : selectedCustomerIds.length;
+    const targetCustomerIds = selectAllAcrossPages ? [] : [...selectedCustomerIds];
+    const sendAll = selectAllAcrossPages;
 
-      if (res.data?.success) {
-        setSnackbar({
-          open: true,
-          message: `Bulk message job completed successfully! Sent: ${res.data.successCount}, Failed: ${res.data.failCount}`,
-          severity: 'success'
+    setOpenBulkDialog(false);
+    setSelectedCustomerIds([]);
+
+    startBackgroundJob({
+      title: `Bulk Message (${template.name})`,
+      total: count || 1,
+      taskFn: async (updateProgress) => {
+        updateProgress(0, 0, `Broadcasting "${template.name}" to ${count} recipient(s)...`);
+        const res = await apiClient.post('/messages/bulk-send', {
+          customerIds: targetCustomerIds,
+          sendToAll: sendAll,
+          content: template.content,
+          channel: bulkChannel
         });
-        setOpenBulkDialog(false);
-        setSelectedCustomerIds([]);
+
+        const successCount = res.data?.successCount ?? count;
+        const failCount = res.data?.failCount ?? 0;
+        updateProgress(successCount, failCount, `Finished: ${successCount} sent, ${failCount} failed`);
+
+        return {
+          sentCount: successCount,
+          failCount: failCount,
+          data: res.data
+        };
+      },
+      onComplete: (res) => {
+        fetchCustomers();
       }
-    } catch (err) {
-      console.error('Bulk sending failed:', err);
-      setSnackbar({
-        open: true,
-        message: err.response?.data?.error || 'Bulk sending failed. Please try again.',
-        severity: 'error'
-      });
-    } finally {
-      setBulkSending(false);
-    }
+    });
   };
 
   const toggleSelectAllCustomers = () => {
@@ -766,110 +799,239 @@ export default function Customers() {
       </Box>
 
       {/* Add / Edit Customer Dialog */}
-      <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ fontWeight: 600, fontSize: '1.25rem' }}>
-          {editingId ? 'Edit Customer Details' : 'Add New Customer'}
+      <Dialog
+        open={openDialog}
+        onClose={() => setOpenDialog(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: '16px',
+            overflow: 'hidden',
+            boxShadow: '0 25px 50px -12px rgba(15,23,42,0.3)'
+          }
+        }}
+      >
+        {/* Obsidian Slate Header */}
+        <DialogTitle
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            bgcolor: '#0f172a',
+            color: '#ffffff',
+            py: 2,
+            px: 3
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Avatar
+              sx={{
+                width: 38,
+                height: 38,
+                bgcolor: '#84cc16',
+                color: '#0f172a',
+                fontWeight: 800,
+                fontSize: '1rem'
+              }}
+            >
+              {formData.firstName ? formData.firstName.slice(0, 1).toUpperCase() : 'C'}
+            </Avatar>
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 800, color: '#ffffff', lineHeight: 1.2 }}>
+                {editingId ? 'Edit Customer Details' : 'Add New Customer'}
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                Customer profile, contact details & loyalty tier
+              </Typography>
+            </Box>
+          </Box>
+          <Button
+            onClick={() => setOpenDialog(false)}
+            sx={{ color: '#94a3b8', textTransform: 'none', fontWeight: 600, minWidth: 'auto', p: 0.5, '&:hover': { color: '#ffffff' } }}
+          >
+            ✕
+          </Button>
         </DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} mt={1}>
-            <TextField
-              label="First Name *"
-              fullWidth
-              value={formData.firstName}
-              onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-              placeholder="John"
-            />
-            <TextField
-              label="Last Name"
-              fullWidth
-              value={formData.lastName}
-              onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-              placeholder="Doe"
-            />
-            <TextField
-              label="Email"
-              fullWidth
-              type="email"
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              placeholder="john@example.com"
-            />
+
+        <DialogContent sx={{ p: 3, bgcolor: '#f8fafc' }}>
+          <Stack spacing={2.5} mt={1}>
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  label="First Name *"
+                  fullWidth
+                  size="small"
+                  value={formData.firstName}
+                  onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                  placeholder="e.g. Priya"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  label="Last Name"
+                  fullWidth
+                  size="small"
+                  value={formData.lastName}
+                  onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                  placeholder="e.g. Sharma"
+                />
+              </Grid>
+            </Grid>
+
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={7}>
+                <TextField
+                  label="Email Address"
+                  fullWidth
+                  size="small"
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  placeholder="priya@example.com"
+                />
+              </Grid>
+              <Grid item xs={12} sm={5}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Language</InputLabel>
+                  <Select
+                    value={formData.language}
+                    label="Language"
+                    onChange={(e) => setFormData({ ...formData, language: e.target.value })}
+                  >
+                    <MenuItem value="en">🇬🇧 English</MenuItem>
+                    <MenuItem value="hi">🇮🇳 हिंदी (Hindi)</MenuItem>
+                    <MenuItem value="ta">🇮🇳 தமிழ் (Tamil)</MenuItem>
+                    <MenuItem value="te">🇮🇳 తెలుగు (Telugu)</MenuItem>
+                    <MenuItem value="kn">🇮🇳 ಕನ್ನಡ (Kannada)</MenuItem>
+                    <MenuItem value="ml">🇮🇳 മലയാളം (Malayalam)</MenuItem>
+                    <MenuItem value="mr">🇮🇳 मराठी (Marathi)</MenuItem>
+                    <MenuItem value="gu">🇮🇳 ગુજરાતી (Gujarati)</MenuItem>
+                    <MenuItem value="bn">🇮🇳 বাংলা (Bengali)</MenuItem>
+                    <MenuItem value="pa">🇮🇳 ਪੰਜਾਬੀ (Punjabi)</MenuItem>
+                    <MenuItem value="or">🇮🇳 ଓଡ଼ିଆ (Odia)</MenuItem>
+                    <MenuItem value="as">🇮🇳 অসমীয়া (Assamese)</MenuItem>
+                    <MenuItem value="ur">🇮🇳 اردو (Urdu)</MenuItem>
+                    <MenuItem value="sa">🇮🇳 संस्कृतम् (Sanskrit)</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+            </Grid>
+
             <TextField
               label="Phone Number *"
               fullWidth
+              size="small"
               value={formData.phone}
               onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-              placeholder="+91 9876543210"
+              placeholder="9876543210"
+              InputProps={{
+                startAdornment: <InputAdornment position="start">+91</InputAdornment>,
+              }}
             />
-            <TextField
-              label="WhatsApp Number"
-              fullWidth
-              value={formData.whatsappNumber}
-              onChange={(e) => setFormData({ ...formData, whatsappNumber: e.target.value })}
-              placeholder="+91 9876543210"
-            />
-            <FormControl fullWidth>
-              <InputLabel>Language</InputLabel>
-              <Select
-                value={formData.language}
-                label="Language"
-                onChange={(e) => setFormData({ ...formData, language: e.target.value })}
-              >
-                <MenuItem value="en">English</MenuItem>
-                <MenuItem value="hi">Hindi</MenuItem>
-                <MenuItem value="ta">Tamil</MenuItem>
-                <MenuItem value="te">Telugu</MenuItem>
-                <MenuItem value="mr">Marathi</MenuItem>
-                <MenuItem value="gu">Gujarati</MenuItem>
-                <MenuItem value="kn">Kannada</MenuItem>
-                <MenuItem value="ml">Malayalam</MenuItem>
-                <MenuItem value="pa">Punjabi</MenuItem>
-              </Select>
-            </FormControl>
-            <FormControl fullWidth>
-              <InputLabel>Customer Status</InputLabel>
+
+            <Box>
+              <TextField
+                label="WhatsApp Number"
+                fullWidth
+                size="small"
+                value={formData.whatsappNumber}
+                onChange={(e) => setFormData({ ...formData, whatsappNumber: e.target.value })}
+                placeholder="9876543210"
+                InputProps={{
+                  startAdornment: <InputAdornment position="start">+91</InputAdornment>,
+                }}
+              />
+              {formData.phone && formData.phone !== formData.whatsappNumber && (
+                <Button
+                  size="small"
+                  onClick={() => setFormData({ ...formData, whatsappNumber: formData.phone })}
+                  sx={{ textTransform: 'none', fontSize: '0.75rem', fontWeight: 600, color: '#16a34a', mt: 0.5, p: 0 }}
+                >
+                  ⚡ Same as Phone Number
+                </Button>
+              )}
+            </Box>
+
+            <FormControl fullWidth size="small">
+              <InputLabel>Customer Loyalty Tier (RFM)</InputLabel>
               <Select
                 value={formData.rfmSegment}
-                label="Customer Status"
+                label="Customer Loyalty Tier (RFM)"
                 onChange={(e) => setFormData({ ...formData, rfmSegment: e.target.value })}
               >
-                <MenuItem value="NEW">New</MenuItem>
-                <MenuItem value="VIP">VIP</MenuItem>
-                <MenuItem value="LOYAL">Loyal</MenuItem>
-                <MenuItem value="REGULAR">Regular</MenuItem>
-                <MenuItem value="AT_RISK">At Risk</MenuItem>
-                <MenuItem value="INACTIVE">Inactive</MenuItem>
-                <MenuItem value="LOST">Lost</MenuItem>
+                <MenuItem value="NEW">🌟 New Shopper</MenuItem>
+                <MenuItem value="VIP">👑 VIP Customer</MenuItem>
+                <MenuItem value="LOYAL">💎 Loyal Buyer</MenuItem>
+                <MenuItem value="REGULAR">🛍️ Regular</MenuItem>
+                <MenuItem value="AT_RISK">⚠️ At Risk</MenuItem>
+                <MenuItem value="INACTIVE">💤 Inactive</MenuItem>
+                <MenuItem value="LOST">❌ Lost</MenuItem>
               </Select>
             </FormControl>
           </Stack>
         </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setOpenDialog(false)}>Cancel</Button>
+        <DialogActions sx={{ p: 2.5, bgcolor: '#ffffff', borderTop: '1px solid #e2e8f0', justifyContent: 'space-between' }}>
+          <Button onClick={() => setOpenDialog(false)} sx={{ color: '#64748b', textTransform: 'none', fontWeight: 600 }}>
+            Cancel
+          </Button>
           <Button 
             variant="contained" 
             disableElevation
             onClick={handleSaveCustomer}
             disabled={submitting}
+            sx={{
+              backgroundColor: '#84cc16',
+              color: '#0f172a',
+              textTransform: 'none',
+              fontWeight: 800,
+              borderRadius: '8px',
+              px: 3,
+              '&:hover': { backgroundColor: '#65a30d' }
+            }}
           >
-            {submitting ? 'Saving...' : editingId ? 'Update Customer' : 'Add Customer'}
+            {submitting ? 'Saving...' : editingId ? 'Update Customer' : 'Save Customer'}
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* Excel/CSV Import Dialog */}
-      <Dialog open={importDialogOpen} onClose={() => setImportDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ fontWeight: 600 }}>Import Customers from Excel / CSV</DialogTitle>
-        <DialogContent>
+      <Dialog
+        open={importDialogOpen}
+        onClose={() => setImportDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: '16px',
+            overflow: 'hidden',
+            boxShadow: '0 25px 50px -12px rgba(15,23,42,0.3)'
+          }
+        }}
+      >
+        <DialogTitle sx={{ bgcolor: '#0f172a', color: '#ffffff', py: 2, px: 3, fontWeight: 800 }}>
+          📊 Import Customers from Excel / CSV
+        </DialogTitle>
+        <DialogContent sx={{ p: 3, bgcolor: '#f8fafc' }}>
           <Stack spacing={2} mt={1}>
             <Typography variant="body2" color="text.secondary">
-              Upload an Excel (.xlsx, .xls) or CSV file to import customers.
+              Bulk import customer contacts and mobile numbers into your store audience.
               <br />
-              • Required columns: <b>Customer Name</b> (or firstName) and <b>Mobile Number</b> (phone, must be exactly 10 digits).
+              • Required columns: <b>Customer Name</b> and <b>Mobile Number</b> (10 digits).
               <br />
-              • Optional columns: <i>Address</i>, <i>Email</i>, <i>Instagram Handle</i>, <i>Language</i>.
+              • Optional columns: <i>Email</i>, <i>Address</i>, <i>Instagram Handle</i>, <i>Language</i>.
             </Typography>
-            <Box sx={{ border: '2px dashed #ccc', p: 3, textAlign: 'center', borderRadius: 2, bgcolor: '#fafafa' }}>
+            <Box
+              sx={{
+                border: '2px dashed #cbd5e1',
+                p: 3.5,
+                textAlign: 'center',
+                borderRadius: '12px',
+                bgcolor: '#ffffff',
+                transition: 'all 0.2s',
+                '&:hover': { borderColor: '#84cc16', bgcolor: 'rgba(132,204,22,0.03)' }
+              }}
+            >
               <input
                 type="file"
                 accept=".csv, .xlsx, .xls"
@@ -881,24 +1043,40 @@ export default function Customers() {
                 }}
               />
               <label htmlFor="excel-file-input">
-                <Button variant="outlined" component="span" startIcon={<UploadIcon />} sx={{ mb: 1 }}>
-                  Choose Excel/CSV File
+                <Button
+                  variant="outlined"
+                  component="span"
+                  startIcon={<UploadIcon />}
+                  sx={{
+                    borderColor: '#0f172a',
+                    color: '#0f172a',
+                    textTransform: 'none',
+                    fontWeight: 700,
+                    borderRadius: '8px',
+                    mb: 1
+                  }}
+                >
+                  Choose Excel / CSV File
                 </Button>
               </label>
-              {csvFile && (
-                <Typography variant="body2" color="success.main" sx={{ mt: 1, fontWeight: 500 }}>
-                  Selected: {csvFile.name} ({(csvFile.size / 1024).toFixed(1)} KB)
+              {csvFile ? (
+                <Typography variant="body2" sx={{ mt: 1, fontWeight: 700, color: '#16a34a' }}>
+                  ✓ Selected: {csvFile.name} ({(csvFile.size / 1024).toFixed(1)} KB)
+                </Typography>
+              ) : (
+                <Typography variant="caption" sx={{ color: '#94a3b8', display: 'block' }}>
+                  Supports .xlsx, .xls, and .csv formats
                 </Typography>
               )}
             </Box>
 
             {importErrors.length > 0 && (
-              <Box sx={{ mt: 2, p: 1.5, bgcolor: '#fff5f5', border: '1px solid #ffc1c1', borderRadius: 1, maxHeight: 150, overflowY: 'auto' }}>
-                <Typography variant="subtitle2" color="error.main" sx={{ fontWeight: 600, mb: 0.5 }}>
+              <Box sx={{ mt: 2, p: 1.5, bgcolor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', maxHeight: 150, overflowY: 'auto' }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#b91c1c', mb: 0.5 }}>
                   Validation Errors ({importErrors.length}):
                 </Typography>
                 {importErrors.map((err, i) => (
-                  <div key={i} style={{ fontFamily: 'monospace', fontSize: '0.75rem', color: '#c62828', marginBottom: '4px', display: 'block', textAlign: 'left' }}>
+                  <div key={i} style={{ fontFamily: 'monospace', fontSize: '0.75rem', color: '#b91c1c', marginBottom: '4px' }}>
                     • {err}
                   </div>
                 ))}
@@ -906,47 +1084,84 @@ export default function Customers() {
             )}
           </Stack>
         </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setImportDialogOpen(false)}>Cancel</Button>
+        <DialogActions sx={{ p: 2.5, bgcolor: '#ffffff', borderTop: '1px solid #e2e8f0' }}>
+          <Button onClick={() => setImportDialogOpen(false)} sx={{ color: '#64748b', textTransform: 'none', fontWeight: 600 }}>
+            Cancel
+          </Button>
           <Button
             variant="contained"
             disableElevation
             disabled={!csvFile || importing}
             onClick={handleImportCSV}
+            sx={{
+              backgroundColor: '#84cc16',
+              color: '#0f172a',
+              textTransform: 'none',
+              fontWeight: 800,
+              borderRadius: '8px',
+              px: 3,
+              '&:hover': { backgroundColor: '#65a30d' }
+            }}
           >
-            {importing ? 'Importing...' : 'Import Data'}
+            {importing ? 'Importing...' : 'Start Import'}
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* Delete Customer Confirmation Dialog */}
-      <Dialog open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)}>
-        <DialogTitle sx={{ fontWeight: 600 }}>Delete Customer</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" color="text.secondary">
-            Are you sure you want to delete this customer? This action will remove the customer profile and their conversation logs.
+      <Dialog
+        open={deleteConfirmOpen}
+        onClose={() => setDeleteConfirmOpen(false)}
+        PaperProps={{ sx: { borderRadius: '16px', overflow: 'hidden' } }}
+      >
+        <DialogTitle sx={{ bgcolor: '#0f172a', color: '#ffffff', py: 2, px: 3, fontWeight: 800 }}>
+          ⚠️ Delete Customer Profile?
+        </DialogTitle>
+        <DialogContent sx={{ p: 3 }}>
+          <Typography variant="body2" sx={{ color: '#475569', mt: 1 }}>
+            Are you sure you want to delete this customer? This will remove their profile and all associated chat logs. This action cannot be undone.
           </Typography>
         </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setDeleteConfirmOpen(false)}>Cancel</Button>
-          <Button variant="contained" color="error" disableElevation onClick={handleDeleteCustomer}>
+        <DialogActions sx={{ p: 2.5, bgcolor: '#f8fafc', borderTop: '1px solid #e2e8f0' }}>
+          <Button onClick={() => setDeleteConfirmOpen(false)} sx={{ color: '#64748b', textTransform: 'none', fontWeight: 600 }}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={handleDeleteCustomer}
+            sx={{ textTransform: 'none', fontWeight: 800, borderRadius: '8px', px: 2.5 }}
+          >
             Delete Customer
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* Bulk Delete Customer Confirmation Dialog */}
-      <Dialog open={bulkDeleteConfirmOpen} onClose={() => setBulkDeleteConfirmOpen(false)}>
-        <DialogTitle sx={{ fontWeight: 600 }}>Delete Selected Customers</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" color="text.secondary">
-            Are you sure you want to delete the <strong>{selectedCount}</strong> selected customers? This action will remove their profiles and all associated conversation logs.
+      <Dialog
+        open={bulkDeleteConfirmOpen}
+        onClose={() => setBulkDeleteConfirmOpen(false)}
+        PaperProps={{ sx: { borderRadius: '16px', overflow: 'hidden' } }}
+      >
+        <DialogTitle sx={{ bgcolor: '#0f172a', color: '#ffffff', py: 2, px: 3, fontWeight: 800 }}>
+          ⚠️ Delete {selectedCount} Selected Customers?
+        </DialogTitle>
+        <DialogContent sx={{ p: 3 }}>
+          <Typography variant="body2" sx={{ color: '#475569', mt: 1 }}>
+            Are you sure you want to delete all <strong>{selectedCount}</strong> selected customer profiles? This action will permanently remove their chat history.
           </Typography>
         </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setBulkDeleteConfirmOpen(false)}>Cancel</Button>
-          <Button variant="contained" color="error" disableElevation onClick={handleBulkDeleteCustomers}>
-            Delete Customers
+        <DialogActions sx={{ p: 2.5, bgcolor: '#f8fafc', borderTop: '1px solid #e2e8f0' }}>
+          <Button onClick={() => setBulkDeleteConfirmOpen(false)} sx={{ color: '#64748b', textTransform: 'none', fontWeight: 600 }}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={handleBulkDeleteCustomers}
+            sx={{ textTransform: 'none', fontWeight: 800, borderRadius: '8px', px: 2.5 }}
+          >
+            Delete {selectedCount} Customers
           </Button>
         </DialogActions>
       </Dialog>
@@ -957,20 +1172,106 @@ export default function Customers() {
         onClose={() => !bulkSending && setOpenBulkDialog(false)} 
         maxWidth="sm" 
         fullWidth
-        PaperProps={{ sx: { borderRadius: 3, p: 1 } }}
+        PaperProps={{
+          sx: {
+            borderRadius: '16px',
+            overflow: 'hidden',
+            boxShadow: '0 25px 50px -12px rgba(15,23,42,0.3)'
+          }
+        }}
       >
-        <DialogTitle sx={{ fontWeight: 700 }}>💬 Send Bulk Template Message</DialogTitle>
-        <DialogContent>
-          <Stack spacing={3} mt={1}>
-            <Alert severity="info" sx={{ borderRadius: 2 }}>
-              You are sending a bulk message to <strong>{selectedCount}</strong> selected customer(s).
+        <DialogTitle
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            bgcolor: '#0f172a',
+            color: '#ffffff',
+            py: 2,
+            px: 3
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Box
+              sx={{
+                width: 36,
+                height: 36,
+                borderRadius: '8px',
+                bgcolor: '#84cc16',
+                color: '#0f172a',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <MessageIcon />
+            </Box>
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 800, color: '#ffffff', lineHeight: 1.2 }}>
+                Send Bulk Template Message
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                Broadcast to {selectedCount} selected recipients
+              </Typography>
+            </Box>
+          </Box>
+
+          <Stack direction="row" spacing={0.5} alignItems="center">
+            <Tooltip title="Minimize to background">
+              <IconButton
+                size="small"
+                onClick={() => {
+                  setOpenBulkDialog(false);
+                  showTopToast({
+                    title: '🗕 Minimized Composer',
+                    message: 'Bulk message composer minimized. You can restore it anytime.',
+                    severity: 'info',
+                    duration: 3500
+                  });
+                }}
+                sx={{
+                  color: '#94a3b8',
+                  bgcolor: 'rgba(255,255,255,0.05)',
+                  '&:hover': { color: '#ffffff', bgcolor: 'rgba(255,255,255,0.15)' }
+                }}
+              >
+                <RemoveIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <IconButton
+              size="small"
+              onClick={() => setOpenBulkDialog(false)}
+              sx={{
+                color: '#94a3b8',
+                bgcolor: 'rgba(255,255,255,0.05)',
+                '&:hover': { color: '#ef4444', bgcolor: 'rgba(239,68,68,0.15)' }
+              }}
+            >
+              <CloseIcon fontSize="small" />
+            </IconButton>
+          </Stack>
+        </DialogTitle>
+
+        <DialogContent sx={{ p: 3, bgcolor: '#f8fafc' }}>
+          <Stack spacing={2.5} mt={1}>
+            <Alert
+              severity="info"
+              sx={{
+                borderRadius: '10px',
+                bgcolor: '#eff6ff',
+                color: '#1e40af',
+                border: '1px solid #bfdbfe',
+                '& .MuiAlert-icon': { color: '#2563eb' }
+              }}
+            >
+              Broadcasting message to <strong>{selectedCount}</strong> targeted customer(s).
             </Alert>
 
             <FormControl fullWidth size="small">
-              <InputLabel>Select Message Template</InputLabel>
+              <InputLabel>Select Template</InputLabel>
               <Select
                 value={selectedTemplateId}
-                label="Select Message Template"
+                label="Select Template"
                 onChange={(e) => setSelectedTemplateId(e.target.value)}
                 disabled={bulkSending}
               >
@@ -983,48 +1284,55 @@ export default function Customers() {
             </FormControl>
 
             <FormControl fullWidth size="small">
-              <InputLabel>Channel</InputLabel>
+              <InputLabel>Delivery Channel</InputLabel>
               <Select
                 value={bulkChannel}
-                label="Channel"
+                label="Delivery Channel"
                 onChange={(e) => setBulkChannel(e.target.value)}
                 disabled={bulkSending}
               >
-                <MenuItem value="whatsapp">WhatsApp</MenuItem>
-                <MenuItem value="instagram">Instagram</MenuItem>
+                <MenuItem value="whatsapp">WhatsApp Official API</MenuItem>
+                <MenuItem value="instagram">Instagram Direct</MenuItem>
               </Select>
             </FormControl>
 
             {selectedTemplateId && (
               <Box sx={{ 
                 p: 2, 
-                bgcolor: '#f8fafc', 
+                bgcolor: '#ffffff', 
                 border: '1px solid #e2e8f0', 
-                borderRadius: 2 
+                borderRadius: '10px' 
               }}>
-                <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748b', display: 'block', mb: 1 }}>
-                  TEMPLATE CONTENT PREVIEW:
+                <Typography variant="caption" sx={{ fontWeight: 800, color: '#64748b', display: 'block', mb: 0.5, textTransform: 'uppercase' }}>
+                  Live Content Preview:
                 </Typography>
-                <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', color: '#1e293b' }}>
+                <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', color: '#0f172a', fontSize: '0.85rem' }}>
                   {templates.find(t => t._id === selectedTemplateId)?.content || ''}
                 </Typography>
               </Box>
             )}
           </Stack>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setOpenBulkDialog(false)} disabled={bulkSending} sx={{ textTransform: 'none', fontWeight: 600 }}>
+        <DialogActions sx={{ px: 3, py: 2, bgcolor: '#ffffff', borderTop: '1px solid #e2e8f0' }}>
+          <Button onClick={() => setOpenBulkDialog(false)} disabled={bulkSending} sx={{ textTransform: 'none', fontWeight: 600, color: '#64748b' }}>
             Cancel
           </Button>
           <Button 
             variant="contained" 
-            color="success" 
             disableElevation
             disabled={bulkSending || !selectedTemplateId}
             onClick={handleBulkSend}
-            sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 5, px: 3 }}
+            sx={{
+              backgroundColor: '#84cc16',
+              color: '#0f172a',
+              textTransform: 'none',
+              fontWeight: 800,
+              borderRadius: '8px',
+              px: 3,
+              '&:hover': { backgroundColor: '#65a30d' }
+            }}
           >
-            {bulkSending ? 'Sending...' : 'Send Messages'}
+            {bulkSending ? 'Sending...' : 'Send Broadcast'}
           </Button>
         </DialogActions>
       </Dialog>

@@ -133,28 +133,39 @@ router.get('/:id', async (req, res) => {
 
 // ============ CREATE CUSTOMER ============
 router.post('/', [
-  body('firstName').notEmpty().trim(),
+  body('firstName').notEmpty().withMessage('First name is required').trim(),
   body('lastName').optional({ values: 'falsy' }).trim(),
-  body('phone').notEmpty().trim(),
-  body('email').optional({ checkFalsy: true }).isEmail(),
-  body('whatsappNumber').optional().trim(),
-  body('instagramHandle').optional().trim(),
-  body('language').optional().isIn(['en', 'hi', 'ta', 'te', 'mr', 'gu', 'kn', 'ml', 'pa'])
+  body('phone').optional({ values: 'falsy' }).trim(),
+  body('email').optional({ checkFalsy: true }).isEmail().withMessage('Valid email is required'),
+  body('whatsappNumber').optional({ values: 'falsy' }).trim(),
+  body('instagramHandle').optional({ values: 'falsy' }).trim(),
+  body('language').optional().isIn(['en', 'hi', 'ta', 'te', 'mr', 'gu', 'kn', 'ml', 'pa', 'bn', 'or', 'as', 'ur', 'sa'])
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
+      return res.status(400).json({ error: errors.array()[0]?.msg || 'Validation failed', errors: errors.array() });
     }
 
     const normalizePhone = (phone) => {
-      if (!phone) return phone;
+      if (!phone) return '';
       // Strip spaces, dashes, brackets, and only keep + and digits
-      return phone.replace(/[\s\-\(\)]/g, '');
+      return String(phone).replace(/[\s\-\(\)]/g, '').trim();
     };
 
-    const phone = normalizePhone(req.body.phone);
-    const whatsappNumber = normalizePhone(req.body.whatsappNumber) || phone;
+    let phone = normalizePhone(req.body.phone);
+    let whatsappNumber = normalizePhone(req.body.whatsappNumber);
+
+    if (!phone && whatsappNumber) {
+      phone = whatsappNumber;
+    }
+    if (!whatsappNumber && phone) {
+      whatsappNumber = phone;
+    }
+
+    if (!phone) {
+      return res.status(400).json({ error: 'Please enter a Phone Number or WhatsApp Number' });
+    }
 
     // Check if customer already exists
     const existingCustomer = await Customer.findOne({
@@ -163,14 +174,30 @@ router.post('/', [
     });
 
     if (existingCustomer) {
-      return res.status(400).json({ error: 'Customer with this phone number already exists' });
+      return res.status(400).json({ error: `Customer with phone number ${phone} already exists` });
+    }
+
+    const customerData = { ...req.body };
+    delete customerData.phone;
+    delete customerData.whatsappNumber;
+
+    // Clean up empty strings for optional unique/sparse fields
+    if (!customerData.email || typeof customerData.email !== 'string' || !customerData.email.trim()) {
+      delete customerData.email;
+    }
+    if (!customerData.instagramHandle || typeof customerData.instagramHandle !== 'string' || !customerData.instagramHandle.trim()) {
+      delete customerData.instagramHandle;
+    }
+    if (!customerData.lastName || typeof customerData.lastName !== 'string' || !customerData.lastName.trim()) {
+      delete customerData.lastName;
     }
 
     const customer = new Customer({
-      ...req.body,
+      ...customerData,
       userId: req.user.id,
       phone,
       whatsappNumber,
+      language: customerData.language || 'en',
       optedIn: {
         whatsapp: true,
         instagram: true,
@@ -184,7 +211,10 @@ router.post('/', [
     res.status(201).json(customer);
   } catch (error) {
     console.error('Create Customer Error:', error);
-    res.status(500).json({ error: 'Failed to create customer' });
+    if (error.code === 11000) {
+      return res.status(400).json({ error: 'A customer with this phone number or email already exists' });
+    }
+    res.status(500).json({ error: error.message || 'Failed to create customer' });
   }
 });
 
@@ -192,28 +222,40 @@ router.post('/', [
 router.put('/:id', [
   body('firstName').optional().trim(),
   body('lastName').optional().trim(),
-  body('email').optional({ checkFalsy: true }).isEmail(),
+  body('email').optional({ checkFalsy: true }).isEmail().withMessage('Valid email is required'),
   body('phone').optional().trim(),
   body('whatsappNumber').optional().trim(),
-  body('instagramHandle').optional().trim()
+  body('instagramHandle').optional().trim(),
+  body('language').optional().isIn(['en', 'hi', 'ta', 'te', 'mr', 'gu', 'kn', 'ml', 'pa', 'bn', 'or', 'as', 'ur', 'sa'])
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
+      return res.status(400).json({ error: errors.array()[0]?.msg || 'Validation failed', errors: errors.array() });
     }
 
     const normalizePhone = (phone) => {
-      if (!phone) return phone;
-      return phone.replace(/[\s\-\(\)]/g, '');
+      if (!phone) return '';
+      return String(phone).replace(/[\s\-\(\)]/g, '').trim();
     };
 
     const updateData = { ...req.body };
-    if (updateData.phone) {
+    if (updateData.phone !== undefined) {
       updateData.phone = normalizePhone(updateData.phone);
     }
-    if (updateData.whatsappNumber) {
+    if (updateData.whatsappNumber !== undefined) {
       updateData.whatsappNumber = normalizePhone(updateData.whatsappNumber);
+    }
+
+    if (!updateData.phone && updateData.whatsappNumber) {
+      updateData.phone = updateData.whatsappNumber;
+    }
+    if (!updateData.whatsappNumber && updateData.phone) {
+      updateData.whatsappNumber = updateData.phone;
+    }
+
+    if (updateData.email === '' || (typeof updateData.email === 'string' && !updateData.email.trim())) {
+      updateData.email = undefined;
     }
 
     const customer = await Customer.findOneAndUpdate(
@@ -229,7 +271,10 @@ router.put('/:id', [
     res.json(customer);
   } catch (error) {
     console.error('Update Customer Error:', error);
-    res.status(500).json({ error: 'Failed to update customer' });
+    if (error.code === 11000) {
+      return res.status(400).json({ error: 'Another customer with this phone number or email already exists' });
+    }
+    res.status(500).json({ error: error.message || 'Failed to update customer' });
   }
 });
 

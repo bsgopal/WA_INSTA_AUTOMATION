@@ -30,17 +30,10 @@ const TemplateSchema = new mongoose.Schema({
     required: true
   },
   
-  // Multi-language support
+  // Multi-language support (supports en, hi, ta, te, kn, ml, mr, gu, bn, pa, or, as, ur, etc.)
   translations: {
-    en: String,
-    hi: String,
-    ta: String,
-    te: String,
-    mr: String,
-    gu: String,
-    kn: String,
-    ml: String,
-    pa: String
+    type: mongoose.Schema.Types.Mixed,
+    default: {}
   },
   
   // Content
@@ -68,6 +61,12 @@ const TemplateSchema = new mongoose.Schema({
     type: String,
     enum: ['TEXT', 'QA', 'RICH'],
     default: 'TEXT'
+  },
+  // Target Dispatch Engine (Meta official vs Docker WAHA vs Both)
+  targetEngine: {
+    type: String,
+    enum: ['META', 'DOCKER', 'BOTH'],
+    default: 'BOTH'
   },
   // Example: {{customer_name}}, {{order_id}}, {{discount_percentage}}
   variables: [{

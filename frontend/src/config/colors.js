@@ -2,7 +2,6 @@
 // Auto-generated from source scan; keep names stable.
 
 export const colors = {
-  black: '#000',
   black: '#000000',
   c006653: '#006653',
   c0073e6: '#0073e6',
@@ -241,7 +240,6 @@ export const colors = {
   cffe0b2: '#ffe0b2',
   cffeaa7: '#ffeaa7',
   cffebee: '#ffebee',
-  white: '#fff',
   cfff3e0: '#fff3e0',
   cfff59d: '#fff59d',
   red50c: '#fff5f5',

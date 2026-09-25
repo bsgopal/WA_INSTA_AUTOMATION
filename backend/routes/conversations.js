@@ -6,10 +6,47 @@ const ConversationMessage = require('../models/ConversationMessage');
 const Customer = require('../models/Customer');
 const { body, validationResult } = require('express-validator');
 
+// Helper to merge and deduplicate conversations per customer
+async function deduplicateCustomerConversations(userId) {
+  try {
+    const allConvs = await Conversation.find({ userId }).sort({ updatedAt: -1, createdAt: -1 });
+    const seenCustomers = new Map();
+    const duplicateIds = [];
+
+    for (const conv of allConvs) {
+      if (!conv.customerId) {
+        duplicateIds.push(conv._id);
+        continue;
+      }
+      const cId = String(conv.customerId);
+      if (!seenCustomers.has(cId)) {
+        seenCustomers.set(cId, conv);
+      } else {
+        const primary = seenCustomers.get(cId);
+        // Move any messages from the duplicate conversation to the primary conversation
+        await ConversationMessage.updateMany(
+          { conversationId: conv._id },
+          { $set: { conversationId: primary._id } }
+        );
+        duplicateIds.push(conv._id);
+      }
+    }
+
+    if (duplicateIds.length > 0) {
+      await Conversation.deleteMany({ _id: { $in: duplicateIds } });
+      console.log(`[Conversations] Merged and cleaned up ${duplicateIds.length} duplicate conversation threads.`);
+    }
+  } catch (err) {
+    console.warn('[Conversations] Deduplication error:', err.message);
+  }
+}
+
 // ============ GET ALL CONVERSATIONS (UNIFIED INBOX) ============
 router.get('/', async (req, res) => {
   try {
     const userId = req.user.id;
+    await deduplicateCustomerConversations(userId);
+
     const { status, assignedTo, platform, search, page = 1, limit = 20 } = req.query;
 
     const query = { userId };
@@ -72,7 +109,7 @@ router.get('/', async (req, res) => {
     const skip = (page - 1) * limit;
 
     const conversations = await Conversation.find(query)
-      .populate('customerId', 'firstName lastName phone whatsappNumber rfmSegment loyaltyTier language totalSpent')
+      .populate('customerId', 'firstName lastName phone whatsappNumber rfmSegment loyaltyTier language totalSpent customFields')
       .populate('assignedTo', 'name email')
       .sort({ lastActivityAt: -1 })
       .skip(skip)

@@ -48,6 +48,11 @@ const CampaignSchema = new mongoose.Schema({
     required: true
   },
   
+  senderMode: {
+    type: String,
+    enum: ['META', 'DOCKER']
+  },
+  
   // Content
   messageTemplate: {
     type: mongoose.Schema.Types.ObjectId,
