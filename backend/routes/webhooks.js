@@ -147,7 +147,20 @@ const normalizeInteractiveReply = data => {
   };
 };
 
-// ============ WHATSAPP WEBHOOK (WAHA) ============
+// ============ WHATSAPP WEBHOOK (WAHA & META) ============
+router.get(['/whatsapp', '/whatsapp/:customerCode'], (req, res) => {
+  const mode = req.query['hub.mode'];
+  const token = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
+  if (mode && token) {
+    if (mode === 'subscribe' && token === (process.env.META_VERIFY_TOKEN || 'renic_automation_verify_token')) {
+      return res.status(200).send(challenge);
+    }
+    return res.sendStatus(403);
+  }
+  return res.status(200).json({ status: 'ok', service: 'WAHA / WhatsApp Webhook', active: true });
+});
+
 router.post(['/whatsapp', '/whatsapp/:customerCode'], async (req, res) => {
   try {
     let targetCustomerCode = req.params.customerCode || req.headers['x-customer-code'];

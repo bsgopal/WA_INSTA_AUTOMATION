@@ -49,6 +49,20 @@ if (mongoose.connection.readyState === 0 && (process.env.MONGODB_URI || process.
 
 const app = express();
 
+// Ensure DB is connected for serverless invocations
+app.use(async (req, res, next) => {
+  if (mongoose.connection.readyState === 0 && (process.env.MONGODB_URI || process.env.MONGO_URI)) {
+    try {
+      await mongoose.connect(process.env.MONGODB_URI || process.env.MONGO_URI, {
+        serverSelectionTimeoutMS: 5000
+      });
+    } catch (e) {
+      console.warn('⚠️ Serverless DB connect warning:', e.message);
+    }
+  }
+  next();
+});
+
 // ============ MIDDLEWARE ============
 app.use(helmet({
   crossOriginResourcePolicy: false,
