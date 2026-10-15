@@ -466,12 +466,12 @@ router.post('/:id/messages', [
           createdAt: { $gte: twentyFourHoursAgo }
         });
         
-        const shouldUseTemplate = shop?.metaApiEnabled && !recentCustomerMessage;
+        const senderMode = (shop?.whatsappSenderMode || (shop?.metaApiEnabled ? 'META' : 'DOCKER')).toUpperCase();
+        const shouldUseTemplate = senderMode === 'META' && !recentCustomerMessage;
 
         if (shouldUseTemplate) {
           const templateLang = customer.language || 'en';
 
-          sendOptions.forceMeta = true;
           sendOptions.templateName = hasMedia ? 'sales_promotion' : 'message';
           sendOptions.templateLanguage = templateLang;
           sendOptions.templateParams = hasMedia ? [] : [{ type: 'text', text: finalContent }];

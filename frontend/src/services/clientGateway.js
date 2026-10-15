@@ -1,5 +1,5 @@
 // renic-automation-frontend/src/services/clientGateway.js
-// Enterprise SAP DM Style Destination & API Gateway SDK
+// Enterprise Destination & API Gateway SDK
 import axios from 'axios';
 import { API_BASE, API_ORIGIN } from '../api/base';
 
@@ -15,37 +15,46 @@ class TenantAPIGateway {
    * Resolves the active customer code from storage, subdomain, or query params.
    */
   resolveCustomerCode() {
-    // 1. LocalStorage
-    const stored = localStorage.getItem('customerCode');
-    if (stored) return stored.toUpperCase();
-
-    // 2. Query param ?tenant=AU20 or ?customerCode=AU20
     if (typeof window !== 'undefined' && window.location) {
+      // 1. Query param ?tenant=apx-wa01 or ?customerCode=apx-wa01
       const urlParams = new URLSearchParams(window.location.search);
-      const qCode = urlParams.get('tenant') || urlParams.get('customerCode');
+      const qCode = urlParams.get('tenant') || urlParams.get('customerCode') || urlParams.get('clientId');
       if (qCode) {
-        localStorage.setItem('customerCode', qCode.toUpperCase());
-        return qCode.toUpperCase();
+        const clean = qCode.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+        localStorage.setItem('customerCode', clean);
+        return clean;
       }
 
-      // 3. Subdomain extraction (e.g. au20.yourdomain.com, au20.lvh.me)
+      // 2. Subdomain extraction (e.g. wa.apx-wa01.lvh.me, wa.apx-wa01.renictech.com, apx-wa01.renictech.com)
       const host = window.location.hostname.toLowerCase();
       const parts = host.split('.');
-      if (parts.length >= 2) {
-        const sub = parts[0];
-        const reserved = ['www', 'localhost', 'app', 'admin', 'hq', 'api'];
-        if (!reserved.includes(sub)) {
-          localStorage.setItem('customerCode', sub.toUpperCase());
-          return sub.toUpperCase();
-        }
+      const knownAppSlugs = ['wa', 'pos', 'challan', 'crm', 'app', 'www', 'api', 'admin', 'hq', 'mail', 'ftp'];
+      let sub = '';
+      if (parts.length >= 3 && knownAppSlugs.includes(parts[0])) {
+        sub = parts[1];
+      } else if (parts.length >= 2 && !knownAppSlugs.includes(parts[0])) {
+        sub = parts[0];
+      }
+      
+      const reserved = ['localhost', 'lvh', 'renictech', 'com', 'me', 'io', 'dev', '127', '0'];
+      if (sub && !reserved.includes(sub) && !knownAppSlugs.includes(sub)) {
+        const clean = sub.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+        localStorage.setItem('customerCode', clean);
+        return clean;
       }
     }
 
-    return 'AU20'; // Default demo tenant
+    // 3. Stored session fallback
+    const stored = localStorage.getItem('customerCode');
+    if (stored && stored !== 'wa' && stored !== 'default') {
+      return stored.toLowerCase().replace(/[^a-z0-9_-]/g, '');
+    }
+
+    return '';
   }
 
   /**
-   * SAP DM Style Destination Resolver: this.getRestAPIUrl(endpointPath)
+   * Enterprise Destination Resolver: this.getRestAPIUrl(endpointPath)
    * Resolves the full URL for a service endpoint based on active tenant hosting.
    */
   getRestAPIUrl(endpointPath) {
@@ -121,7 +130,7 @@ class TenantAPIGateway {
   }
 
   /**
-   * SAP DM Style Encapsulated Secure Fetch Method
+   * Encapsulated Secure Fetch Method
    */
   async executeRequest(endpointPath, options = {}) {
     const url = this.getRestAPIUrl(endpointPath);
@@ -146,4 +155,5 @@ class TenantAPIGateway {
 }
 
 export const tenantGateway = new TenantAPIGateway();
+export const resolveCustomerCode = () => tenantGateway.resolveCustomerCode();
 export default tenantGateway;

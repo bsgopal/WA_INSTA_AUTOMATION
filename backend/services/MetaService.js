@@ -518,10 +518,13 @@ async function sendMessage(to, message, options = {}) {
       };
     }
 
+    // Meta accepted the message and returned a wamid, so it has left our
+    // system. Seed SENT (not QUEUED) so the row can never be stranded when no
+    // status webhook follows; Meta webhooks upgrade SENT -> DELIVERED -> READ.
     return {
       success: true,
       externalMessageId,
-      status: 'QUEUED',
+      status: 'SENT',
       sentAt: new Date(),
       channel: 'whatsapp',
       to: formattedPhone

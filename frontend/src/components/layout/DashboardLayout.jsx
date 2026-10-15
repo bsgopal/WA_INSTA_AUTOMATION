@@ -5,7 +5,7 @@ import {
   List, ListItem, ListItemButton, ListItemIcon, ListItemText, 
   Toolbar, Typography, Button, Avatar, Tooltip, Menu, MenuItem,
   Dialog, DialogTitle, DialogContent, DialogActions, TextField,
-  Snackbar, Alert, Grid, Chip, InputBase, Badge, Divider, LinearProgress, Stack
+  Snackbar, Alert, Grid, Chip, InputBase, Divider, LinearProgress, Stack
 } from '@mui/material';
 import {
   Menu as MenuIcon, Dashboard as DashboardIcon, 
@@ -21,7 +21,11 @@ import {
   Logout as LogoutIcon, Person as PersonIcon, ArrowBack as ArrowBackIcon,
   Notifications as NotificationsIcon, DoneAll as DoneAllIcon, CheckCircle as CheckCircleIcon,
   DeleteSweep as DeleteSweepIcon, WhatsApp as WhatsAppIcon,
-  Error as ErrorOutlineIcon, AccessTime as AccessTimeIcon
+  Error as ErrorOutlineIcon, AccessTime as AccessTimeIcon,
+  History as HistoryIcon, Receipt as QuotationIcon,
+  EventAvailable as EventAvailableIcon, MedicalServices as ServiceIcon,
+  Badge as StaffIcon, EventNote as CalendarIcon,
+  Lock as LockIcon
 } from '@mui/icons-material';
 import apiClient from '../../api/client';
 import useAuthStore from '../../store/authStore';
@@ -44,9 +48,19 @@ const menuGroups = [
     ],
   },
   {
+    label: 'Appointments',
+    items: [
+      { text: 'Calendar & Bookings', icon: <EventAvailableIcon />, path: '/appointments' },
+      { text: 'Services Catalog', icon: <ServiceIcon />, path: '/appointment-services' },
+      { text: 'Staff & Specialists', icon: <StaffIcon />, path: '/appointment-staff' },
+      { text: 'Booking Rules & Shifts', icon: <CalendarIcon />, path: '/appointment-settings' },
+    ],
+  },
+  {
     label: 'Marketing',
     items: [
       { text: 'Campaigns', icon: <CampaignIcon />, path: '/campaigns' },
+      { text: 'Campaign History', icon: <HistoryIcon />, path: '/campaign-history' },
       { text: 'Templates', icon: <TemplateIcon />, path: '/templates' },
       { text: 'Catalog', icon: <CatalogIcon />, path: '/catalog' },
       { text: 'Quick Replies', icon: <MessageIcon />, path: '/quick-replies' },
@@ -57,8 +71,6 @@ const menuGroups = [
     label: 'Automation',
     items: [
       { text: 'Workflows', icon: <WorkflowIcon />, path: '/workflows' },
-      { text: 'AI Response Rules', icon: <BotIcon />, path: '/response-rules' },
-      { text: 'AI Features', icon: <AutoAwesomeIcon />, path: '/ai-features' },
     ],
   },
   {
@@ -76,13 +88,12 @@ const menuGroups = [
 ];
 
 const canAccess = (item, role, permissions = {}) => {
-  const normalizedRole = (role || 'ADMIN').toUpperCase();
-  if (normalizedRole === 'PLATFORM_OWNER' || normalizedRole === 'ADMIN' || normalizedRole === 'OWNER' || normalizedRole === 'SUPER_ADMIN') {
-    return true;
-  }
-  
-  // OTA Screen-Gate from Renic_Soft dynamic PaaS catalog (if explicitly set to false)
-  if (permissions && typeof permissions === 'object') {
+  // OTA Screen-Gate from Renic_Soft dynamic PaaS catalog (strict feature governance)
+  if (permissions && typeof permissions === 'object' && Object.keys(permissions).length > 0) {
+    if (item.path === '/appointments' && permissions.appointments === false && permissions.appointmentBooking === false) return false;
+    if (item.path === '/appointment-services' && permissions.appointmentServices === false && permissions.appointmentBooking === false) return false;
+    if (item.path === '/appointment-staff' && permissions.appointmentStaff === false && permissions.appointmentBooking === false) return false;
+    if (item.path === '/appointment-settings' && permissions.appointmentSettings === false && permissions.appointmentBooking === false) return false;
     if (item.path === '/workflows' && permissions.workflows === false) return false;
     if (item.path === '/response-rules' && permissions.responseRules === false) return false;
     if (item.path === '/ai-features' && (permissions.aiFeatures === false || permissions.aiAgent === false)) return false;
@@ -90,7 +101,11 @@ const canAccess = (item, role, permissions = {}) => {
     if (item.path === '/templates' && permissions.templates === false) return false;
     if (item.path === '/quick-replies' && permissions.quickReplies === false) return false;
     if (item.path === '/campaigns' && (permissions.campaigns === false || permissions.bulkBroadcast === false)) return false;
+    if (item.path === '/campaign-history' && (permissions.campaigns === false || permissions.bulkBroadcast === false)) return false;
     if (item.path === '/analytics' && (permissions.analytics === false || permissions.exportReports === false)) return false;
+    if (item.path === '/quotations' && permissions.quotations === false) return false;
+    if (item.path === '/conversations' && permissions.conversations === false && permissions.liveChat === false) return false;
+    if (item.path === '/messages' && permissions.messages === false && permissions.liveChat === false) return false;
     if (item.path === '/settings' && permissions.settings === false) return false;
   }
 
@@ -187,7 +202,6 @@ const RenicBrand = ({ collapsed, onClick }) => (
 );
 
 export default function DashboardLayout() {
-  const { isOauthLocked } = useTenant();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [anchorElUser, setAnchorElUser] = useState(null);
   const [anchorElNotif, setAnchorElNotif] = useState(null);
@@ -233,6 +247,15 @@ export default function DashboardLayout() {
   const logout = useAuthStore((state) => state.logout);
   const user = useAuthStore((state) => state.user);
   const updateUser = useAuthStore((state) => state.updateUser);
+
+  const {
+    screenPermissions: tenantScreenPermissions,
+    clientName,
+    isLicenseLocked,
+    isOauthLocked,
+    licenseActive,
+    licenseRequired
+  } = useTenant();
 
   // Fetch license status once on mount for expiry warnings
   useEffect(() => {
@@ -427,7 +450,7 @@ export default function DashboardLayout() {
 
       <Box sx={{ overflowX: 'hidden', overflowY: 'auto', mt: 1, flexGrow: 1 }}>
         {menuGroups.map((group) => {
-          const permissions = licenseStatus?.featurePermissions || licenseStatus?.screenPermissions || user?.screenPermissions || {};
+          const permissions = tenantScreenPermissions || licenseStatus?.featurePermissions || licenseStatus?.screenPermissions || user?.screenPermissions || {};
           const visibleItems = group.items.filter((item) => canAccess(item, user?.role, permissions));
           if (visibleItems.length === 0) return null;
           return (
@@ -452,6 +475,7 @@ export default function DashboardLayout() {
               )}
               <List sx={{ px: 0, py: 0 }}>
                 {visibleItems.map((item) => {
+                  const isItemLocked = isOauthLocked && item.path !== '/settings';
                   const isActive = item.path === '/' 
                     ? location.pathname === '/' 
                     : (location.pathname === item.path || location.pathname.startsWith(item.path + '/'));
@@ -478,6 +502,7 @@ export default function DashboardLayout() {
                         py: 1,
                         justifyContent: sidebarCollapsed ? 'center' : 'initial',
                         minHeight: 42,
+                        opacity: isItemLocked ? 0.65 : 1,
                         borderLeft: isActive ? '4px solid #84cc16' : '4px solid transparent',
                         bgcolor: isActive ? 'rgba(132, 204, 22, 0.12)' : 'transparent',
                         transition: 'all 0.18s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -491,31 +516,41 @@ export default function DashboardLayout() {
                         minWidth: sidebarCollapsed ? 0 : 34,
                         mr: sidebarCollapsed ? 0 : 'auto',
                         justifyContent: 'center',
-                        color: isActive ? '#65a30d' : '#64748b',
+                        color: isItemLocked ? '#94a3b8' : (isActive ? '#65a30d' : '#64748b'),
                         transition: 'color 0.18s ease'
                       }}>
                         {item.icon}
                       </ListItemIcon>
                       {!sidebarCollapsed && (
-                        <ListItemText
-                          primary={item.text}
-                          slotProps={{
-                            primary: {
-                              fontSize: '0.875rem',
-                              fontWeight: isActive ? 700 : 500,
-                              color: isActive ? '#3f6212' : '#334155',
-                              transition: 'color 0.18s ease'
-                            }
-                          }}
-                        />
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', minWidth: 0 }}>
+                          <ListItemText
+                            primary={item.text}
+                            slotProps={{
+                              primary: {
+                                fontSize: '0.875rem',
+                                fontWeight: isActive ? 700 : 500,
+                                color: isItemLocked ? '#64748b' : (isActive ? '#3f6212' : '#334155'),
+                                transition: 'color 0.18s ease',
+                                noWrap: true
+                              }
+                            }}
+                          />
+                          {isItemLocked && (
+                            <LockIcon sx={{ fontSize: 14, color: '#f59e0b', ml: 0.5, flexShrink: 0 }} />
+                          )}
+                        </Box>
                       )}
                     </ListItemButton>
                   );
 
+                  const tooltipTitle = isItemLocked 
+                    ? `${item.text} (Requires OAuth 2.0 Activation in Settings)`
+                    : item.text;
+
                   return (
                     <ListItem key={item.text} disablePadding sx={{ display: 'block' }}>
-                      {sidebarCollapsed ? (
-                        <Tooltip title={item.text} placement="right" arrow>
+                      {sidebarCollapsed || isItemLocked ? (
+                        <Tooltip title={tooltipTitle} placement="right" arrow>
                           {buttonContent}
                         </Tooltip>
                       ) : (
@@ -575,7 +610,7 @@ export default function DashboardLayout() {
   );
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh', width: '100%', backgroundColor: '#f8fafc' }}>
+    <Box sx={{ display: 'flex', height: '100vh', maxHeight: '100vh', overflow: 'hidden', width: '100%', backgroundColor: '#f8fafc' }}>
       <CssBaseline />
       <AppBar
         position="fixed"
@@ -668,10 +703,10 @@ export default function DashboardLayout() {
               />
               <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', gap: 0.5 }}>
                 <Typography sx={{ fontWeight: 800, fontSize: '0.88rem', color: '#ffffff', letterSpacing: '0.4px', lineHeight: 1 }}>
-                  RENIC
+                  {clientName ? clientName.toUpperCase() : (licenseStatus?.companyName ? licenseStatus.companyName.toUpperCase() : 'RENIC')}
                 </Typography>
                 <Typography sx={{ fontSize: '0.58rem', fontWeight: 800, color: '#0f172a', bgcolor: '#84cc16', px: 0.5, py: 0.1, borderRadius: '3px', lineHeight: 1 }}>
-                  TECH
+                  {licenseStatus?.planTier ? licenseStatus.planTier.toUpperCase() : 'APP'}
                 </Typography>
               </Box>
             </Box>
@@ -808,21 +843,7 @@ export default function DashboardLayout() {
                   }
                 }}
               >
-                <Badge
-                  badgeContent={unreadCount > 0 ? unreadCount : 0}
-                  color="error"
-                  invisible={!unreadCount || unreadCount <= 0}
-                  sx={{
-                    '& .MuiBadge-badge': {
-                      fontSize: '0.65rem',
-                      height: 18,
-                      minWidth: 18,
-                      fontWeight: 800
-                    }
-                  }}
-                >
-                  <MessageIcon sx={{ fontSize: 20, color: runningJobs?.length > 0 ? '#84cc16' : 'inherit' }} />
-                </Badge>
+                <MessageIcon sx={{ fontSize: 20, color: runningJobs?.length > 0 ? '#84cc16' : 'inherit' }} />
               </IconButton>
             </Tooltip>
 
@@ -862,19 +883,6 @@ export default function DashboardLayout() {
                   <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#ffffff', fontSize: '0.9rem' }}>
                     Message Center
                   </Typography>
-                  {unreadCount > 0 && (
-                    <Chip
-                      label={`${unreadCount} new`}
-                      size="small"
-                      sx={{
-                        height: 18,
-                        fontSize: '0.65rem',
-                        fontWeight: 800,
-                        bgcolor: '#ef4444',
-                        color: '#ffffff'
-                      }}
-                    />
-                  )}
                 </Box>
                 <Stack direction="row" spacing={0.5}>
                   {unreadCount > 0 && (
@@ -1158,26 +1166,46 @@ export default function DashboardLayout() {
         sx={{ 
           flexGrow: 1, 
           minWidth: 0,
+          height: '100vh',
+          maxHeight: '100vh',
+          overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
           bgcolor: '#f1f3f6'
         }}
       >
-        <Toolbar sx={{ minHeight: '56px !important' }} />
+        <Toolbar sx={{ minHeight: '56px !important', flexShrink: 0 }} />
         <WorkspaceTabBar />
         <Box
           sx={{
             flexGrow: 1,
-            p: { xs: 1.5, sm: 2.5 },
+            minHeight: 0,
+            overflowY: 'auto',
+            overflowX: 'hidden',
+            p: { xs: 1, sm: 1.25, md: 1.5 },
             minWidth: 0,
             display: 'flex',
-            flexDirection: 'column'
+            flexDirection: 'column',
+            '&::-webkit-scrollbar': {
+              width: '6px',
+              height: '6px'
+            },
+            '&::-webkit-scrollbar-track': {
+              background: 'transparent'
+            },
+            '&::-webkit-scrollbar-thumb': {
+              background: '#cbd5e1',
+              borderRadius: '4px'
+            },
+            '&::-webkit-scrollbar-thumb:hover': {
+              background: '#94a3b8'
+            }
           }}
         >
           {licenseNeedsWarning && (
             <Alert
               severity={licenseStatus.status === 'expired' ? 'error' : 'warning'}
-              sx={{ mb: 2, borderRadius: 1, '& .MuiAlert-message': { fontWeight: 600, fontSize: '0.875rem' } }}
+              sx={{ mb: 1.5, py: 0.5, borderRadius: 1, '& .MuiAlert-message': { fontWeight: 600, fontSize: '0.8rem' } }}
             >
               {licenseStatus.status === 'expired' ? (
                 <>Your license expired on <b>{new Date(licenseStatus.expiresAt).toLocaleDateString()}</b>. Please contact administrator to renew.</>
@@ -1199,9 +1227,25 @@ export default function DashboardLayout() {
               animation: 'pageFadeSlideIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards'
             }}
           >
-            {isOauthLocked && location.pathname !== '/settings' ? (
-              <ScreenLocked isOauthLock={true} />
-            ) : (
+          {(() => {
+            const allNavItems = menuGroups.flatMap((g) => g.items);
+            const currentItem = allNavItems.find(item => {
+              if (item.path === '/') return location.pathname === '/';
+              return location.pathname.startsWith(item.path);
+            });
+            const effectivePermissions = tenantScreenPermissions || licenseStatus?.screenPermissions || licenseStatus?.featurePermissions || {};
+            const isCurrentScreenAllowed = currentItem ? canAccess(currentItem, user?.role, effectivePermissions) : true;
+
+            if (isLicenseLocked) {
+              return <ScreenLocked isLicenseLock={true} />;
+            }
+            if (isOauthLocked && location.pathname !== '/settings') {
+              return <ScreenLocked isOauthLock={true} />;
+            }
+            if (!isCurrentScreenAllowed && location.pathname !== '/settings') {
+              return <ScreenLocked isForbiddenScreen={true} screenName={currentItem?.text || location.pathname} />;
+            }
+            return (
               <Suspense
                 fallback={
                   <Box sx={{ width: '100%', py: 1 }}>
@@ -1211,7 +1255,8 @@ export default function DashboardLayout() {
               >
                 <Outlet />
               </Suspense>
-            )}
+            );
+          })()}
           </Box>
         </Box>
       </Box>

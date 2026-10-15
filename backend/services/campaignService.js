@@ -77,6 +77,9 @@ async function executeCampaign(campaign, customers) {
       console.log(`[CampaignService] 🐳 Docker WAHA mode active for campaign ${campaign.name}. Using ${activeThrottleDelay / 1000}s anti-ban delay per message.`);
     }
 
+    // Docker anti-ban pattern: 6s between messages, but a longer 30s pause after every 5th message
+    let dockerMessageCount = 0;
+
     for (let i = 0; i < customers.length; i += batchSize) {
       // Check if campaign is still running/active
       const currentCampaign = await Campaign.findById(campaign._id);
@@ -96,8 +99,42 @@ async function executeCampaign(campaign, customers) {
               campaign.totalFailed++;
               continue;
             }
+            // Resolve language for customer (e.g. Tamil 'ta', Hindi 'hi', Telugu 'te', etc.)
+            let customerRawContent = content;
+            const custLang = (customer.language || 'en').toLowerCase().trim();
+            const langCodeMap = {
+              'tamil': 'ta', 'hindi': 'hi', 'telugu': 'te', 'kannada': 'kn',
+              'malayalam': 'ml', 'marathi': 'mr', 'gujarati': 'gu', 'bengali': 'bn',
+              'punjabi': 'pa', 'odia': 'or', 'urdu': 'ur', 'english': 'en'
+            };
+            const resolvedLang = langCodeMap[custLang] || custLang;
+
+            if (campaign.messageTemplate?.translations?.[resolvedLang]) {
+              customerRawContent = campaign.messageTemplate.translations[resolvedLang];
+            } else if (campaign.translations?.[resolvedLang]) {
+              customerRawContent = campaign.translations[resolvedLang];
+            } else if (resolvedLang !== 'en' && resolvedLang !== (campaign.language || 'en').toLowerCase()) {
+              // Dynamic AI translation fallback into customer's preferred language
+              try {
+                const aiMessageAnalyzer = require('./aiMessageAnalyzer');
+                const aiConfig = {
+                  provider: shop?.useAnthropic && shop?.anthropicApiKey ? 'anthropic' : 'gemini',
+                  apiKey: (shop?.useAnthropic && shop?.anthropicApiKey) ? shop.anthropicApiKey : (shop?.geminiApiKey || process.env.GEMINI_API_KEY),
+                  model: (shop?.useAnthropic && shop?.anthropicApiKey) ? (shop?.anthropicModel || 'claude-3-haiku-20240307') : (shop?.geminiModel || process.env.GEMINI_MODEL || 'gemini-1.5-flash')
+                };
+                if (aiConfig.apiKey) {
+                  const translated = await aiMessageAnalyzer.translateText(customerRawContent, resolvedLang, aiConfig);
+                  if (translated && translated.trim()) {
+                    customerRawContent = translated;
+                  }
+                }
+              } catch (tErr) {
+                console.warn(`[CampaignService] Auto-translation to ${resolvedLang} skipped:`, tErr.message);
+              }
+            }
+
             const personalizedContent = await VariableInterpolationService.interpolateVariables(
-              content,
+              customerRawContent,
               campaign.userId,
               { customer }
             );
@@ -203,7 +240,16 @@ async function executeCampaign(campaign, customers) {
           }
 
           // Throttle to prevent rate limit (6s in Docker mode, 1s in Meta mode)
-          await new Promise(resolve => setTimeout(resolve, activeThrottleDelay));
+          // Docker anti-ban pattern: 6s between messages, then a 30s pause after every 5th message
+          if (isDockerMode) {
+            dockerMessageCount++;
+            const isLongPause = dockerMessageCount % 5 === 0;
+            const delayMs = isLongPause ? 30000 : activeThrottleDelay;
+            console.log(`[CampaignService] Docker anti-ban delay: ${delayMs / 1000}s ${isLongPause ? '(long pause after 5 messages)' : `(message #${dockerMessageCount})`}`);
+            await new Promise(resolve => setTimeout(resolve, delayMs));
+          } else {
+            await new Promise(resolve => setTimeout(resolve, activeThrottleDelay));
+          }
         } catch (error) {
           console.error(`[CampaignService] Error sending message to customer ${customer._id}:`, error);
           campaign.totalFailed++;

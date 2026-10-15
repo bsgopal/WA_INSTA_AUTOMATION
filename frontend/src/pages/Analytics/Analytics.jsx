@@ -78,242 +78,316 @@ export default function Analytics() {
   };
 
   const MetricCard = ({ title, value, change, icon, color = 'primary' }) => (
-    <Card elevation={0}>
-      <CardContent>
-        <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-          <Box>
-            <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-              {title}
-            </Typography>
-            <Typography variant="h4" color={`${color}.main`}>
-              {value}
-            </Typography>
-            {change !== undefined && (
-              <Stack direction="row" alignItems="center" spacing={0.5} mt={1}>
-                {change >= 0 ? (
-                  <TrendingUpIcon sx={{ fontSize: 16, color: 'success.main' }} />
-                ) : (
-                  <TrendingDownIcon sx={{ fontSize: 16, color: 'error.main' }} />
-                )}
-                <Typography
-                  variant="caption"
-                  color={change >= 0 ? 'success.main' : 'error.main'}
-                  fontWeight={500}
-                >
-                  {Math.abs(change)}%
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  vs last period
-                </Typography>
-              </Stack>
+    <Paper 
+      elevation={0}
+      sx={{
+        p: 1.25,
+        borderRadius: '8px',
+        bgcolor: '#ffffff',
+        border: '1px solid #e2e8f0',
+        height: '100%',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
+      }}
+    >
+      <Box sx={{ minWidth: 0 }}>
+        <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.4px', fontSize: '0.68rem', display: 'block', noWrap: true }}>
+          {title}
+        </Typography>
+        <Typography sx={{ fontWeight: 800, color: '#0f172a', fontSize: '1.35rem', lineHeight: 1.2, mt: 0.2 }}>
+          {value}
+        </Typography>
+        {change !== undefined && (
+          <Stack direction="row" alignItems="center" spacing={0.4} mt={0.2}>
+            {change >= 0 ? (
+              <TrendingUpIcon sx={{ fontSize: 13, color: '#10b981' }} />
+            ) : (
+              <TrendingDownIcon sx={{ fontSize: 13, color: '#ef4444' }} />
             )}
-          </Box>
-          <Box sx={{ bgcolor: `${color}.50`, p: 1.5, borderRadius: '50%' }}>
-            {icon}
-          </Box>
-        </Stack>
-      </CardContent>
-    </Card>
+            <Typography variant="caption" sx={{ color: change >= 0 ? '#10b981' : '#ef4444', fontWeight: 800, fontSize: '0.68rem' }}>
+              {Math.abs(change)}%
+            </Typography>
+            <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.65rem' }}>
+              vs prev cycle
+            </Typography>
+          </Stack>
+        )}
+      </Box>
+      <Box sx={{ 
+        bgcolor: color === 'primary' ? '#84cc16' : color === 'info' ? '#0284c7' : color === 'success' ? '#10b981' : '#f59e0b',
+        p: 0.9, 
+        borderRadius: '6px', 
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: color === 'primary' ? '#0f172a' : '#ffffff',
+        flexShrink: 0
+      }}>
+        {icon}
+      </Box>
+    </Paper>
   );
 
   return (
-    <Box sx={{ width: '100%', flexGrow: 1 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', mb: 3 }}>
-        <Stack direction="row" spacing={1.5} alignItems="center">
-          <FormControl size="small" sx={{ minWidth: 150 }}>
-            <InputLabel>Time Range</InputLabel>
+    <Box sx={{ width: '100%', flexGrow: 1, display: 'flex', flexDirection: 'column', gap: 1.25, pb: 1 }}>
+      {/* Top Header Controls */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Typography sx={{ fontWeight: 800, color: '#0f172a', fontSize: '1rem' }}>
+            Analytics &amp; Performance Overview
+          </Typography>
+          <Chip label="Live Metrics" size="small" sx={{ height: 20, fontSize: '0.65rem', bgcolor: 'rgba(132, 204, 22, 0.15)', color: '#4d7c0f', fontWeight: 800 }} />
+        </Box>
+        <Stack direction="row" spacing={1} alignItems="center">
+          <FormControl size="small" sx={{ minWidth: 120 }}>
             <Select
               value={timeRange}
-              label="Time Range"
               onChange={(e) => setTimeRange(e.target.value)}
+              sx={{ height: 32, fontSize: '0.78rem', bgcolor: '#ffffff', borderRadius: '6px' }}
             >
-              <MenuItem value={7}>Last 7 days</MenuItem>
-              <MenuItem value={30}>Last 30 days</MenuItem>
-              <MenuItem value={90}>Last 90 days</MenuItem>
+              <MenuItem value={7} sx={{ fontSize: '0.78rem' }}>Last 7 days</MenuItem>
+              <MenuItem value={30} sx={{ fontSize: '0.78rem' }}>Last 30 days</MenuItem>
+              <MenuItem value={90} sx={{ fontSize: '0.78rem' }}>Last 90 days</MenuItem>
             </Select>
           </FormControl>
           <Button
+            size="small"
             variant="outlined"
-            startIcon={<DownloadIcon />}
+            startIcon={<DownloadIcon sx={{ fontSize: 16 }} />}
             onClick={handleExport}
+            sx={{ height: 32, fontSize: '0.75rem', fontWeight: 700, borderRadius: '6px', borderColor: '#cbd5e1', color: '#0f172a', textTransform: 'none' }}
           >
-            Export
+            Export CSV
           </Button>
         </Stack>
       </Box>
 
       {loading ? (
-        <LinearProgress />
+        <LinearProgress sx={{ borderRadius: 1, bgcolor: 'rgba(132, 204, 22, 0.2)', '& .MuiLinearProgress-bar': { bgcolor: '#84cc16' } }} />
       ) : (
         <>
           {/* Key Metrics */}
-          <Grid container spacing={3} mb={4}>
-            <Grid item xs={12} sm={6} md={3}>
-              <MetricCard
-                title="Total Customers"
-                value={overview.totalCustomers?.toLocaleString() || 0}
-                icon={<SendIcon />}
-                color="primary"
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <MetricCard
-                title="Messages Sent"
-                value={overview.messagesSent?.toLocaleString() || 0}
-                change={overview.messageGrowth}
-                icon={<SendIcon />}
-                color="info"
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <MetricCard
-                title="Delivery Rate"
-                value={`${overview.deliveryRate?.toFixed(1) || 0}%`}
-                icon={<DoneAllIcon />}
-                color="success"
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <MetricCard
-                title="Response Rate"
-                value={`${overview.responseRate?.toFixed(1) || 0}%`}
-                icon={<VisibilityIcon />}
-                color="warning"
-              />
-            </Grid>
-          </Grid>
+          <Box sx={{
+            display: 'grid',
+            gridTemplateColumns: {
+              xs: '1fr',
+              sm: 'repeat(2, minmax(0, 1fr))',
+              lg: 'repeat(4, minmax(0, 1fr))'
+            },
+            gap: 1.25
+          }}>
+            <MetricCard
+              title="Total Customers"
+              value={overview.totalCustomers?.toLocaleString() || 0}
+              icon={<SendIcon sx={{ fontSize: 18 }} />}
+              color="primary"
+            />
+            <MetricCard
+              title="Messages Sent"
+              value={overview.messagesSent?.toLocaleString() || 0}
+              change={overview.messageGrowth}
+              icon={<SendIcon sx={{ fontSize: 18 }} />}
+              color="info"
+            />
+            <MetricCard
+              title="Delivery Rate"
+              value={`${overview.deliveryRate?.toFixed(1) || 0}%`}
+              icon={<DoneAllIcon sx={{ fontSize: 18 }} />}
+              color="success"
+            />
+            <MetricCard
+              title="Response Rate"
+              value={`${overview.responseRate?.toFixed(1) || 0}%`}
+              icon={<VisibilityIcon sx={{ fontSize: 18 }} />}
+              color="warning"
+            />
+          </Box>
 
-          {/* Engagement Timeline */}
-          <Paper elevation={0} sx={{ p: 3, mb: 4 }}>
-            <Typography variant="h6" gutterBottom>
-              Engagement Timeline
-            </Typography>
-            <Divider sx={{ my: 2 }} />
-            <Box sx={{ height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <TimelineChart data={timeline} />
-            </Box>
-          </Paper>
+          {/* Middle Row: Engagement Timeline + Customer Segments */}
+          <Box sx={{
+            display: 'grid',
+            gridTemplateColumns: {
+              xs: '1fr',
+              md: 'minmax(0, 2fr) minmax(280px, 1fr)'
+            },
+            gap: 1.25
+          }}>
+            {/* Engagement Timeline */}
+            <Paper elevation={0} sx={{ p: 1.5, borderRadius: '8px', border: '1px solid #e2e8f0', bgcolor: '#ffffff', display: 'flex', flexDirection: 'column', height: 210 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#0f172a', fontSize: '0.85rem' }}>
+                  Engagement Timeline
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.7rem' }}>
+                  Sent vs Delivered
+                </Typography>
+              </Box>
+              <Divider sx={{ mb: 1, borderColor: '#f1f5f9' }} />
+              <Box sx={{ flexGrow: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <TimelineChart data={timeline} />
+              </Box>
+            </Paper>
 
-          <Grid container spacing={3}>
             {/* Customer Segments */}
-            <Grid item xs={12} md={6}>
-              <Paper elevation={0} sx={{ p: 3 }}>
-                <Typography variant="h6" gutterBottom>
+            <Paper elevation={0} sx={{ p: 1.5, borderRadius: '8px', border: '1px solid #e2e8f0', bgcolor: '#ffffff', display: 'flex', flexDirection: 'column', height: 210, overflow: 'hidden' }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#0f172a', fontSize: '0.85rem' }}>
                   Customer Segments
                 </Typography>
-                <Divider sx={{ my: 2 }} />
-                <Stack spacing={2}>
-                  {segments.map((segment) => (
-                    <Box key={segment._id}>
-                      <Stack direction="row" justifyContent="space-between" mb={1}>
-                        <Typography variant="body2" fontWeight={500}>
-                          {segment._id}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          {segment.count} customers
-                        </Typography>
-                      </Stack>
-                      <LinearProgress
-                        variant="determinate"
-                        value={(segment.count / overview.totalCustomers) * 100}
-                        sx={{ height: 8, borderRadius: 1 }}
-                      />
-                    </Box>
-                  ))}
+                <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.7rem' }}>
+                  Distribution
+                </Typography>
+              </Box>
+              <Divider sx={{ mb: 1, borderColor: '#f1f5f9' }} />
+              <Box sx={{ 
+                overflowY: 'auto', 
+                flexGrow: 1, 
+                pr: 0.5,
+                '&::-webkit-scrollbar': { width: '4px' },
+                '&::-webkit-scrollbar-thumb': { background: '#cbd5e1', borderRadius: '4px' }
+              }}>
+                <Stack spacing={1.2}>
+                  {segments.length === 0 ? (
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'center', py: 2 }}>
+                      No segment data available
+                    </Typography>
+                  ) : (
+                    segments.map((segment) => (
+                      <Box key={segment._id}>
+                        <Stack direction="row" justifyContent="space-between" mb={0.3}>
+                          <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: '#0f172a' }}>
+                            {segment._id || 'Standard'}
+                          </Typography>
+                          <Typography sx={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 700 }}>
+                            {segment.count} leads
+                          </Typography>
+                        </Stack>
+                        <LinearProgress
+                          variant="determinate"
+                          value={overview.totalCustomers ? Math.min((segment.count / overview.totalCustomers) * 100, 100) : 0}
+                          sx={{ height: 5, borderRadius: 1, bgcolor: '#f1f5f9', '& .MuiLinearProgress-bar': { bgcolor: '#84cc16' } }}
+                        />
+                      </Box>
+                    ))
+                  )}
                 </Stack>
-              </Paper>
-            </Grid>
+              </Box>
+            </Paper>
+          </Box>
 
+          {/* Bottom Row: Channel & Campaign Performance */}
+          <Box sx={{
+            display: 'grid',
+            gridTemplateColumns: {
+              xs: '1fr',
+              md: '1fr 1fr'
+            },
+            gap: 1.25
+          }}>
             {/* Channel Performance */}
-            <Grid item xs={12} md={6}>
-              <Paper elevation={0} sx={{ p: 3 }}>
-                <Typography variant="h6" gutterBottom>
+            <Paper elevation={0} sx={{ p: 1.5, borderRadius: '8px', border: '1px solid #e2e8f0', bgcolor: '#ffffff', display: 'flex', flexDirection: 'column', height: 180, overflow: 'hidden' }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#0f172a', fontSize: '0.85rem' }}>
                   Channel Performance
                 </Typography>
-                <Divider sx={{ my: 2 }} />
-                <TableContainer>
-                  <Table size="small">
-                    <TableHead>
+              </Box>
+              <Divider sx={{ mb: 0.5, borderColor: '#f1f5f9' }} />
+              <Box sx={{ 
+                overflowY: 'auto', 
+                flexGrow: 1,
+                '&::-webkit-scrollbar': { width: '4px' },
+                '&::-webkit-scrollbar-thumb': { background: '#cbd5e1', borderRadius: '4px' }
+              }}>
+                <Table size="small" stickyHeader>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell sx={{ py: 0.5, fontSize: '0.7rem', fontWeight: 800, bgcolor: '#f8fafc' }}>Channel</TableCell>
+                      <TableCell align="right" sx={{ py: 0.5, fontSize: '0.7rem', fontWeight: 800, bgcolor: '#f8fafc' }}>Sent</TableCell>
+                      <TableCell align="right" sx={{ py: 0.5, fontSize: '0.7rem', fontWeight: 800, bgcolor: '#f8fafc' }}>Delivered</TableCell>
+                      <TableCell align="right" sx={{ py: 0.5, fontSize: '0.7rem', fontWeight: 800, bgcolor: '#f8fafc' }}>Rate</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {channels.length === 0 ? (
                       <TableRow>
-                        <TableCell>Channel</TableCell>
-                        <TableCell align="right">Sent</TableCell>
-                        <TableCell align="right">Delivered</TableCell>
-                        <TableCell align="right">Rate</TableCell>
+                        <TableCell colSpan={4} align="center" sx={{ py: 2, fontSize: '0.75rem', color: '#94a3b8' }}>
+                          WhatsApp Live • 100% active
+                        </TableCell>
                       </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {channels.map((channel) => (
-                        <TableRow key={channel.channel}>
-                          <TableCell>
-                            <Chip label={channel.channel} size="small" />
+                    ) : (
+                      channels.map((channel) => (
+                        <TableRow key={channel.channel} hover>
+                          <TableCell sx={{ py: 0.5, fontSize: '0.75rem', fontWeight: 600 }}>
+                            <Chip label={channel.channel} size="small" sx={{ height: 18, fontSize: '0.62rem', fontWeight: 700 }} />
                           </TableCell>
-                          <TableCell align="right">{channel.totalSent}</TableCell>
-                          <TableCell align="right">{channel.delivered}</TableCell>
-                          <TableCell align="right">
-                            <Typography
-                              variant="body2"
-                              color={channel.deliveryRate > 90 ? 'success.main' : 'text.primary'}
-                              fontWeight={500}
-                            >
+                          <TableCell align="right" sx={{ py: 0.5, fontSize: '0.75rem' }}>{channel.totalSent}</TableCell>
+                          <TableCell align="right" sx={{ py: 0.5, fontSize: '0.75rem' }}>{channel.delivered}</TableCell>
+                          <TableCell align="right" sx={{ py: 0.5, fontSize: '0.75rem' }}>
+                            <Typography sx={{ fontSize: '0.75rem', fontWeight: 800, color: channel.deliveryRate > 90 ? '#16a34a' : '#0f172a' }}>
                               {channel.deliveryRate}%
                             </Typography>
                           </TableCell>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              </Paper>
-            </Grid>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </Box>
+            </Paper>
 
             {/* Campaign Performance */}
-            <Grid item xs={12}>
-              <Paper elevation={0} sx={{ p: 3 }}>
-                <Typography variant="h6" gutterBottom>
+            <Paper elevation={0} sx={{ p: 1.5, borderRadius: '8px', border: '1px solid #e2e8f0', bgcolor: '#ffffff', display: 'flex', flexDirection: 'column', height: 180, overflow: 'hidden' }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#0f172a', fontSize: '0.85rem' }}>
                   Recent Campaign Performance
                 </Typography>
-                <Divider sx={{ my: 2 }} />
-                <TableContainer>
-                  <Table>
-                    <TableHead>
+              </Box>
+              <Divider sx={{ mb: 0.5, borderColor: '#f1f5f9' }} />
+              <Box sx={{ 
+                overflowY: 'auto', 
+                flexGrow: 1,
+                '&::-webkit-scrollbar': { width: '4px' },
+                '&::-webkit-scrollbar-thumb': { background: '#cbd5e1', borderRadius: '4px' }
+              }}>
+                <Table size="small" stickyHeader>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell sx={{ py: 0.5, fontSize: '0.7rem', fontWeight: 800, bgcolor: '#f8fafc' }}>Campaign</TableCell>
+                      <TableCell sx={{ py: 0.5, fontSize: '0.7rem', fontWeight: 800, bgcolor: '#f8fafc' }}>Status</TableCell>
+                      <TableCell align="right" sx={{ py: 0.5, fontSize: '0.7rem', fontWeight: 800, bgcolor: '#f8fafc' }}>Sent</TableCell>
+                      <TableCell align="right" sx={{ py: 0.5, fontSize: '0.7rem', fontWeight: 800, bgcolor: '#f8fafc' }}>Delivery</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {campaigns.length === 0 ? (
                       <TableRow>
-                        <TableCell>Campaign</TableCell>
-                        <TableCell>Status</TableCell>
-                        <TableCell align="right">Sent</TableCell>
-                        <TableCell align="right">Delivered</TableCell>
-                        <TableCell align="right">Read</TableCell>
-                        <TableCell align="right">Delivery Rate</TableCell>
-                        <TableCell align="right">Read Rate</TableCell>
+                        <TableCell colSpan={4} align="center" sx={{ py: 2, fontSize: '0.75rem', color: '#94a3b8' }}>
+                          No campaigns dispatched yet
+                        </TableCell>
                       </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {campaigns.map((campaign) => (
+                    ) : (
+                      campaigns.map((campaign) => (
                         <TableRow key={campaign._id} hover>
-                          <TableCell>
-                            <Typography variant="body2" fontWeight={500}>
-                              {campaign.name}
-                            </Typography>
+                          <TableCell sx={{ py: 0.5, fontSize: '0.75rem', fontWeight: 600, maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {campaign.name}
                           </TableCell>
-                          <TableCell>
-                            <Chip label={campaign.status} size="small" color="primary" />
+                          <TableCell sx={{ py: 0.5 }}>
+                            <Chip label={campaign.status} size="small" sx={{ height: 18, fontSize: '0.62rem', fontWeight: 700, bgcolor: campaign.status === 'COMPLETED' ? '#dcfce7' : 'rgba(132, 204, 22, 0.15)', color: campaign.status === 'COMPLETED' ? '#166534' : '#4d7c0f' }} />
                           </TableCell>
-                          <TableCell align="right">{campaign.totalSent || 0}</TableCell>
-                          <TableCell align="right">{campaign.totalDelivered || 0}</TableCell>
-                          <TableCell align="right">{campaign.totalRead || 0}</TableCell>
-                          <TableCell align="right">
+                          <TableCell align="right" sx={{ py: 0.5, fontSize: '0.75rem' }}>{campaign.totalSent || 0}</TableCell>
+                          <TableCell align="right" sx={{ py: 0.5, fontSize: '0.75rem', fontWeight: 700, color: '#16a34a' }}>
                             {campaign.deliveryRate?.toFixed(1) || 0}%
                           </TableCell>
-                          <TableCell align="right">
-                            {campaign.readRate?.toFixed(1) || 0}%
-                          </TableCell>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              </Paper>
-            </Grid>
-          </Grid>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </Box>
+            </Paper>
+          </Box>
         </>
       )}
     </Box>

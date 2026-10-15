@@ -19,7 +19,7 @@ const StatCard = ({ title, value, icon, trend, trendUp = true, color = '#84cc16'
     elevation={0} 
     onClick={onClick}
     sx={{ 
-      p: 2.5, 
+      p: 1.5, 
       display: 'flex', 
       flexDirection: 'column', 
       height: '100%',
@@ -28,47 +28,50 @@ const StatCard = ({ title, value, icon, trend, trendUp = true, color = '#84cc16'
       border: '1px solid #e2e8f0',
       borderRadius: '8px',
       cursor: onClick ? 'pointer' : 'default',
-      boxShadow: '0 1px 3px 0 rgba(0,0,0,.05)',
-      transition: 'all 0.2s ease-in-out',
+      boxShadow: '0 1px 3px 0 rgba(0,0,0,.04)',
+      transition: 'all 0.18s ease-in-out',
       '&:hover': {
-        boxShadow: '0 6px 18px 0 rgba(0,0,0,.08)',
-        transform: onClick ? 'translateY(-2px)' : 'none',
+        boxShadow: '0 4px 12px 0 rgba(0,0,0,.07)',
+        transform: onClick ? 'translateY(-1px)' : 'none',
         borderColor: '#cbd5e1'
       }
     }}
   >
-    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-      <Box>
-        <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.6px', fontSize: '0.72rem' }}>
+    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+      <Box sx={{ minWidth: 0 }}>
+        <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', fontSize: '0.68rem', display: 'block', noWrap: true }}>
           {title}
         </Typography>
-        <Typography variant="h4" sx={{ fontWeight: 800, color: '#0f172a', mt: 0.5 }}>
+        <Typography sx={{ fontWeight: 800, color: '#0f172a', fontSize: { xs: '1.25rem', sm: '1.45rem' }, lineHeight: 1.2, mt: 0.3 }}>
           {value}
         </Typography>
       </Box>
       <Box sx={{ 
         bgcolor: color,
-        p: 1.5, 
+        p: 1, 
         borderRadius: '6px', 
         display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
         color: iconColor,
-        boxShadow: `0 2px 8px ${color}35`
+        boxShadow: `0 2px 6px ${color}30`,
+        flexShrink: 0
       }}>
         {icon}
       </Box>
     </Box>
     {trend && (
-      <Box sx={{ display: 'flex', alignItems: 'center', mt: 1.5, pt: 1.5, borderTop: '1px solid #f1f5f9' }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', pt: 0.8, borderTop: '1px solid #f1f5f9' }}>
         {trendUp ? (
-          <TrendingUpIcon sx={{ color: '#10b981', fontSize: 18, mr: 0.5 }} />
+          <TrendingUpIcon sx={{ color: '#10b981', fontSize: 15, mr: 0.4 }} />
         ) : (
-          <TrendingDownIcon sx={{ color: '#ef4444', fontSize: 18, mr: 0.5 }} />
+          <TrendingDownIcon sx={{ color: '#ef4444', fontSize: 15, mr: 0.4 }} />
         )}
-        <Typography variant="body2" sx={{ fontWeight: 700, color: trendUp ? '#10b981' : '#ef4444' }}>
+        <Typography variant="caption" sx={{ fontWeight: 800, color: trendUp ? '#10b981' : '#ef4444', fontSize: '0.72rem' }}>
           {trend}
         </Typography>
-        <Typography variant="caption" sx={{ ml: 1, color: '#64748b', fontSize: '0.75rem' }}>
-          growth vs previous cycle
+        <Typography variant="caption" sx={{ ml: 0.8, color: '#94a3b8', fontSize: '0.68rem' }}>
+          vs prev cycle
         </Typography>
       </Box>
     )}
@@ -117,7 +120,7 @@ export default function Dashboard() {
         const mapped = recentMessages.map(msg => ({
           type: msg.aiGenerated ? 'MESSAGE_SENT' : 'CUSTOMER_ADDED',
           title: msg.aiGenerated ? 'AI Smart Reply' : 'Incoming Lead Message',
-          description: `"${msg.content.substring(0, 45)}${msg.content.length > 45 ? '...' : ''}"`,
+          description: `"${msg.content.substring(0, 40)}${msg.content.length > 40 ? '...' : ''}"`,
           createdAt: msg.createdAt
         }));
         setActivities(mapped);
@@ -144,37 +147,37 @@ export default function Dashboard() {
   };
 
   return (
-    <Box sx={{ width: '100%', flexGrow: 1, pb: 4 }}>
-      {/* Brand Hero Banner */}
+    <Box sx={{ width: '100%', flexGrow: 1, display: 'flex', flexDirection: 'column', gap: 1.5, pb: 1 }}>
+      {/* Compact Brand Hero Banner */}
       <Paper
         elevation={0}
         sx={{
-          p: { xs: 2.5, sm: 3 },
-          mb: 3,
+          px: { xs: 1.5, sm: 2 },
+          py: 1.2,
           borderRadius: '8px',
           background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
           color: '#ffffff',
           display: 'flex',
-          flexDirection: { xs: 'column', md: 'row' },
+          flexDirection: { xs: 'column', sm: 'row' },
           justifyContent: 'space-between',
-          alignItems: { xs: 'flex-start', md: 'center' },
-          gap: 2,
-          boxShadow: '0 4px 20px rgba(15, 23, 42, 0.12)',
+          alignItems: { xs: 'flex-start', sm: 'center' },
+          gap: 1.5,
+          boxShadow: '0 2px 10px rgba(15, 23, 42, 0.1)',
           border: '1px solid rgba(255,255,255,0.08)'
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
           <Box
             sx={{
               bgcolor: '#ffffff',
-              borderRadius: '10px',
-              p: '4px',
+              borderRadius: '8px',
+              p: '3px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 4px 14px rgba(0,0,0,0.25)',
-              width: 44,
-              height: 44,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+              width: 34,
+              height: 34,
               flexShrink: 0
             }}
           >
@@ -186,32 +189,36 @@ export default function Dashboard() {
             />
           </Box>
           <Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-              <Typography variant="h5" sx={{ fontWeight: 800, color: '#ffffff', letterSpacing: '-0.3px' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography sx={{ fontWeight: 800, color: '#ffffff', fontSize: '0.95rem', letterSpacing: '-0.2px' }}>
                 Renic Automation Hub
               </Typography>
               <Chip 
-                icon={<StarIcon sx={{ color: '#0f172a !important', fontSize: 14 }} />}
-                label="Full Platform Admin" 
+                icon={<StarIcon sx={{ color: '#0f172a !important', fontSize: 13 }} />}
+                label="Full Admin" 
                 size="small" 
-                sx={{ bgcolor: '#84cc16', color: '#0f172a', fontWeight: 800, fontSize: '0.72rem' }}
+                sx={{ height: 20, bgcolor: '#84cc16', color: '#0f172a', fontWeight: 800, fontSize: '0.65rem' }}
               />
             </Box>
-            <Typography variant="body2" sx={{ color: '#94a3b8', fontSize: '0.88rem' }}>
-              Full platform control • WhatsApp & Instagram CRM • Live AI Automation & Workflows
+            <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.75rem', display: { xs: 'none', md: 'block' } }}>
+              WhatsApp & Instagram CRM • Live AI Automation & Workflows
             </Typography>
           </Box>
         </Box>
 
-        <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
           <Button
+            size="small"
             variant="contained"
             onClick={() => navigate('/catalog')}
-            startIcon={<StorefrontIcon />}
+            startIcon={<StorefrontIcon sx={{ fontSize: 16 }} />}
             sx={{
               bgcolor: 'rgba(255,255,255,0.08)',
               color: '#ffffff',
               fontWeight: 700,
+              fontSize: '0.75rem',
+              py: 0.4,
+              px: 1.2,
               borderRadius: '6px',
               border: '1px solid rgba(255,255,255,0.15)',
               '&:hover': { bgcolor: 'rgba(255,255,255,0.16)' }
@@ -220,13 +227,17 @@ export default function Dashboard() {
             Catalog
           </Button>
           <Button
+            size="small"
             variant="contained"
             onClick={() => navigate('/conversations')}
-            startIcon={<ChatIcon />}
+            startIcon={<ChatIcon sx={{ fontSize: 16 }} />}
             sx={{
               bgcolor: '#0284c7',
               color: '#ffffff',
               fontWeight: 700,
+              fontSize: '0.75rem',
+              py: 0.4,
+              px: 1.2,
               borderRadius: '6px',
               '&:hover': { bgcolor: '#0369a1' }
             }}
@@ -234,15 +245,19 @@ export default function Dashboard() {
             Live Inbox
           </Button>
           <Button 
+            size="small"
             variant="contained" 
-            startIcon={<AddCircleIcon />}
+            startIcon={<AddCircleIcon sx={{ fontSize: 16 }} />}
             onClick={() => navigate('/campaigns')}
             sx={{
               bgcolor: '#84cc16',
               color: '#0f172a',
               fontWeight: 800,
+              fontSize: '0.75rem',
+              py: 0.4,
+              px: 1.2,
               borderRadius: '6px',
-              boxShadow: '0 4px 12px rgba(132, 204, 22, 0.35)',
+              boxShadow: '0 2px 8px rgba(132, 204, 22, 0.35)',
               '&:hover': { bgcolor: '#65a30d' }
             }}
           >
@@ -260,14 +275,13 @@ export default function Dashboard() {
             sm: 'repeat(2, minmax(0, 1fr))',
             lg: 'repeat(4, minmax(0, 1fr))'
           },
-          gap: 2.5,
-          mb: 3
+          gap: 1.5
         }}
       >
         <StatCard 
           title="Total Customers" 
           value={stats.totalCustomers.toLocaleString()} 
-          icon={<PeopleIcon sx={{ fontSize: 26 }} />} 
+          icon={<PeopleIcon sx={{ fontSize: 20 }} />} 
           trend="+18%"
           color="#84cc16"
           iconColor="#0f172a"
@@ -276,7 +290,7 @@ export default function Dashboard() {
         <StatCard 
           title="Active Campaigns" 
           value={stats.activeCampaigns} 
-          icon={<CampaignIcon sx={{ fontSize: 26 }} />} 
+          icon={<CampaignIcon sx={{ fontSize: 20 }} />} 
           trend="+2"
           color="#0284c7"
           iconColor="#ffffff"
@@ -285,7 +299,7 @@ export default function Dashboard() {
         <StatCard 
           title="Messages Delivered" 
           value={stats.messagesSent} 
-          icon={<SendIcon sx={{ fontSize: 26 }} />} 
+          icon={<SendIcon sx={{ fontSize: 20 }} />} 
           trend="+24%"
           color="#10b981"
           iconColor="#ffffff"
@@ -294,7 +308,7 @@ export default function Dashboard() {
         <StatCard 
           title="Response Rate" 
           value={`${stats.responseRate}%`} 
-          icon={<TrendingUpIcon sx={{ fontSize: 26 }} />} 
+          icon={<TrendingUpIcon sx={{ fontSize: 20 }} />} 
           trend="+5%"
           color="#8b5cf6"
           iconColor="#ffffff"
@@ -308,93 +322,102 @@ export default function Dashboard() {
           display: 'grid',
           gridTemplateColumns: {
             xs: '1fr',
-            xl: 'minmax(0, 2fr) minmax(320px, 1fr)'
+            lg: 'minmax(0, 2fr) minmax(300px, 1fr)'
           },
-          gap: 2.5,
-          alignItems: 'stretch'
+          gap: 1.5,
+          flexGrow: 1,
+          minHeight: 0
         }}
       >
-        <Box sx={{ minWidth: 0 }}>
+        <Box sx={{ minWidth: 0, height: { xs: 260, md: 'calc(100vh - 260px)' }, minHeight: 240, maxHeight: 380 }}>
           <Paper elevation={0} sx={{ 
-            p: 3, 
-            height: '420px',
+            p: 1.5, 
+            height: '100%',
             width: '100%',
+            display: 'flex',
+            flexDirection: 'column',
             backgroundColor: '#ffffff',
             border: '1px solid #e2e8f0',
             borderRadius: '8px',
-            boxShadow: '0 1px 3px 0 rgba(0,0,0,.05)'
+            boxShadow: '0 1px 3px 0 rgba(0,0,0,.04)'
           }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#0f172a' }}>
-                Weekly Message Traffic & Engagement
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#0f172a', fontSize: '0.85rem' }}>
+                Weekly Message Traffic &amp; Engagement
               </Typography>
-              <Chip label="Live Metrics" size="small" sx={{ bgcolor: 'rgba(132, 204, 22, 0.12)', color: '#4d7c0f', fontWeight: 800 }} />
+              <Chip label="Live Metrics" size="small" sx={{ height: 20, fontSize: '0.65rem', bgcolor: 'rgba(132, 204, 22, 0.12)', color: '#4d7c0f', fontWeight: 800 }} />
             </Box>
-            <Divider sx={{ mb: 2, borderColor: '#f1f5f9' }} />
-            <Box sx={{ width: '100%', height: '78%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+            <Divider sx={{ mb: 1, borderColor: '#f1f5f9' }} />
+            <Box sx={{ width: '100%', flexGrow: 1, minHeight: 0, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
               <EngagementChart />
             </Box>
           </Paper>
         </Box>
-        <Box sx={{ minWidth: 0 }}>
+        <Box sx={{ minWidth: 0, height: { xs: 260, md: 'calc(100vh - 260px)' }, minHeight: 240, maxHeight: 380 }}>
           <Paper elevation={0} sx={{ 
-            p: 3, 
-            height: '420px', 
+            p: 1.5, 
+            height: '100%', 
             width: '100%',
             display: 'flex', 
             flexDirection: 'column',
             backgroundColor: '#ffffff',
             border: '1px solid #e2e8f0',
             borderRadius: '8px',
-            boxShadow: '0 1px 3px 0 rgba(0,0,0,.05)',
+            boxShadow: '0 1px 3px 0 rgba(0,0,0,.04)',
             overflow: 'hidden'
           }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#0f172a' }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#0f172a', fontSize: '0.85rem' }}>
                 Recent Platform Activity
               </Typography>
-              <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>
+              <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 700, fontSize: '0.7rem' }}>
                 Real-time
               </Typography>
             </Box>
-            <Divider sx={{ mb: 2, borderColor: '#f1f5f9' }} />
-            <Box sx={{ overflow: 'auto', flexGrow: 1, pr: 0.5 }}>
+            <Divider sx={{ mb: 1, borderColor: '#f1f5f9' }} />
+            <Box sx={{ 
+              overflowY: 'auto', 
+              flexGrow: 1, 
+              pr: 0.5,
+              '&::-webkit-scrollbar': { width: '4px' },
+              '&::-webkit-scrollbar-thumb': { background: '#cbd5e1', borderRadius: '4px' }
+            }}>
               {activities.length === 0 ? (
                 <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: '#94a3b8' }}>
-                  <Typography variant="body2">No recent activity</Typography>
+                  <Typography variant="caption">No recent activity</Typography>
                 </Box>
               ) : (
-                <Stack spacing={2}>
+                <Stack spacing={1}>
                   {activities.map((activity, idx) => (
                     <Box key={idx} sx={{ 
                       display: 'flex', 
-                      gap: 1.5, 
-                      pb: 1.5, 
+                      gap: 1.2, 
+                      pb: 1, 
                       borderBottom: '1px solid #f1f5f9',
                       '&:last-child': { borderBottom: 'none' }
                     }}>
                       <Box sx={{ 
-                        width: 36, 
-                        height: 36, 
-                        borderRadius: '8px', 
+                        width: 28, 
+                        height: 28, 
+                        borderRadius: '6px', 
                         bgcolor: 'rgba(132, 204, 22, 0.12)', 
                         display: 'flex', 
                         alignItems: 'center', 
                         justifyContent: 'center',
-                        fontSize: '1.2rem',
+                        fontSize: '0.95rem',
                         flexShrink: 0 
                       }}>
                         {getActivityIcon(activity.type)}
                       </Box>
                       <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Typography variant="body2" sx={{ fontWeight: 700, color: '#0f172a' }}>
+                        <Typography sx={{ fontWeight: 700, color: '#0f172a', fontSize: '0.78rem', lineHeight: 1.2, noWrap: true }}>
                           {activity.title || activity.type}
                         </Typography>
-                        <Typography variant="caption" sx={{ display: 'block', color: '#64748b', mt: 0.2 }}>
+                        <Typography sx={{ display: 'block', color: '#64748b', fontSize: '0.7rem', noWrap: true }}>
                           {activity.description || 'Activity'}
                         </Typography>
-                        <Typography variant="caption" sx={{ display: 'block', color: '#94a3b8', mt: 0.2, fontSize: '0.7rem' }}>
-                          {new Date(activity.createdAt).toLocaleString()}
+                        <Typography variant="caption" sx={{ display: 'block', color: '#94a3b8', fontSize: '0.65rem' }}>
+                          {new Date(activity.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </Typography>
                       </Box>
                     </Box>

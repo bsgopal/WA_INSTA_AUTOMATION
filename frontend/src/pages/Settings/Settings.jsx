@@ -1,166 +1,70 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Typography, Box, Paper, Grid, TextField, Button, Switch,
-  FormControlLabel, Divider, Stack, Card, CardContent, Alert,
-  Tabs, Tab, IconButton, List, ListItem, ListItemText,
-  ListItemSecondaryAction, MenuItem, FormControl, InputLabel, Select,
-  Avatar, Badge, CircularProgress, Chip
+  FormControlLabel, Stack, Card, CardContent, Alert,
+  Tabs, Tab, IconButton, CircularProgress, Chip,
+  Dialog, DialogTitle, DialogContent, DialogActions
 } from '@mui/material';
 import SaveIcon from '@mui/icons-material/Save';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
-import SettingsIcon from '@mui/icons-material/Settings';
 import StorefrontIcon from '@mui/icons-material/Storefront';
-import ShoppingBagIcon from '@mui/icons-material/ShoppingBag';
 import ChatIcon from '@mui/icons-material/Chat';
-import CloudUploadIcon from '@mui/icons-material/CloudUpload';
-import SendIcon from '@mui/icons-material/Send';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import InfoIcon from '@mui/icons-material/Info';
-import CloseIcon from '@mui/icons-material/Close';
-import PersonIcon from '@mui/icons-material/Person';
-import SmartToyIcon from '@mui/icons-material/SmartToy';
+import SendIcon from '@mui/icons-material/Send';
 import CloudIcon from '@mui/icons-material/Cloud';
 import KeyIcon from '@mui/icons-material/Key';
-import ForwardIcon from '@mui/icons-material/Forward';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import ShieldIcon from '@mui/icons-material/Shield';
+import DescriptionIcon from '@mui/icons-material/Description';
 
 import apiClient from '../../api/client';
-import { API_ORIGIN } from '../../api/base';
 import CustomSnackbar from '../../components/Snackbar';
 import { useTenant } from '../../context/TenantContext';
-
-function TabPanel(props) {
-  const { children, value, index, ...other } = props;
-  return (
-    <div
-      role="tabpanel"
-      hidden={value !== index}
-      id={`settings-tabpanel-${index}`}
-      aria-labelledby={`settings-tab-${index}`}
-      style={{ width: '100%' }}
-      {...other}
-    >
-      {value === index && (
-        <Box
-          sx={{
-            pt: 3,
-            width: '100%',
-            '@keyframes tabFadeIn': {
-              from: {
-                opacity: 0,
-                transform: 'translateY(6px)'
-              },
-              to: {
-                opacity: 1,
-                transform: 'translateY(0)'
-              }
-            },
-            animation: 'tabFadeIn 0.25s cubic-bezier(0.25, 0.8, 0.25, 1) forwards'
-          }}
-        >
-          {children}
-        </Box>
-      )}
-    </div>
-  );
-}
 
 export default function Settings() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(0);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
   const [loadingConfig, setLoadingConfig] = useState(false);
-  const [loadingCatalog, setLoadingCatalog] = useState(false);
   const [savingConfig, setSavingConfig] = useState(false);
-  const [savingCatalog, setSavingCatalog] = useState(false);
 
-  // Tab 1: Integrations State (Local Storage)
-  const [integrations, setIntegrations] = useState(() => {
-    const saved = localStorage.getItem('renic_settings');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        return {
-          twilioSid: parsed.twilioSid || '',
-          twilioToken: parsed.twilioToken || '',
-          instagramToken: parsed.instagramToken || '',
-          geminiKey: parsed.geminiKey || '',
-          useAnthropic: parsed.useAnthropic !== undefined ? parsed.useAnthropic : false,
-          anthropicApiKey: parsed.anthropicApiKey || '',
-          anthropicModel: parsed.anthropicModel || 'claude-3-haiku-20240307',
-          geminiModel: parsed.geminiModel || 'gemini-1.5-flash',
-          emailNotifications: parsed.emailNotifications !== undefined ? parsed.emailNotifications : true,
-          smsNotifications: parsed.smsNotifications !== undefined ? parsed.smsNotifications : false,
-          campaignAlerts: parsed.campaignAlerts !== undefined ? parsed.campaignAlerts : true,
-          defaultLanguage: parsed.defaultLanguage || 'en',
-          timezone: parsed.timezone || 'Asia/Kolkata',
-          autoReply: parsed.autoReply !== undefined ? parsed.autoReply : true,
-        };
-      } catch (e) {
-        console.error(e);
-      }
-    }
-    return {
-      twilioSid: '',
-      twilioToken: '',
-      instagramToken: '',
-      geminiKey: '',
-      useAnthropic: false,
-      anthropicApiKey: '',
-      anthropicModel: 'claude-3-haiku-20240307',
-      geminiModel: 'gemini-1.5-flash',
-      emailNotifications: true,
-      smsNotifications: false,
-      campaignAlerts: true,
-      defaultLanguage: 'en',
-      timezone: 'Asia/Kolkata',
-      autoReply: true,
-    };
-  });
+  // Active WhatsApp Engine Mode ('DOCKER' | 'META')
+  const [senderMode, setSenderMode] = useState('DOCKER');
+  const [dockerThrottle, setDockerThrottle] = useState(6);
+  const [savingEngine, setSavingEngine] = useState(false);
 
-  // Tab 2: Knowledge Base State (MongoDB / ShopConfig)
+  // Tab 0: Knowledge Base / Store & Branding State (MongoDB / ShopConfig)
   const [shopConfig, setShopConfig] = useState({
-    shopName: 'Renic Jewellers',
-    websiteUrl: 'https://kanalli.in/',
-    address: '123 Gold Bazaar, T. Nagar, Chennai, Tamil Nadu - 600017',
-    operatingHours: '10:00 AM - 8:30 PM (Monday to Saturday)',
-    contactPhone: '+91 9345578103',
-    returnPolicy: '7-day replacement guarantee on manufacturing defects. 100% buyback guarantee at current gold rates.',
-    aiCustomInstructions: 'Always sound extremely polite, warm, and helpful. Invite customers to consult on gold customization options.',
-    faqs: []
+    shopName: 'Renic Technology',
+    companyName: 'RENIC TECHNOLOGY',
+    tagline: 'IDEAS | SOLUTIONS | GROWTH',
+    email: 'info@renictechnology.com',
+    websiteUrl: 'https://www.renictechnology.com',
+    catalogImageUrl: '',
+    logoUrl: '',
+    address: '123, Main Road, Gobichettipalayam, Erode - 638452, Tamil Nadu, India',
+    operatingHours: '9:00 AM - 7:00 PM (Monday to Saturday)',
+    contactPhone: '+91 88070 25752',
+    gstin: '33AAAAA0000A1Z5',
+    currency: 'INR',
+    currencySymbol: '₹',
+    themeColor: '#84CC16',
+    signatoryName: 'Renic Team',
+    signatoryTitle: 'Authorized Signature',
+    signatoryCompany: 'RENIC TECHNOLOGY',
+    defaultQuotationTerms: [
+      '50% advance payment to start the project.',
+      'Balance payment after final delivery.',
+      'Timeline: 4 – 6 weeks (depends on features).',
+      '1 year free support for the delivered project.',
+      'Quotation is valid for 30 days.'
+    ]
   });
 
-  const [newFaq, setNewFaq] = useState({ question: '', answer: '' });
+  const [newTermInput, setNewTermInput] = useState('');
 
-  // Tab 3: Catalog State
-  const [catalogItems, setCatalogItems] = useState([]);
-  const [newCatalog, setNewCatalog] = useState({
-    name: '',
-    category: 'Rings',
-    price: '',
-    description: '',
-    keywords: '',
-    imageFile: null,
-    imagePreview: ''
-  });
-  const fileInputRef = useRef(null);
-
-  // Tab 4: Sandbox Chat State
-  const [sandboxMessages, setSandboxMessages] = useState([
-    {
-      sender: 'ai',
-      text: 'Namaste! Welcome to Renic Jewellers. May I know your name, please?',
-      timestamp: new Date()
-    }
-  ]);
-  const [sandboxInput, setSandboxInput] = useState('');
-  const [sandboxName, setSandboxName] = useState('Customer');
-  const [sandboxSending, setSandboxSending] = useState(false);
-  const chatEndRef = useRef(null);
-
-  // WhatsApp Session Management State
+  // Tab 1: WhatsApp Session Management State (Docker WAHA)
   const [whatsappStatus, setWhatsappStatus] = useState({
     success: true,
     status: 'STOPPED',
@@ -172,18 +76,14 @@ export default function Settings() {
   const [loadingQr, setLoadingQr] = useState(false);
   const [qrError, setQrError] = useState('');
   const [restartingSession, setRestartingSession] = useState(false);
-  const qrRetryTimer = useRef(null);
   const whatsappQrRef = useRef('');
 
-  // Instagram Session Management State
-  const [instagramStatus, setInstagramStatus] = useState({
-    success: false,
-    profile: null,
-    error: null
-  });
-  const [loadingInstagram, setLoadingInstagram] = useState(false);
+  // WhatsApp Pairing Code Flow State
+  const [pairingPhone, setPairingPhone] = useState('');
+  const [pairingCode, setPairingCode] = useState('');
+  const [requestingCode, setRequestingCode] = useState(false);
 
-  // Meta API Configuration State
+  // Tab 1: Meta API Configuration State
   const [metaConfig, setMetaConfig] = useState({
     metaApiEnabled: false,
     metaAppId: '',
@@ -198,12 +98,117 @@ export default function Settings() {
   });
   const [metaTesting, setMetaTesting] = useState(false);
   const [metaTestResult, setMetaTestResult] = useState(null);
-  
+
   // System Status State
   const [systemStatus, setSystemStatus] = useState({
     ngrok: { running: false },
     waha: { running: false }
   });
+
+  // Tab 2: OAuth 2.0 State
+  const { oauthEnforced, oauthStatus, isOauthLocked, refreshScreens, whatsappSenderMode, clientName } = useTenant();
+  const [tenantClientId, setTenantClientId] = useState('');
+  const [tenantClientSecret, setTenantClientSecret] = useState('');
+  const [verifyingOauth, setVerifyingOauth] = useState(false);
+  const [savingOauth, setSavingOauth] = useState(false);
+  const [oauthAlertBox, setOauthAlertBox] = useState({
+    open: false,
+    title: '',
+    message: '',
+    severity: 'error'
+  });
+
+  useEffect(() => {
+    if (isOauthLocked) {
+      setActiveTab(2);
+    }
+  }, [isOauthLocked]);
+
+  useEffect(() => {
+    if (whatsappSenderMode) {
+      setSenderMode(whatsappSenderMode.toUpperCase());
+    }
+  }, [whatsappSenderMode]);
+
+  useEffect(() => {
+    if (oauthStatus?.clientId) {
+      setTenantClientId(oauthStatus.clientId);
+    }
+  }, [oauthStatus?.clientId]);
+
+  // Load backend data on mount
+  useEffect(() => {
+    fetchShopConfig();
+    fetchWhatsappEngine();
+    fetchWhatsappStatus();
+    fetchMetaConfig();
+    fetchSystemStatus();
+
+    // Poll status periodically
+    const interval = setInterval(fetchWhatsappStatus, 12000);
+    const sysInterval = setInterval(fetchSystemStatus, 30000);
+    return () => {
+      clearInterval(interval);
+      clearInterval(sysInterval);
+    };
+  }, []);
+
+  // Fetch QR Code automatically when in Docker mode and not authenticated
+  useEffect(() => {
+    if (activeTab === 1 && senderMode === 'DOCKER' && !whatsappStatus.authenticated) {
+      fetchWhatsappQr();
+    }
+  }, [activeTab, senderMode, whatsappStatus.authenticated]);
+
+  const fetchShopConfig = async () => {
+    try {
+      setLoadingConfig(true);
+      const response = await apiClient.get('/ai-chat/shop-config');
+      if (response.data.success && response.data.config) {
+        setShopConfig(prev => ({
+          ...prev,
+          ...response.data.config,
+          defaultQuotationTerms: response.data.config.defaultQuotationTerms?.length > 0 
+            ? response.data.config.defaultQuotationTerms 
+            : prev.defaultQuotationTerms
+        }));
+      }
+    } catch (error) {
+      console.error('Failed to load shop config:', error);
+    } finally {
+      setLoadingConfig(false);
+    }
+  };
+
+  const fetchWhatsappEngine = async () => {
+    try {
+      const response = await apiClient.get('/shop-config/whatsapp-engine');
+      if (response.data.success) {
+        const mode = (response.data.whatsappSenderMode || 'DOCKER').toUpperCase();
+        setSenderMode(mode);
+        if (response.data.dockerThrottleSeconds) {
+          setDockerThrottle(response.data.dockerThrottleSeconds);
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to load WhatsApp engine mode:', error);
+    }
+  };
+
+  const handleSaveDockerThrottle = async () => {
+    try {
+      setSavingEngine(true);
+      await apiClient.post('/shop-config/whatsapp-engine', {
+        whatsappSenderMode: senderMode,
+        dockerThrottleSeconds: Number(dockerThrottle) || 6
+      });
+      setSnackbar({ open: true, message: 'Throttle delay saved successfully!', severity: 'success' });
+    } catch (error) {
+      setSnackbar({ open: true, message: 'Failed to save throttle delay.', severity: 'error' });
+    } finally {
+      setSavingEngine(false);
+    }
+  };
 
   const fetchSystemStatus = async () => {
     try {
@@ -236,7 +241,8 @@ export default function Settings() {
       setSavingConfig(true);
       const response = await apiClient.post('/shop-config/meta-config', metaConfig);
       if (response.data.success) {
-        setSnackbar({ open: true, message: 'Meta API configuration saved successfully!', severity: 'success' });
+        setSnackbar({ open: true, message: 'Meta Cloud API configuration saved successfully!', severity: 'success' });
+        fetchWhatsappStatus();
       }
     } catch (error) {
       console.error('Failed to save Meta config:', error);
@@ -252,8 +258,9 @@ export default function Settings() {
       setMetaTestResult(null);
       const response = await apiClient.post('/shop-config/meta-test');
       if (response.data.success) {
-        setMetaTestResult({ success: true, message: 'Meta API connection successful!' });
-        setSnackbar({ open: true, message: 'Meta API connection successful!', severity: 'success' });
+        const verifiedName = response.data?.data?.verified_name ? ` (${response.data.data.verified_name})` : '';
+        setMetaTestResult({ success: true, message: `Meta API connection verified successfully!${verifiedName}` });
+        setSnackbar({ open: true, message: 'Meta API connection verified successfully!', severity: 'success' });
       } else {
         setMetaTestResult({ success: false, message: response.data.error || 'Connection failed' });
         setSnackbar({ open: true, message: response.data.error || 'Connection failed', severity: 'error' });
@@ -267,146 +274,91 @@ export default function Settings() {
     }
   };
 
-  // OAuth 2.0 State
-  const { oauthEnforced, oauthStatus, refreshScreens } = useTenant();
-  const [tenantClientId, setTenantClientId] = useState('');
-  const [tenantClientSecret, setTenantClientSecret] = useState('');
-  const [verifyingOauth, setVerifyingOauth] = useState(false);
-  const [savingOauth, setSavingOauth] = useState(false);
-
-  useEffect(() => {
-    if (oauthStatus?.clientId) {
-      setTenantClientId(oauthStatus.clientId);
-    }
-  }, [oauthStatus?.clientId]);
-
   const handleVerifyOauth = async () => {
     if (!tenantClientId.trim() || !tenantClientSecret.trim()) {
-      setSnackbar({ open: true, message: 'Please enter both Client ID and Client Secret.', severity: 'warning' });
+      setOauthAlertBox({
+        open: true,
+        title: 'Missing OAuth Credentials',
+        message: 'Please provide both the Client ID and Client Secret generated in Renic Soft Master HQ to verify connection.',
+        severity: 'warning'
+      });
+      setSnackbar({
+        open: true,
+        message: 'Please enter both Client ID and Client Secret.',
+        severity: 'warning',
+        anchorOrigin: { vertical: 'center', horizontal: 'center' }
+      });
       return;
     }
-    setVerifyingOauth(true);
     try {
-      const res = await apiClient.post('/settings/verify-oauth', {
+      setVerifyingOauth(true);
+      const response = await apiClient.post('/settings/verify-oauth', {
         clientId: tenantClientId.trim(),
         clientSecret: tenantClientSecret.trim()
       });
-      if (res.data?.success) {
-        setSnackbar({ open: true, message: 'OAuth 2.0 Credentials verified successfully with Renic Soft Master!', severity: 'success' });
-        if (refreshScreens) refreshScreens();
-      } else {
-        setSnackbar({ open: true, message: res.data?.error || 'Verification failed', severity: 'error' });
+      if (response.data?.success) {
+        setSnackbar({
+          open: true,
+          message: '🎉 ' + (response.data.message || 'OAuth 2.0 Credentials successfully verified!'),
+          severity: 'success',
+          anchorOrigin: { vertical: 'top', horizontal: 'center' }
+        });
+        if (typeof refreshScreens === 'function') refreshScreens();
       }
     } catch (err) {
-      const msg = err.response?.data?.error || err.message || 'Verification failed';
-      setSnackbar({ open: true, message: msg, severity: 'error' });
+      const errMsg = err.response?.data?.error || err.response?.data?.message || err.message || 'Verification failed';
+      setSnackbar({
+        open: true,
+        message: '❌ ' + errMsg,
+        severity: 'error',
+        anchorOrigin: { vertical: 'center', horizontal: 'center' }
+      });
+      setOauthAlertBox({
+        open: true,
+        title: 'Authentication Rejected: Invalid Client Credentials',
+        message: errMsg.toLowerCase().includes('client id not found')
+          ? `The Client ID "${tenantClientId.trim()}" does not exist in Renic Soft Master HQ. A security notification has been dispatched to the platform administrator.`
+          : `The Client Secret entered for "${tenantClientId.trim()}" is incorrect. Access is denied, and a security alert was dispatched to Renic Soft Master HQ.`,
+        severity: 'error'
+      });
     } finally {
       setVerifyingOauth(false);
     }
   };
 
   const handleSaveOauthCredentials = async () => {
-    setSavingOauth(true);
     try {
-      const res = await apiClient.post('/settings/oauth-credentials', {
+      setSavingOauth(true);
+      const response = await apiClient.post('/settings/oauth-credentials', {
         clientId: tenantClientId.trim(),
         clientSecret: tenantClientSecret.trim()
       });
-      if (res.data?.success) {
-        setSnackbar({ open: true, message: 'OAuth Credentials saved successfully.', severity: 'success' });
-        if (refreshScreens) refreshScreens();
-      } else {
-        setSnackbar({ open: true, message: res.data?.error || 'Failed to save', severity: 'error' });
+      if (response.data?.success) {
+        setSnackbar({ open: true, message: 'OAuth credentials saved successfully.', severity: 'success' });
+        if (typeof refreshScreens === 'function') refreshScreens();
       }
     } catch (err) {
-      setSnackbar({ open: true, message: err.message || 'Failed to save', severity: 'error' });
+      const errMsg = err.response?.data?.error || err.message || 'Failed to save credentials';
+      setSnackbar({ open: true, message: errMsg, severity: 'error' });
     } finally {
       setSavingOauth(false);
     }
   };
 
-  const [oauthData, setOauthData] = useState({
-    clientId: '',
-    scopes: [],
-    lastUsedAt: null
-  });
-  const [newSecretGenerated, setNewSecretGenerated] = useState('');
-  const [generatingSecret, setGeneratingSecret] = useState(false);
-
-  const fetchOAuthCredentials = async () => {
+  const fetchWhatsappStatus = async () => {
     try {
-      const res = await apiClient.get('/v1/oauth/credentials');
-      if (res.data?.success) {
-        setOauthData({
-          clientId: res.data.clientId,
-          scopes: res.data.scopes || [],
-          lastUsedAt: res.data.lastUsedAt
-        });
-        if (res.data.clientSecret) {
-          setNewSecretGenerated(res.data.clientSecret);
+      const response = await apiClient.get('/ai-chat/whatsapp/waha-status');
+      setWhatsappStatus(response.data);
+      if (response.data.success && !response.data.authenticated) {
+        if (!whatsappQrRef.current) {
+          fetchWhatsappQr();
         }
+      } else if (response.data.success && response.data.authenticated) {
+        whatsappQrRef.current = '';
+        setWhatsappQr('');
       }
-    } catch (err) {
-      console.warn('OAuth credentials fetch warning:', err);
-    }
-  };
-
-  // OAuth credentials are centrally managed by Renic Soft Master HQ (SAP DM Governance)
-
-  const [knowledgeDocs, setKnowledgeDocs] = useState([]);
-  const [loadingDocs, setLoadingDocs] = useState(false);
-  const [uploadingDoc, setUploadingDoc] = useState(false);
-
-  const fetchKnowledgeDocs = async () => {
-    try {
-      setLoadingDocs(true);
-      const response = await apiClient.get('/knowledge-documents');
-      setKnowledgeDocs(response.data || []);
     } catch (error) {
-      console.error('Failed to load knowledge documents:', error);
-      setSnackbar({ open: true, message: 'Could not load knowledge documents.', severity: 'error' });
-    } finally {
-      setLoadingDocs(false);
-    }
-  };
-
-  const handleUploadDoc = async (file) => {
-    if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      setSnackbar({ open: true, message: 'File is too large. Maximum size is 5MB.', severity: 'warning' });
-      return;
-    }
-    const fileExt = file.name.split('.').pop().toLowerCase();
-    if (!['txt', 'pdf', 'csv'].includes(fileExt)) {
-      setSnackbar({ open: true, message: 'Unsupported file type. Please upload .txt, .pdf, or .csv.', severity: 'warning' });
-      return;
-    }
-    try {
-      setUploadingDoc(true);
-      const formData = new FormData();
-      formData.append('file', file);
-      const response = await apiClient.post('/knowledge-documents/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-      setKnowledgeDocs(prev => [response.data, ...prev]);
-      setSnackbar({ open: true, message: `${file.name} uploaded and ingested successfully!`, severity: 'success' });
-    } catch (error) {
-      console.error('Failed to upload document:', error);
-      const errorMsg = error.response?.data?.error || 'Failed to upload document.';
-      setSnackbar({ open: true, message: errorMsg, severity: 'error' });
-    } finally {
-      setUploadingDoc(false);
-    }
-  };
-
-  const handleDeleteDoc = async (docId) => {
-    try {
-      await apiClient.delete(`/knowledge-documents/${docId}`);
-      setKnowledgeDocs(prev => prev.filter(d => d._id !== docId));
-      setSnackbar({ open: true, message: 'Knowledge document deleted successfully.', severity: 'success' });
-    } catch (error) {
-      console.error('Failed to delete document:', error);
-      setSnackbar({ open: true, message: 'Failed to delete knowledge document.', severity: 'error' });
+      console.error('Failed to fetch WhatsApp status:', error);
     }
   };
 
@@ -415,21 +367,19 @@ export default function Settings() {
       setLoadingQr(true);
       setQrError('');
       const response = await apiClient.get('/ai-chat/whatsapp/qr');
-      if (response.data.success && response.data.qrCode) {
-        whatsappQrRef.current = response.data.qrCode;
-        setWhatsappQr(response.data.qrCode);
-      } else if (response.data.status === 'STARTING' || response.data.status === 'STOPPING') {
-        setQrError(response.data.error || 'WhatsApp session is starting up, please wait a few seconds...');
-        if (qrRetryTimer.current) clearTimeout(qrRetryTimer.current);
-        qrRetryTimer.current = setTimeout(() => {
-          if (!whatsappStatus.authenticated) fetchWhatsappQr();
-        }, response.data.retryAfter || 8000);
+      // WAHAService.getQRCode() returns `qrCode`; older callers looked for
+      // `qr`. Reading only `.qr` made this branch always fail and surface the
+      // generic "Failed to load QR code." even when WAHA handed back a valid
+      // image. Accept either key.
+      const qr = response.data.qr || response.data.qrCode;
+      if (response.data.success && qr) {
+        whatsappQrRef.current = qr;
+        setWhatsappQr(qr);
       } else {
         setQrError(response.data.error || 'Failed to load QR code.');
       }
     } catch (error) {
-      console.error('Failed to fetch WhatsApp QR:', error);
-      setQrError('Failed to reach the WhatsApp service. Make sure the Docker (WAHA) container is running.');
+      setQrError('Failed to reach the WhatsApp service. Make sure the Docker (WAHA) container is running on localhost:3000.');
     } finally {
       setLoadingQr(false);
     }
@@ -449,46 +399,12 @@ export default function Settings() {
           fetchWhatsappQr();
         }, 6000);
       } else {
-        setSnackbar({ open: true, message: response.data.error || 'Failed to restart WhatsApp session.', severity: 'error' });
+        setSnackbar({ open: true, message: response.data.error || 'Failed to restart session.', severity: 'error' });
       }
     } catch (error) {
-      console.error('Failed to restart WhatsApp session:', error);
       setSnackbar({ open: true, message: 'Failed to restart WhatsApp session.', severity: 'error' });
     } finally {
       setRestartingSession(false);
-    }
-  };
-
-  const fetchWhatsappStatus = async () => {
-    try {
-      const response = await apiClient.get('/ai-chat/whatsapp/waha-status');
-      setWhatsappStatus(response.data);
-      if (response.data.success && !response.data.authenticated) {
-        // Only fetch a fresh QR if we don't already have one displayed.
-        // WAHA regenerates the QR on every /auth/qr call, so re-fetching while
-        // polling would invalidate the code the user is trying to scan.
-        if (!whatsappQrRef.current) {
-          fetchWhatsappQr();
-        }
-      } else if (response.data.success && response.data.authenticated) {
-        whatsappQrRef.current = '';
-        setWhatsappQr('');
-      }
-    } catch (error) {
-      console.error('Failed to fetch WhatsApp status:', error);
-    }
-  };
-
-  const fetchInstagramStatus = async () => {
-    try {
-      setLoadingInstagram(true);
-      const response = await apiClient.get('/ai-chat/instagram/status');
-      setInstagramStatus(response.data);
-    } catch (error) {
-      console.error('Failed to fetch Instagram status:', error);
-      setInstagramStatus({ success: false, error: 'Failed to fetch status' });
-    } finally {
-      setLoadingInstagram(false);
     }
   };
 
@@ -496,25 +412,18 @@ export default function Settings() {
     try {
       setLoadingWhatsapp(true);
       await apiClient.post('/ai-chat/whatsapp/logout');
-      setSnackbar({ open: true, message: 'Logged out from WhatsApp successfully.', severity: 'info' });
+      setSnackbar({ open: true, message: 'Disconnected WhatsApp session.', severity: 'info' });
       fetchWhatsappStatus();
     } catch (error) {
-      console.error('Failed to logout WhatsApp:', error);
-      setSnackbar({ open: true, message: 'Failed to disconnect WhatsApp session.', severity: 'error' });
+      setSnackbar({ open: true, message: 'Failed to disconnect session.', severity: 'error' });
     } finally {
       setLoadingWhatsapp(false);
     }
   };
 
-  // WhatsApp Pairing Code Flow State
-  const [pairingPhone, setPairingPhone] = useState('');
-  const [pairingCode, setPairingCode] = useState('');
-  const [requestingCode, setRequestingCode] = useState(false);
-  const [showPairingForm, setShowPairingForm] = useState(false);
-
   const handleRequestPairingCode = async () => {
     if (!pairingPhone.trim()) {
-      setSnackbar({ open: true, message: 'Please enter a valid phone number.', severity: 'warning' });
+      setSnackbar({ open: true, message: 'Please enter a valid phone number with country code.', severity: 'warning' });
       return;
     }
     try {
@@ -530,1539 +439,1006 @@ export default function Settings() {
         setSnackbar({ open: true, message: response.data.error || 'Failed to request pairing code', severity: 'error' });
       }
     } catch (error) {
-      console.error('Failed to request pairing code:', error);
-      setSnackbar({ open: true, message: 'Failed to generate pairing code. Make sure WAHA container is running.', severity: 'error' });
+      setSnackbar({ open: true, message: 'Failed to generate pairing code. Make sure Docker container is running.', severity: 'error' });
     } finally {
       setRequestingCode(false);
     }
   };
 
-  // Load backend data
-  useEffect(() => {
-    fetchShopConfig();
-    fetchCatalog();
-    fetchWhatsappStatus();
-    fetchInstagramStatus();
-    fetchKnowledgeDocs();
-    fetchMetaConfig();
-    fetchSystemStatus();
-    // Poll WhatsApp status every 12 seconds
-    const interval = setInterval(fetchWhatsappStatus, 12000);
-    // Poll System status every 30 seconds
-    const sysInterval = setInterval(fetchSystemStatus, 30000);
-    return () => {
-      clearInterval(interval);
-      clearInterval(sysInterval);
-    };
-  }, []);
-
-  // Fetch QR Code automatically when switching to the WhatsApp tab
-  useEffect(() => {
-    if (activeTab === 2 && !whatsappStatus.authenticated) {
-      fetchWhatsappQr();
-    }
-  }, [activeTab, whatsappStatus.authenticated]);
-
-  // Scroll chat sandbox
-  useEffect(() => {
-    if (chatEndRef.current) {
-      chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [sandboxMessages]);
-
-  const fetchShopConfig = async () => {
-    try {
-      setLoadingConfig(true);
-      const response = await apiClient.get('/ai-chat/shop-config');
-      if (response.data.success && response.data.config) {
-        setShopConfig(response.data.config);
-        const config = response.data.config || {};
-        setIntegrations(prev => ({
-          ...prev,
-          geminiKey: config.geminiApiKey ?? prev.geminiKey,
-          useAnthropic: config.useAnthropic ?? prev.useAnthropic,
-          anthropicApiKey: config.anthropicApiKey ?? prev.anthropicApiKey,
-          anthropicModel: config.anthropicModel ?? prev.anthropicModel,
-          geminiModel: config.geminiModel ?? prev.geminiModel
-        }));
-      }
-    } catch (error) {
-      console.error('Failed to load shop config:', error);
-      setSnackbar({ open: true, message: 'Could not load knowledge base settings.', severity: 'error' });
-    } finally {
-      setLoadingConfig(false);
-    }
-  };
-
-  const fetchCatalog = async () => {
-    try {
-      setLoadingCatalog(true);
-      const response = await apiClient.get('/ai-chat/catalog');
-      if (response.data.success) {
-        setCatalogItems(response.data.items || []);
-      }
-    } catch (error) {
-      console.error('Failed to load catalog items:', error);
-      setSnackbar({ open: true, message: 'Could not load catalog database.', severity: 'error' });
-    } finally {
-      setLoadingCatalog(false);
-    }
-  };
-
-  // Save integrations to localStorage
-  const handleSaveIntegrations = async () => {
-    localStorage.setItem('renic_settings', JSON.stringify(integrations));
-    try {
-      setSavingConfig(true);
-      const response = await apiClient.put('/ai-chat/shop-config', {
-        geminiApiKey: integrations.geminiKey,
-        useAnthropic: integrations.useAnthropic,
-        anthropicApiKey: integrations.anthropicApiKey,
-        anthropicModel: integrations.anthropicModel,
-        geminiModel: integrations.geminiModel
-      });
-      if (response.data.success) {
-        setShopConfig(response.data.config);
-        setSnackbar({ open: true, message: 'Integration settings saved and synced to database!', severity: 'success' });
-      }
-    } catch (err) {
-      console.error('Failed to sync settings to database:', err);
-      setSnackbar({ open: true, message: 'Settings saved locally, but database sync failed.', severity: 'warning' });
-    } finally {
-      setSavingConfig(false);
-    }
-  };
-
-  // Save shop config to MongoDB
-  const handleSaveShopConfig = async (updatedConfig = shopConfig) => {
-    try {
-      setSavingConfig(true);
-      const response = await apiClient.put('/ai-chat/shop-config', updatedConfig);
-      if (response.data.success) {
-        setShopConfig(response.data.config);
-        setSnackbar({ open: true, message: 'Knowledge base updated successfully!', severity: 'success' });
-      }
-    } catch (error) {
-      console.error('Failed to save config:', error);
-      setSnackbar({ open: true, message: 'Failed to update knowledge base.', severity: 'error' });
-    } finally {
-      setSavingConfig(false);
-    }
-  };
-
-  // Manage FAQs
-  const handleAddFaq = () => {
-    if (!newFaq.question.trim() || !newFaq.answer.trim()) {
-      setSnackbar({ open: true, message: 'Please provide both a question and answer.', severity: 'warning' });
-      return;
-    }
-    const updatedFaqs = [...shopConfig.faqs, { ...newFaq }];
-    const updatedConfig = { ...shopConfig, faqs: updatedFaqs };
-    setShopConfig(updatedConfig);
-    handleSaveShopConfig(updatedConfig);
-    setNewFaq({ question: '', answer: '' });
-  };
-
-  const handleDeleteFaq = (index) => {
-    const updatedFaqs = shopConfig.faqs.filter((_, i) => i !== index);
-    const updatedConfig = { ...shopConfig, faqs: updatedFaqs };
-    setShopConfig(updatedConfig);
-    handleSaveShopConfig(updatedConfig);
-  };
-
-  // Handle integration changes
-  const handleIntegrationChange = (field, value) => {
-    setIntegrations(prev => ({ ...prev, [field]: value }));
-  };
-
-  // Handle shopConfig changes
   const handleConfigChange = (field, value) => {
     setShopConfig(prev => ({ ...prev, [field]: value }));
   };
 
-  // Handle Catalog Form file upload
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setNewCatalog(prev => ({
-        ...prev,
-        imageFile: file,
-        imagePreview: URL.createObjectURL(file)
-      }));
-    }
+  const handleAddTerm = () => {
+    if (!newTermInput.trim()) return;
+    setShopConfig(prev => ({
+      ...prev,
+      defaultQuotationTerms: [...(prev.defaultQuotationTerms || []), newTermInput.trim()]
+    }));
+    setNewTermInput('');
   };
 
-  // Add Catalog Item
-  const handleAddCatalogItem = async (e) => {
-    e.preventDefault();
-    if (!newCatalog.name.trim() || !newCatalog.price || !newCatalog.imageFile) {
-      setSnackbar({ open: true, message: 'Name, price, and product image are required.', severity: 'warning' });
-      return;
-    }
+  const handleUpdateTerm = (index, value) => {
+    const updated = [...(shopConfig.defaultQuotationTerms || [])];
+    updated[index] = value;
+    setShopConfig(prev => ({ ...prev, defaultQuotationTerms: updated }));
+  };
 
+  const handleRemoveTerm = (index) => {
+    setShopConfig(prev => ({
+      ...prev,
+      defaultQuotationTerms: (prev.defaultQuotationTerms || []).filter((_, i) => i !== index)
+    }));
+  };
+
+  const handleSaveShopConfig = async () => {
     try {
-      setSavingCatalog(true);
-      const formData = new FormData();
-      formData.append('name', newCatalog.name);
-      formData.append('category', newCatalog.category);
-      formData.append('price', newCatalog.price);
-      formData.append('description', newCatalog.description);
-      formData.append('keywords', newCatalog.keywords);
-      formData.append('image', newCatalog.imageFile);
-
-      const response = await apiClient.post('/ai-chat/catalog', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-
+      setSavingConfig(true);
+      const response = await apiClient.put('/ai-chat/shop-config', shopConfig);
       if (response.data.success) {
-        setCatalogItems(prev => [response.data.item, ...prev]);
-        setNewCatalog({
-          name: '',
-          category: 'Rings',
-          price: '',
-          description: '',
-          keywords: '',
-          imageFile: null,
-          imagePreview: ''
-        });
-        if (fileInputRef.current) fileInputRef.current.value = '';
-        setSnackbar({ open: true, message: 'Product added to jewelry catalog!', severity: 'success' });
+        setShopConfig(response.data.config);
+        setSnackbar({ open: true, message: 'Store details and branding settings saved successfully!', severity: 'success' });
       }
     } catch (error) {
-      console.error('Failed to create catalog item:', error);
-      setSnackbar({ open: true, message: 'Failed to upload catalog item.', severity: 'error' });
+      console.error('Failed to save store settings:', error);
+      setSnackbar({ open: true, message: 'Failed to save store settings.', severity: 'error' });
     } finally {
-      setSavingCatalog(false);
+      setSavingConfig(false);
     }
   };
 
-  // Delete Catalog Item
-  const handleDeleteCatalog = async (id) => {
-    try {
-      const response = await apiClient.delete(`/ai-chat/catalog/${id}`);
-      if (response.data.success) {
-        setCatalogItems(prev => prev.filter(item => item._id !== id));
-        setSnackbar({ open: true, message: 'Product removed from catalog.', severity: 'success' });
-      }
-    } catch (error) {
-      console.error('Failed to delete catalog item:', error);
-      setSnackbar({ open: true, message: 'Failed to delete catalog item.', severity: 'error' });
-    }
-  };
-
-  // Send message in sandbox
-  const handleSendSandbox = async (presetInput = null) => {
-    const payload = typeof presetInput === 'object' && presetInput !== null
-      ? presetInput
-      : { text: presetInput || sandboxInput };
-    const textToSend = (payload.text || '').trim();
-    if (!textToSend) return;
-
-    // Add user message
-    const userMsg = {
-      sender: 'customer',
-      text: textToSend,
-      timestamp: new Date()
-    };
-    setSandboxMessages(prev => [...prev, userMsg]);
-    if (!presetInput) setSandboxInput('');
-
-    try {
-      setSandboxSending(true);
-      const response = await apiClient.post('/ai-chat/test-ai-response', {
-        message: textToSend,
-        widgetData: payload.widgetData || null
-      });
-      if (response.data.success) {
-        const aiMsg = {
-          sender: 'ai',
-          text: response.data.aiResponse,
-          timestamp: new Date(),
-          mediaUrl: response.data.mediaUrl,
-          buttons: response.data.buttons || [],
-          list: response.data.list || null,
-          isCatalogPrompt: response.data.isCatalogPrompt,
-          catalogMatches: response.data.catalogMatches || [],
-          nameUpdated: response.data.nameUpdated,
-          newName: response.data.newName
-        };
-        setSandboxMessages(prev => [...prev, aiMsg]);
-        if (response.data.nameUpdated && response.data.newName) {
-          setSandboxName(response.data.newName);
-        }
-      }
-    } catch (error) {
-      console.error('Sandbox error:', error);
-      setSandboxMessages(prev => [...prev, {
-        sender: 'ai',
-        text: '⚠️ error calling AI service. Check your API key and retry limit.',
-        timestamp: new Date(),
-        error: true
-      }]);
-    } finally {
-      setSandboxSending(false);
-    }
-  };
-
-  // Format response for WhatsApp bold style (*word* -> bold)
-  const formatAIResponse = (text) => {
-    if (!text) return '';
-    return text.split(/\*([^*]+)\*/g).map((part, index) => {
-      return index % 2 === 1 ? <strong key={index} style={{ fontWeight: 700 }}>{part}</strong> : part;
-    });
-  };
-
-  const getImageUrl = (url) => {
-    if (!url) return '';
-    if (url.startsWith('http')) return url;
-    return `${API_ORIGIN}${url}`;
-  };
-
-  const formatActionTypeLabel = (actionType, fallback = 'Quick Reply') => {
-    const normalized = String(actionType || '').trim();
-    if (!normalized) return fallback;
-    return normalized.replace(/_/g, ' ');
-  };
-
-  const renderSandboxInteractive = (msg) => {
-    const buttons = Array.isArray(msg.buttons) ? msg.buttons : [];
-    const list = msg.list || null;
-
-    if (buttons.length === 0 && !list) return null;
-
-    return (
-      <Box sx={{ mt: 1.25, display: 'flex', flexDirection: 'column', gap: 1 }}>
-        {buttons.length > 0 && (
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-            {buttons.map((btn, idx) => (
-              <Button
-                key={idx}
-                size="small"
-                variant="outlined"
-                onClick={() => {
-                  const actionValue = btn.value || btn.actionValue || btn.label;
-                  const actionType = String(btn.actionType || btn.type || 'QUICK_REPLY').toUpperCase();
-                  if (actionType === 'URL' && actionValue) {
-                    window.open(actionValue, '_blank', 'noopener,noreferrer');
-                    return;
-                  }
-                  if (actionType === 'CATALOG') {
-                    if (actionValue && /^https?:\/\//i.test(actionValue)) {
-                      window.open(actionValue, '_blank', 'noopener,noreferrer');
-                    } else {
-                      navigate('/catalog');
-                    }
-                    return;
-                  }
-                  handleSendSandbox({
-                    text: btn.label,
-                    value: actionValue,
-                        widgetData: {
-                          interactiveReply: {
-                            id: actionValue,
-                            actionValue,
-                            actionType,
-                            triggerText: btn.label,
-                            text: btn.label
-                          }
-                        }
-                      });
-                }}
-                sx={{ textTransform: 'none', borderRadius: 4, bgcolor: '#ffffff', py: 0.5, px: 1.5, fontSize: '0.75rem', fontWeight: 600, border: '1px solid #e8eef7', color: 'primary.main', '&:hover': { bgcolor: 'primary.light', color: 'primary.contrastText' } }}
-              >
-                {btn.label}
-                <Typography variant="caption" sx={{ display: 'block', fontWeight: 700, color: 'primary.main' }}>
-                  {formatActionTypeLabel(btn.actionType || btn.type, 'Quick Reply')}
-                </Typography>
-              </Button>
-            ))}
-          </Box>
-        )}
-
-        {list && (
-          <Box sx={{ border: '1px solid #e8eef7', borderRadius: 3, bgcolor: '#ffffff', p: 1.5 }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
-              {list.title || 'Options'}
-            </Typography>
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-              {list.buttonText || 'Select'}
-            </Typography>
-            <Stack spacing={1}>
-              {(list.sections || []).map((section, sectionIdx) => (
-                <Box key={sectionIdx}>
-                  {section.title && (
-                    <Typography variant="caption" sx={{ fontWeight: 700, textTransform: 'uppercase', color: 'text.secondary' }}>
-                      {section.title}
-                    </Typography>
-                  )}
-                  <Stack spacing={1} sx={{ mt: 0.5 }}>
-                    {(section.rows || []).map((row, rowIdx) => (
-                      <Button
-                        key={rowIdx}
-                        size="small"
-                        variant="outlined"
-                        onClick={() => {
-                          const actionValue = row.actionValue || row.id || row.title;
-                          const actionType = String(row.actionType || 'CUSTOM').toUpperCase();
-                          if (actionType === 'URL' && actionValue) {
-                            window.open(actionValue, '_blank', 'noopener,noreferrer');
-                            return;
-                          }
-                          if (actionType === 'CATALOG') {
-                            if (actionValue && /^https?:\/\//i.test(actionValue)) {
-                              window.open(actionValue, '_blank', 'noopener,noreferrer');
-                            } else {
-                              navigate('/catalog');
-                            }
-                            return;
-                          }
-                          handleSendSandbox({
-                            text: row.title,
-                            value: actionValue,
-                            widgetData: {
-                              interactiveReply: {
-                                id: row.rowId || row.id || row.title,
-                                actionValue,
-                                actionType,
-                                triggerText: row.title,
-                                text: row.title
-                              }
-                            }
-                          });
-                        }}
-                        sx={{ justifyContent: 'flex-start', textTransform: 'none', borderRadius: 3, bgcolor: '#ffffff', py: 0.7, px: 1.2, fontSize: '0.75rem', fontWeight: 600, border: '1px solid #e8eef7', color: 'text.primary' }}
-                      >
-                        <Box sx={{ textAlign: 'left' }}>
-                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                            {row.title}
-                          </Typography>
-                          <Typography variant="caption" color="primary.main" sx={{ display: 'block', fontWeight: 700 }}>
-                            {formatActionTypeLabel(row.actionType, 'Custom')}
-                          </Typography>
-                          {row.description && (
-                            <Typography variant="caption" color="text.secondary">
-                              {row.description}
-                            </Typography>
-                          )}
-                        </Box>
-                      </Button>
-                    ))}
-                  </Stack>
-                </Box>
-              ))}
-            </Stack>
-          </Box>
-        )}
-      </Box>
-    );
-  };
-
+  // SCROLL CONTAINER. Every ancestor in DashboardLayout (main -> content Box
+  // -> page wrapper) is `overflow: hidden`, so without `overflowY: 'auto'` on
+  // this root the page was clipped at the fold and no scrollbar could ever
+  // form — which is why Settings could not be scrolled. `minHeight: 0` lets a
+  // flex child shrink below its content size; without it min-height:auto keeps
+  // the box at content height and it overflows again.
   return (
-    <Box sx={{ width: '100%', flexGrow: 1, display: 'flex', flexDirection: 'column', gap: 3.5 }}>
+    <Box sx={{ width: '100%', flexGrow: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 1.5, pb: 1 }}>
+      {/* OAuth 2.0 Activation Required Alert Banner */}
+      {isOauthLocked && (
+        <Alert
+          severity="warning"
+          variant="filled"
+          icon={<KeyIcon sx={{ fontSize: 18 }} />}
+          action={
+            <Button color="inherit" size="small" onClick={() => setActiveTab(2)} sx={{ fontWeight: 800, textTransform: 'none', fontSize: '0.75rem', bgcolor: 'rgba(255,255,255,0.2)', '&:hover': { bgcolor: 'rgba(255,255,255,0.3)' } }}>
+              Activate Now (Tab 3)
+            </Button>
+          }
+          sx={{
+            py: 0.5,
+            px: 1.5,
+            borderRadius: '8px',
+            bgcolor: '#d97706',
+            color: '#ffffff',
+            fontWeight: 700,
+            fontSize: '0.82rem',
+            boxShadow: '0 2px 8px rgba(217, 119, 6, 0.2)'
+          }}
+        >
+          🔒 <strong>OAuth 2.0 Activation Required</strong> — Please verify Client ID &amp; Secret from Renic Soft Master HQ to unlock this workspace.
+        </Alert>
+      )}
+
       {/* Top Tabs */}
       <Paper 
         elevation={0} 
         sx={{ 
-          p: 0.8, 
+          p: 0.4, 
           bgcolor: '#f1f5f9', 
-          borderRadius: '14px', 
+          borderRadius: '8px', 
           border: '1px solid #e2e8f0' 
         }}
       >
         <Tabs
           value={activeTab}
-          onChange={(_, val) => {
-            setActiveTab(val);
-            if (val === 4) fetchOAuthCredentials();
-          }}
+          onChange={(_, val) => setActiveTab(val)}
           variant="fullWidth"
           sx={{
-            minHeight: 44,
+            minHeight: 36,
             '& .MuiTabs-indicator': {
               display: 'none'
             },
             '& .MuiTab-root': {
-              minHeight: 44,
+              minHeight: 36,
+              py: 0.5,
               fontWeight: 700,
-              fontSize: '0.85rem',
+              fontSize: '0.8rem',
               textTransform: 'none',
-              borderRadius: '10px',
+              borderRadius: '6px',
               color: '#64748b',
-              transition: 'all 0.2s ease',
-              gap: 1.2,
+              transition: 'all 0.18s ease',
+              gap: 1,
               '&.Mui-selected': {
-                color: '#3f6212',
-                bgcolor: '#ffffff',
-                boxShadow: '0 4px 6px -1px rgba(0,0,0,0.08), 0 2px 4px -1px rgba(0,0,0,0.03)',
-                border: '1px solid rgba(132, 204, 22, 0.4)'
+                color: '#0f172a',
+                bgcolor: '#84cc16',
+                boxShadow: '0 2px 6px rgba(132, 204, 22, 0.3)',
+                fontWeight: 800
               },
               '&:hover:not(.Mui-selected)': {
-                bgcolor: 'rgba(255,255,255,0.4)',
+                bgcolor: 'rgba(255,255,255,0.6)',
                 color: '#0f172a'
               }
             }
           }}
         >
-          <Tab icon={<StorefrontIcon sx={{ fontSize: 18 }} />} iconPosition="start" label="Store Details" />
-          <Tab icon={<SmartToyIcon sx={{ fontSize: 18 }} />} iconPosition="start" label="AI & Policies" />
-          <Tab icon={<ChatIcon sx={{ fontSize: 18 }} />} iconPosition="start" label="WhatsApp Login" />
-          <Tab icon={<CloudIcon sx={{ fontSize: 18 }} />} iconPosition="start" label="Meta API Config" />
-          <Tab icon={<KeyIcon sx={{ fontSize: 18 }} />} iconPosition="start" label="API & OAuth 2.0" />
+          <Tab icon={<StorefrontIcon sx={{ fontSize: 16 }} />} iconPosition="start" label="Store Details & Branding" />
+          <Tab icon={<ChatIcon sx={{ fontSize: 16 }} />} iconPosition="start" label="WhatsApp Engine & Connection" />
+          <Tab icon={<KeyIcon sx={{ fontSize: 16 }} />} iconPosition="start" label="API & OAuth 2.0" />
         </Tabs>
       </Paper>
 
       {/* Tab Panels */}
       {loadingConfig ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-          <CircularProgress sx={{ color: '#84cc16' }} />
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+          <CircularProgress size={32} sx={{ color: '#84cc16' }} />
         </Box>
       ) : (
-        <Box sx={{ width: '100%' }}>
-          {/* Tab 1: Store Details */}
+        <Box sx={{ width: '100%', flexGrow: 1 }}>
+          {/* Tab 0: Store Details & Branding */}
           {activeTab === 0 && (
-            <Grid container spacing={3.5} sx={{
+            <Grid container spacing={1.5} sx={{
               '@keyframes tabFadeIn': {
-                from: { opacity: 0, transform: 'translateY(6px)' },
+                from: { opacity: 0, transform: 'translateY(4px)' },
                 to: { opacity: 1, transform: 'translateY(0)' }
               },
-              animation: 'tabFadeIn 0.25s cubic-bezier(0.25, 0.8, 0.25, 1) forwards'
+              animation: 'tabFadeIn 0.2s ease forwards'
             }}>
-
               {/* Shop Details Configuration */}
               <Grid item xs={12} md={6}>
                 <Card 
                   elevation={0} 
                   sx={{ 
-                    borderRadius: '16px', 
+                    borderRadius: '8px', 
                     border: '1px solid #e2e8f0', 
-                    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)',
                     bgcolor: '#ffffff',
                     height: '100%'
                   }}
                 >
-                  <CardContent sx={{ p: 4 }}>
-                    <Stack direction="row" spacing={2} sx={{ alignItems: 'center', mb: 3 }}>
-                      <Box sx={{ width: 40, height: 40, borderRadius: '10px', bgcolor: 'rgba(132, 204, 22, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <StorefrontIcon sx={{ color: '#4d7c0f', fontSize: 20 }} />
+                  <CardContent sx={{ p: 2 }}>
+                    <Stack direction="row" spacing={1.2} sx={{ alignItems: 'center', mb: 1.5 }}>
+                      <Box sx={{ width: 32, height: 32, borderRadius: '6px', bgcolor: 'rgba(132, 204, 22, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <StorefrontIcon sx={{ color: '#4d7c0f', fontSize: 18 }} />
                       </Box>
                       <Box>
-                        <Typography variant="h6" sx={{ fontWeight: 800, color: '#1e293b' }}>
+                        <Typography sx={{ fontWeight: 800, color: '#0f172a', fontSize: '0.9rem' }}>
                           Store Information
                         </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          Core store details referenced by the AI to answer business and location inquiries
+                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+                          Core store details referenced by AI for customer inquiries
                         </Typography>
                       </Box>
                     </Stack>
 
-                    <Stack spacing={2.5}>
+                    <Stack spacing={1.2}>
                       <TextField
                         label="Store Name"
+                        size="small"
                         fullWidth
-                        value={shopConfig.shopName}
+                        value={shopConfig.shopName || ''}
                         onChange={(e) => handleConfigChange('shopName', e.target.value)}
-                        slotProps={{ input: { sx: { borderRadius: '12px' } } }}
+                        slotProps={{ input: { sx: { borderRadius: '6px', fontSize: '0.8rem' } } }}
                       />
                       <TextField
                         label="Store Address"
+                        size="small"
                         fullWidth
                         multiline
                         rows={2}
-                        value={shopConfig.address}
+                        value={shopConfig.address || ''}
                         onChange={(e) => handleConfigChange('address', e.target.value)}
-                        slotProps={{ input: { sx: { borderRadius: '12px' } } }}
+                        slotProps={{ input: { sx: { borderRadius: '6px', fontSize: '0.8rem' } } }}
                       />
-                      <TextField
-                        label="Jewelry Website URL (One URL)"
-                        fullWidth
-                        value={shopConfig.websiteUrl || ''}
-                        placeholder="e.g. https://kanalli.in/"
-                        onChange={(e) => handleConfigChange('websiteUrl', e.target.value)}
-                        slotProps={{ input: { sx: { borderRadius: '12px' } } }}
-                      />
-                      <TextField
-                        label="Catalog Cover Image URL (One URL Image)"
-                        fullWidth
-                        value={shopConfig.catalogImageUrl || ''}
-                        placeholder="e.g. https://kanalli.in/wp-content/uploads/...logo.png"
-                        onChange={(e) => handleConfigChange('catalogImageUrl', e.target.value)}
-                        helperText="Used to scrape logo/banner dynamically if left blank."
-                        slotProps={{ input: { sx: { borderRadius: '12px' } } }}
-                      />
-
-                      <Grid container spacing={2.5}>
+                      <Grid container spacing={1.2}>
                         <Grid item xs={6}>
                           <TextField
                             label="Contact Phone"
+                            size="small"
                             fullWidth
-                            value={shopConfig.contactPhone}
+                            value={shopConfig.contactPhone || ''}
                             onChange={(e) => handleConfigChange('contactPhone', e.target.value)}
-                            slotProps={{ input: { sx: { borderRadius: '12px' } } }}
+                            slotProps={{ input: { sx: { borderRadius: '6px', fontSize: '0.8rem' } } }}
                           />
                         </Grid>
                         <Grid item xs={6}>
                           <TextField
                             label="Operating Hours"
+                            size="small"
                             fullWidth
-                            value={shopConfig.operatingHours}
+                            value={shopConfig.operatingHours || ''}
                             onChange={(e) => handleConfigChange('operatingHours', e.target.value)}
-                            slotProps={{ input: { sx: { borderRadius: '12px' } } }}
+                            slotProps={{ input: { sx: { borderRadius: '6px', fontSize: '0.8rem' } } }}
                           />
                         </Grid>
                       </Grid>
-                    </Stack>
-                  </CardContent>
-                </Card>
-              </Grid>
-
-              {/* Save Button for Store & Rates */}
-              <Grid item xs={12}>
-                <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1 }}>
-                  <Button
-                    variant="contained"
-                    size="large"
-                    startIcon={<SaveIcon />}
-                    onClick={() => handleSaveShopConfig()}
-                    disabled={savingConfig}
-                    sx={{ 
-                      borderRadius: '12px', 
-                      fontWeight: 800, 
-                      px: 4, 
-                      py: 1.5, 
-                      textTransform: 'none',
-                      bgcolor: '#84cc16',
-                      color: '#0f172a',
-                      boxShadow: '0 4px 14px rgba(132, 204, 22, 0.35)',
-                      '&:hover': {
-                        bgcolor: '#65a30d',
-                        boxShadow: '0 6px 20px rgba(132, 204, 22, 0.45)'
-                      }
-                    }}
-                  >
-                    {savingConfig ? 'Saving Store Settings...' : 'Save Settings'}
-                  </Button>
-                </Box>
-              </Grid>
-            </Grid>
-          )}
-
-          {/* Tab 2: AI & Policies */}
-          {activeTab === 1 && (
-            <Grid container spacing={3.5} sx={{
-              '@keyframes tabFadeIn': {
-                from: { opacity: 0, transform: 'translateY(6px)' },
-                to: { opacity: 1, transform: 'translateY(0)' }
-              },
-              animation: 'tabFadeIn 0.25s cubic-bezier(0.25, 0.8, 0.25, 1) forwards'
-            }}>
-              {/* Policies & Instructions */}
-              <Grid item xs={12}>
-                <Card 
-                  elevation={0}
-                  sx={{ 
-                    borderRadius: '16px', 
-                    border: '1px solid #e2e8f0', 
-                    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)',
-                    bgcolor: '#ffffff'
-                  }}
-                >
-                  <CardContent sx={{ p: 4 }}>
-                    <Stack direction="row" spacing={2} sx={{ alignItems: 'center', mb: 3 }}>
-                      <Box sx={{ width: 40, height: 40, borderRadius: '10px', bgcolor: '#F0FDF4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <SmartToyIcon sx={{ color: '#16A34A', fontSize: 20 }} />
-                      </Box>
-                      <Box>
-                        <Typography variant="h6" sx={{ fontWeight: 800, color: '#1e293b' }}>
-                          Policies & Custom AI Behavior
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          Define purchase rules, return policies, and prompt behavior instructions for your AI agent
-                        </Typography>
-                      </Box>
-                    </Stack>
-
-                    <Stack spacing={3}>
                       <TextField
-                        label="Return & Buyback Policy"
+                        label="Website URL"
+                        size="small"
                         fullWidth
-                        multiline
-                        rows={3}
-                        value={shopConfig.returnPolicy}
-                        onChange={(e) => handleConfigChange('returnPolicy', e.target.value)}
-                        slotProps={{ input: { sx: { borderRadius: '12px' } } }}
+                        value={shopConfig.websiteUrl || ''}
+                        placeholder="e.g. https://www.renictechnology.com"
+                        onChange={(e) => handleConfigChange('websiteUrl', e.target.value)}
+                        slotProps={{ input: { sx: { borderRadius: '6px', fontSize: '0.8rem' } } }}
                       />
                       <TextField
-                        label="Custom AI Behavior Instructions"
+                        label="Catalog / Logo URL"
+                        size="small"
                         fullWidth
-                        multiline
-                        rows={4}
-                        value={shopConfig.aiCustomInstructions}
-                        onChange={(e) => handleConfigChange('aiCustomInstructions', e.target.value)}
-                        placeholder="e.g. Always offer custom metal/carat configurations. Address customers with respect. Suggest visiting the website for checkout."
-                        slotProps={{ input: { sx: { borderRadius: '12px' } } }}
-                        helperText="Provide specific guidelines on tone, language preference, and catalog presentation."
+                        value={shopConfig.catalogImageUrl || ''}
+                        placeholder="e.g. https://domain.com/logo.png"
+                        onChange={(e) => handleConfigChange('catalogImageUrl', e.target.value)}
+                        slotProps={{ input: { sx: { borderRadius: '6px', fontSize: '0.8rem' } } }}
                       />
                     </Stack>
                   </CardContent>
                 </Card>
               </Grid>
 
-              {/* FAQ Management */}
-              <Grid item xs={12}>
-                <Card 
-                  elevation={0}
-                  sx={{ 
-                    borderRadius: '16px', 
-                    border: '1px solid #e2e8f0', 
-                    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)',
-                    bgcolor: '#ffffff',
-                    mt: 1
-                  }}
-                >
-                  <CardContent sx={{ p: 4 }}>
-                    <Stack direction="row" spacing={2} sx={{ alignItems: 'center', mb: 3 }}>
-                      <Box sx={{ width: 40, height: 40, borderRadius: '10px', bgcolor: '#EEF2FF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <InfoIcon sx={{ color: '#4F46E5', fontSize: 20 }} />
-                      </Box>
-                      <Box>
-                        <Typography variant="h6" sx={{ fontWeight: 800, color: '#1e293b' }}>
-                          Frequently Asked Questions (FAQs)
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          Teach the AI specific answers to typical user inquiries (returns, delivery times, pricing, etc.)
-                        </Typography>
-                      </Box>
-                    </Stack>
-
-                    {/* FAQ List */}
-                    <Box sx={{ mb: 4 }}>
-                      {(!shopConfig.faqs || shopConfig.faqs.length === 0) ? (
-                        <Paper variant="outlined" sx={{ p: 3, textAlign: 'center', borderRadius: '12px', borderStyle: 'dashed', bgcolor: '#f8fafc', borderColor: '#e2e8f0' }}>
-                          <Typography variant="body2" color="text.secondary">
-                            No FAQs added yet. Use the fields below to add your first FAQ item.
-                          </Typography>
-                        </Paper>
-                      ) : (
-                        <Stack spacing={2}>
-                          {shopConfig.faqs.map((faq, index) => (
-                            <Paper 
-                              key={index} 
-                              variant="outlined" 
-                              sx={{ 
-                                p: 2.5, 
-                                borderRadius: '12px', 
-                                border: '1px solid #e2e8f0',
-                                position: 'relative',
-                                '&:hover': { bgcolor: '#f8fafc' }
-                              }}
-                            >
-                              <IconButton 
-                                size="small" 
-                                onClick={() => handleDeleteFaq(index)}
-                                sx={{ position: 'absolute', top: 12, right: 12, color: 'text.disabled', '&:hover': { color: 'error.main' } }}
-                              >
-                                <DeleteIcon fontSize="small" />
-                              </IconButton>
-                              <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#1e293b', pr: 4 }}>
-                                Q: {faq.question}
-                              </Typography>
-                              <Typography variant="body2" color="text.secondary" sx={{ mt: 1, pr: 4 }}>
-                                A: {faq.answer}
-                              </Typography>
-                            </Paper>
-                          ))}
-                        </Stack>
-                      )}
-                    </Box>
-
-                    <Divider sx={{ my: 3 }} />
-
-                    {/* Add New FAQ Form */}
-                    <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 2, color: '#334155' }}>
-                      Add a New FAQ Item
-                    </Typography>
-                    <Grid container spacing={2.5} sx={{ alignItems: 'flex-start' }}>
-                      <Grid item xs={12} sm={5}>
-                        <TextField
-                          label="Question"
-                          fullWidth
-                          value={newFaq.question}
-                          onChange={(e) => setNewFaq({ ...newFaq, question: e.target.value })}
-                          placeholder="e.g. Do you ship internationally?"
-                          slotProps={{ input: { sx: { borderRadius: '12px' } } }}
-                        />
-                      </Grid>
-                      <Grid item xs={12} sm={5}>
-                        <TextField
-                          label="Answer"
-                          fullWidth
-                          multiline
-                          maxRows={3}
-                          value={newFaq.answer}
-                          onChange={(e) => setNewFaq({ ...newFaq, answer: e.target.value })}
-                          placeholder="e.g. Yes, we ship worldwide. Shipping rates vary by country."
-                          slotProps={{ input: { sx: { borderRadius: '12px' } } }}
-                        />
-                      </Grid>
-                      <Grid item xs={12} sm={2}>
-                        <Button
-                          variant="outlined"
-                          fullWidth
-                          startIcon={<AddIcon />}
-                          onClick={handleAddFaq}
-                          sx={{ 
-                            borderRadius: '12px', 
-                            py: 1.8, 
-                            fontWeight: 700,
-                            textTransform: 'none',
-                            borderWidth: 1.5,
-                            '&:hover': { borderWidth: 1.5 }
-                          }}
-                        >
-                          Add Item
-                        </Button>
-                      </Grid>
-                    </Grid>
-                  </CardContent>
-                </Card>
-              </Grid>
-
-              {/* Save Button for AI & Policies */}
-              <Grid item xs={12}>
-                <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1 }}>
-                  <Button
-                    variant="contained"
-                    size="large"
-                    startIcon={<SaveIcon />}
-                    onClick={() => handleSaveShopConfig()}
-                    disabled={savingConfig}
-                    sx={{ 
-                      borderRadius: '12px', 
-                      fontWeight: 800, 
-                      px: 4, 
-                      py: 1.5, 
-                      textTransform: 'none',
-                      bgcolor: '#84cc16',
-                      color: '#0f172a',
-                      boxShadow: '0 4px 14px rgba(132, 204, 22, 0.35)',
-                      '&:hover': {
-                        bgcolor: '#65a30d',
-                        boxShadow: '0 6px 20px rgba(132, 204, 22, 0.45)'
-                      }
-                    }}
-                  >
-                    {savingConfig ? 'Saving AI Settings...' : 'Save Settings'}
-                  </Button>
-                </Box>
-              </Grid>
-            </Grid>
-          )}
-
-          {/* Tab 3: WhatsApp Login & Status */}
-          {activeTab === 2 && (
-            <Box sx={{
-              '@keyframes tabFadeIn': {
-                from: { opacity: 0, transform: 'translateY(6px)' },
-                to: { opacity: 1, transform: 'translateY(0)' }
-              },
-              animation: 'tabFadeIn 0.25s cubic-bezier(0.25, 0.8, 0.25, 1) forwards',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 3.5
-            }}>
-              {/* Header Status Card */}
-              <Card elevation={0} sx={{ borderRadius: '16px', border: '1px solid', borderColor: whatsappStatus.authenticated ? '#A7F3D0' : '#FDE68A', overflow: 'hidden' }}>
-                <Box sx={{
-                  p: 4,
-                  background: whatsappStatus.authenticated 
-                    ? 'linear-gradient(135deg, #ECFDF5 0%, #F0FDF4 100%)' 
-                    : 'linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%)',
-                  display: 'flex',
-                  flexDirection: { xs: 'column', sm: 'row' },
-                  justifyContent: 'space-between',
-                  alignItems: { xs: 'flex-start', sm: 'center' },
-                  gap: 2
-                }}>
-                  <Box>
-                    <Typography variant="h5" sx={{ fontWeight: 800, color: whatsappStatus.authenticated ? '#065F46' : '#92400E', mb: 0.5, display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                      <Box sx={{ 
-                        width: 12, 
-                        height: 12, 
-                        borderRadius: '50%', 
-                        bgcolor: whatsappStatus.authenticated ? '#10B981' : '#F59E0B',
-                        boxShadow: whatsappStatus.authenticated ? '0 0 12px #10B981' : '0 0 12px #F59E0B',
-                        animation: 'pulse 2s infinite'
-                      }} />
-                      {whatsappStatus.authenticated ? 'WhatsApp Active & Connected' : 'WhatsApp Connection Required'}
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: whatsappStatus.authenticated ? '#047857' : '#B45309', fontWeight: 500 }}>
-                      {whatsappStatus.authenticated 
-                        ? `Your WhatsApp service is fully authorized and running under session ID: default`
-                        : 'Connect your WhatsApp business/personal number to enable automated campaign broadcasting and AI chat responses.'}
-                    </Typography>
-                  </Box>
-
-                  {whatsappStatus.authenticated && (
-                    <Button
-                      variant="outlined"
-                      color="error"
-                      onClick={handleWhatsappLogout}
-                      sx={{ 
-                        borderRadius: '10px', 
-                        fontWeight: 700, 
-                        borderColor: '#FCA5A5', 
-                        color: '#DC2626', 
-                        bgcolor: '#FFFFFF',
-                        '&:hover': { bgcolor: '#FEF2F2', borderColor: '#EF4444' },
-                        textTransform: 'none',
-                        px: 3
-                      }}
-                    >
-                      Disconnect Account
-                    </Button>
-                  )}
-                </Box>
-              </Card>
-
-              {/* Main Panel Content */}
-              {whatsappStatus.authenticated ? (
-                /* Connected State View */
+              {/* Quotation & Invoicing Branding Configuration */}
+              <Grid item xs={12} md={6}>
                 <Card 
                   elevation={0} 
                   sx={{ 
-                    borderRadius: '16px', 
+                    borderRadius: '8px', 
                     border: '1px solid #e2e8f0', 
-                    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)',
-                    p: 4, 
-                    display: 'flex', 
-                    flexDirection: 'column', 
-                    alignItems: 'center', 
-                    textAlign: 'center', 
-                    py: 6,
-                    bgcolor: '#ffffff'
+                    bgcolor: '#ffffff',
+                    height: '100%'
                   }}
                 >
-                  <Box sx={{ 
-                    width: 80, 
-                    height: 80, 
-                    borderRadius: '50%', 
-                    bgcolor: '#E8F5E9', 
-                    display: 'flex', 
-                    justifyContent: 'center', 
-                    alignItems: 'center',
-                    mb: 3,
-                    boxShadow: '0 8px 16px rgba(16, 185, 129, 0.1)'
-                  }}>
-                    <SmartToyIcon sx={{ fontSize: 40, color: '#2E7D32' }} />
-                  </Box>
-                  
-                  <Typography variant="h5" sx={{ fontWeight: 800, mb: 1, color: '#1F2937' }}>
-                    Connected to {(() => {
-                      if (!whatsappStatus.phoneNumber) return 'WhatsApp';
-                      if (whatsappStatus.channel === 'meta_api') return whatsappStatus.phoneNumber;
-                      const clean = whatsappStatus.phoneNumber.replace('@c.us', '').replace('@s.whatsapp.net', '');
-                      return clean.startsWith('+') ? clean : '+' + clean;
-                    })()}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 460, mb: 4, lineHeight: 1.6 }}>
-                    {whatsappStatus.channel === 'meta_api'
-                      ? 'The Meta WhatsApp Cloud API is successfully configured. Automated campaigns, broadcasts, and AI responses will deploy automatically.'
-                      : 'The AI Auto-Responder engine is successfully listening to incoming messages. Any campaigns or auto-replies configured in the platform will deploy automatically.'}
-                  </Typography>
+                  <CardContent sx={{ p: 2 }}>
+                    <Stack direction="row" spacing={1.2} sx={{ alignItems: 'center', mb: 1.5 }}>
+                      <Box sx={{ width: 32, height: 32, borderRadius: '6px', bgcolor: 'rgba(132, 204, 22, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <DescriptionIcon sx={{ color: '#4d7c0f', fontSize: 18 }} />
+                      </Box>
+                      <Box>
+                        <Typography sx={{ fontWeight: 800, color: '#0f172a', fontSize: '0.9rem' }}>
+                          Quotation &amp; Billing Branding
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+                          Business profile rendered across PDF proposals and invoices
+                        </Typography>
+                      </Box>
+                    </Stack>
 
-                  <Grid container spacing={3} sx={{ maxWidth: 800, mx: 'auto' }}>
-                    <Grid item xs={12} sm={4}>
-                      <Paper variant="outlined" sx={{ p: 2.5, borderRadius: '12px', textAlign: 'left', bgcolor: '#F8FAFC', borderColor: '#e2e8f0', height: '100%' }}>
-                        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>PROVIDER MODE</Typography>
-                        <Typography variant="body1" sx={{ fontWeight: 700, mt: 0.5, color: '#334155' }}>
-                          {whatsappStatus.channel === 'meta_api' ? 'Meta Cloud API' : 'Docker WAHA (QR Mode)'}
-                        </Typography>
-                      </Paper>
-                    </Grid>
-                    <Grid item xs={12} sm={4}>
-                      <Paper variant="outlined" sx={{ p: 2.5, borderRadius: '12px', textAlign: 'left', bgcolor: '#F8FAFC', borderColor: '#e2e8f0', height: '100%' }}>
-                        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>ENDPOINT HOST</Typography>
-                        <Typography variant="body1" sx={{ fontWeight: 700, mt: 0.5, color: '#334155', wordBreak: 'break-all' }}>
-                          {whatsappStatus.channel === 'meta_api' ? 'graph.facebook.com' : 'localhost:3000'}
-                        </Typography>
-                      </Paper>
-                    </Grid>
-                    <Grid item xs={12} sm={4}>
-                      <Paper variant="outlined" sx={{ p: 2.5, borderRadius: '12px', textAlign: 'left', bgcolor: systemStatus.ngrok.running ? '#ECFDF5' : '#FEF2F2', borderColor: systemStatus.ngrok.running ? '#A7F3D0' : '#FECACA', height: '100%' }}>
-                        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
-                          TUNNEL STATUS
-                          <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: systemStatus.ngrok.running ? '#10B981' : '#EF4444' }} />
-                        </Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 600, mt: 0.5, color: systemStatus.ngrok.running ? '#065F46' : '#991B1B' }}>
-                          {systemStatus.ngrok.running ? 'Connected' : 'Disconnected'}
-                        </Typography>
-                      </Paper>
-                    </Grid>
-                  </Grid>
-                </Card>
-              ) : (
-                /* Pairing Options (Disconnected State) */
-                <Grid container spacing={4}>
-                  {/* Option 1: QR Code Card */}
-                  <Grid item xs={12} md={6}>
-                    <Card elevation={0} sx={{ borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', bgcolor: '#ffffff', height: '100%', display: 'flex', flexDirection: 'column' }}>
-                      <CardContent sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-                        <Box sx={{ 
-                          width: 56, 
-                          height: 56, 
-                          borderRadius: '12px', 
-                          bgcolor: 'rgba(132, 204, 22, 0.15)', 
-                          display: 'flex', 
-                          justifyContent: 'center', 
-                          alignItems: 'center',
-                          mb: 2.5
-                        }}>
-                          <SmartToyIcon sx={{ fontSize: 28, color: '#4d7c0f' }} />
-                        </Box>
-                        
-                        <Typography variant="h6" sx={{ fontWeight: 800, mb: 1, color: '#1F2937' }}>
-                          Option 1: Scan QR Code
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 300, mb: 4, lineHeight: 1.5 }}>
-                          Open WhatsApp on your mobile phone &rarr; Settings &rarr; Linked Devices &rarr; Link a Device, then scan the QR code below.
-                        </Typography>
-
-                        <Box sx={{ 
-                          width: 240, 
-                          height: 240, 
-                          borderRadius: '16px', 
-                          border: '1px solid #E5E7EB',
-                          bgcolor: '#FFFFFF',
-                          boxShadow: '0 10px 25px -5px rgba(0,0,0,0.05)',
-                          display: 'flex',
-                          justifyContent: 'center',
-                          alignItems: 'center',
-                          position: 'relative',
-                          p: 2,
-                          mb: 3
-                        }}>
-                          {loadingQr ? (
-                            <CircularProgress size={36} />
-                          ) : whatsappQr ? (
-                            <img src={whatsappQr} alt="WhatsApp QR Code" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-                          ) : qrError ? (
-                            <Typography variant="caption" color="text.secondary" px={3} sx={{ textAlign: 'center' }}>
-                              {qrError}
-                            </Typography>
-                          ) : (
-                            <Typography variant="caption" color="text.secondary" px={3}>
-                              Press refresh to load the QR code.
-                            </Typography>
-                          )}
-                        </Box>
-
-                        <Stack direction="row" spacing={1.5}>
-                          <Button
-                            variant="outlined"
-                            startIcon={<RefreshIcon />}
-                            onClick={fetchWhatsappQr}
-                            disabled={loadingQr}
-                            sx={{ 
-                              borderRadius: '10px', 
-                              fontWeight: 700,
-                              textTransform: 'none',
-                              px: 3,
-                              borderColor: '#D1D5DB',
-                              color: '#4B5563',
-                              '&:hover': { bgcolor: '#F9FAFB', borderColor: '#9CA3AF' }
-                            }}
-                          >
-                            Refresh QR Code
-                          </Button>
-                          {!whatsappStatus.authenticated && (
-                            <Button
-                              variant="contained"
-                              startIcon={<RefreshIcon />}
-                              onClick={handleRestartSession}
-                              disabled={restartingSession}
-                              sx={{ 
-                                borderRadius: '10px', 
-                                fontWeight: 700,
-                                textTransform: 'none',
-                                px: 3,
-                                bgcolor: '#D97706',
-                                '&:hover': { bgcolor: '#B45309' }
-                              }}
-                            >
-                              {restartingSession ? 'Restarting...' : 'Restart Session'}
-                            </Button>
-                          )}
-                        </Stack>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-
-                  {/* Option 2: Pairing Code Card */}
-                  <Grid item xs={12} md={6}>
-                    <Card elevation={0} sx={{ borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', bgcolor: '#ffffff', height: '100%', display: 'flex', flexDirection: 'column' }}>
-                      <CardContent sx={{ p: 4, flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-                        <Box sx={{ 
-                          width: 56, 
-                          height: 56, 
-                          borderRadius: '12px', 
-                          bgcolor: '#F0FDF4', 
-                          display: 'flex', 
-                          justifyContent: 'center', 
-                          alignItems: 'center',
-                          mb: 2.5
-                        }}>
-                          <SendIcon sx={{ fontSize: 24, color: '#16A34A', transform: 'rotate(-45deg)', mt: -0.5 }} />
-                        </Box>
-                        
-                        <Typography variant="h6" sx={{ fontWeight: 800, mb: 1, color: '#1F2937' }}>
-                          Option 2: Use 8-Character Code
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 320, mb: 4, lineHeight: 1.5 }}>
-                          Enter your phone number (including country code, e.g. 919876543210) to receive an 8-character code to pair instantly.
-                        </Typography>
-
-                        <Stack spacing={2} sx={{ width: '100%', maxWidth: 300, mb: 3 }}>
+                    <Stack spacing={1.2}>
+                      <Grid container spacing={1.2}>
+                        <Grid item xs={7}>
                           <TextField
-                            label="WhatsApp Phone Number"
-                            placeholder="e.g. 919345578103"
-                            value={pairingPhone}
-                            onChange={(e) => setPairingPhone(e.target.value)}
+                            label="Company Name"
+                            size="small"
                             fullWidth
-                            slotProps={{ input: { sx: { borderRadius: '12px' } } }}
+                            value={shopConfig.companyName || ''}
+                            onChange={(e) => handleConfigChange('companyName', e.target.value)}
+                            slotProps={{ input: { sx: { borderRadius: '6px', fontSize: '0.8rem' } } }}
+                          />
+                        </Grid>
+                        <Grid item xs={5}>
+                          <TextField
+                            label="Tagline"
+                            size="small"
+                            fullWidth
+                            value={shopConfig.tagline || ''}
+                            onChange={(e) => handleConfigChange('tagline', e.target.value)}
+                            slotProps={{ input: { sx: { borderRadius: '6px', fontSize: '0.8rem' } } }}
+                          />
+                        </Grid>
+                      </Grid>
+
+                      <Grid container spacing={1.2}>
+                        <Grid item xs={6}>
+                          <TextField
+                            label="Official Email"
+                            size="small"
+                            fullWidth
+                            value={shopConfig.email || ''}
+                            onChange={(e) => handleConfigChange('email', e.target.value)}
+                            slotProps={{ input: { sx: { borderRadius: '6px', fontSize: '0.8rem' } } }}
+                          />
+                        </Grid>
+                        <Grid item xs={6}>
+                          <TextField
+                            label="GSTIN Number"
+                            size="small"
+                            fullWidth
+                            value={shopConfig.gstin || ''}
+                            onChange={(e) => handleConfigChange('gstin', e.target.value)}
+                            slotProps={{ input: { sx: { borderRadius: '6px', fontSize: '0.8rem' } } }}
+                          />
+                        </Grid>
+                      </Grid>
+
+                      <Grid container spacing={1.2}>
+                        <Grid item xs={4}>
+                          <TextField
+                            label="Currency"
+                            size="small"
+                            fullWidth
+                            value={shopConfig.currency || 'INR'}
+                            onChange={(e) => handleConfigChange('currency', e.target.value)}
+                            slotProps={{ input: { sx: { borderRadius: '6px', fontSize: '0.8rem' } } }}
+                          />
+                        </Grid>
+                        <Grid item xs={4}>
+                          <TextField
+                            label="Symbol"
+                            size="small"
+                            fullWidth
+                            value={shopConfig.currencySymbol || '₹'}
+                            onChange={(e) => handleConfigChange('currencySymbol', e.target.value)}
+                            slotProps={{ input: { sx: { borderRadius: '6px', fontSize: '0.8rem' } } }}
+                          />
+                        </Grid>
+                        <Grid item xs={4}>
+                          <TextField
+                            label="Theme Accent"
+                            size="small"
+                            fullWidth
+                            value={shopConfig.themeColor || '#84CC16'}
+                            onChange={(e) => handleConfigChange('themeColor', e.target.value)}
+                            slotProps={{ input: { sx: { borderRadius: '6px', fontSize: '0.8rem' } } }}
+                          />
+                        </Grid>
+                      </Grid>
+
+                      <Grid container spacing={1.2}>
+                        <Grid item xs={6}>
+                          <TextField
+                            label="Signatory Name"
+                            size="small"
+                            fullWidth
+                            value={shopConfig.signatoryName || ''}
+                            onChange={(e) => handleConfigChange('signatoryName', e.target.value)}
+                            slotProps={{ input: { sx: { borderRadius: '6px', fontSize: '0.8rem' } } }}
+                          />
+                        </Grid>
+                        <Grid item xs={6}>
+                          <TextField
+                            label="Signatory Title"
+                            size="small"
+                            fullWidth
+                            value={shopConfig.signatoryTitle || ''}
+                            onChange={(e) => handleConfigChange('signatoryTitle', e.target.value)}
+                            slotProps={{ input: { sx: { borderRadius: '6px', fontSize: '0.8rem' } } }}
+                          />
+                        </Grid>
+                      </Grid>
+
+                      {/* Default Quotation Terms */}
+                      <Box sx={{ pt: 0.5 }}>
+                        <Typography variant="caption" sx={{ fontWeight: 800, color: '#0f172a', mb: 0.5, display: 'block' }}>
+                          Proposal Terms &amp; Conditions ({shopConfig.defaultQuotationTerms?.length || 0})
+                        </Typography>
+                        <Stack spacing={0.6} sx={{ mb: 1, maxHeight: 110, overflowY: 'auto' }}>
+                          {(shopConfig.defaultQuotationTerms || []).map((term, tIdx) => (
+                            <Box key={tIdx} sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
+                              <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748b', minWidth: 16, fontSize: '0.7rem' }}>
+                                {tIdx + 1}.
+                              </Typography>
+                              <TextField
+                                size="small"
+                                fullWidth
+                                value={term}
+                                onChange={(e) => handleUpdateTerm(tIdx, e.target.value)}
+                                slotProps={{ input: { sx: { borderRadius: '4px', fontSize: '0.75rem', py: 0.2 } } }}
+                              />
+                              <IconButton size="small" color="error" onClick={() => handleRemoveTerm(tIdx)} sx={{ p: 0.3 }}>
+                                <DeleteIcon sx={{ fontSize: 15 }} />
+                              </IconButton>
+                            </Box>
+                          ))}
+                        </Stack>
+
+                        <Box sx={{ display: 'flex', gap: 0.8 }}>
+                          <TextField
+                            size="small"
+                            fullWidth
+                            placeholder="Add new proposal term..."
+                            value={newTermInput}
+                            onChange={(e) => setNewTermInput(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddTerm(); } }}
+                            slotProps={{ input: { sx: { borderRadius: '6px', fontSize: '0.75rem' } } }}
+                          />
+                          <Button 
+                            variant="outlined" 
+                            size="small" 
+                            startIcon={<AddIcon sx={{ fontSize: 14 }} />} 
+                            onClick={handleAddTerm}
+                            sx={{ textTransform: 'none', borderRadius: '6px', minWidth: 70, fontSize: '0.75rem', borderColor: '#84cc16', color: '#0f172a', '&:hover': { borderColor: '#65a30d', bgcolor: 'rgba(132, 204, 22, 0.08)' } }}
+                          >
+                            Add
+                          </Button>
+                        </Box>
+                      </Box>
+                    </Stack>
+                  </CardContent>
+                </Card>
+              </Grid>
+
+              {/* Save Button for Store & Branding */}
+              <Grid item xs={12}>
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <Button
+                    variant="contained"
+                    size="small"
+                    startIcon={<SaveIcon sx={{ fontSize: 16 }} />}
+                    onClick={() => handleSaveShopConfig()}
+                    disabled={savingConfig}
+                    sx={{ 
+                      borderRadius: '8px', 
+                      fontWeight: 800, 
+                      px: 3, 
+                      py: 0.8, 
+                      fontSize: '0.8rem',
+                      textTransform: 'none',
+                      bgcolor: '#84cc16',
+                      color: '#0f172a',
+                      boxShadow: '0 2px 8px rgba(132, 204, 22, 0.35)',
+                      '&:hover': { bgcolor: '#65a30d' }
+                    }}
+                  >
+                    {savingConfig ? 'Saving Settings...' : 'Save Settings'}
+                  </Button>
+                </Box>
+              </Grid>
+            </Grid>
+          )}
+
+          {/* Tab 1: WhatsApp Engine & Connection */}
+          {activeTab === 1 && (
+            <Box sx={{
+              '@keyframes tabFadeIn': {
+                from: { opacity: 0, transform: 'translateY(4px)' },
+                to: { opacity: 1, transform: 'translateY(0)' }
+              },
+              animation: 'tabFadeIn 0.2s ease forwards',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 1.5
+            }}>
+              {/* Centrally Governed Engine Banner */}
+              <Box sx={{
+                p: 1.5,
+                borderRadius: '8px',
+                bgcolor: '#0f172a',
+                color: '#ffffff',
+                display: 'flex',
+                flexDirection: { xs: 'column', sm: 'row' },
+                alignItems: { xs: 'flex-start', sm: 'center' },
+                justifyContent: 'space-between',
+                gap: 1,
+                border: '1px solid rgba(255, 255, 255, 0.12)'
+              }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
+                  <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: '#84cc16', boxShadow: '0 0 8px #84cc16' }} />
+                  <Box>
+                    <Typography sx={{ fontWeight: 800, color: '#f8fafc', fontSize: '0.88rem' }}>
+                      Assigned Engine: {senderMode === 'DOCKER' ? '🐳 Docker WAHA (Local QR Engine)' : '⚡ Official Meta WhatsApp Cloud API'}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.72rem' }}>
+                      Centrally managed for {clientName ? <b>{clientName}</b> : 'this workspace'}.
+                    </Typography>
+                  </Box>
+                </Box>
+                <Chip
+                  label="🔒 CENTRALLY ASSIGNED"
+                  size="small"
+                  sx={{ height: 20, bgcolor: 'rgba(132, 204, 22, 0.18)', color: '#a3e635', fontWeight: 800, fontSize: '0.65rem', border: '1px solid rgba(132, 204, 22, 0.4)' }}
+                />
+              </Box>
+
+              {/* VIEW 1: DOCKER / WAHA LOCAL QR ENGINE */}
+              {senderMode === 'DOCKER' && (
+                <Stack spacing={1.5}>
+                  {/* Docker Header Status Card */}
+                  <Card elevation={0} sx={{ borderRadius: '8px', border: '1px solid', borderColor: whatsappStatus.authenticated ? '#86efac' : '#fde68a', overflow: 'hidden' }}>
+                    <Box sx={{
+                      p: 1.5,
+                      background: whatsappStatus.authenticated 
+                        ? 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)' 
+                        : 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
+                      display: 'flex',
+                      flexDirection: { xs: 'column', sm: 'row' },
+                      justifyContent: 'space-between',
+                      alignItems: { xs: 'flex-start', sm: 'center' },
+                      gap: 1.5
+                    }}>
+                      <Box>
+                        <Typography sx={{ fontWeight: 800, fontSize: '0.88rem', color: whatsappStatus.authenticated ? '#166534' : '#92400e', display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Box sx={{ 
+                            width: 10, 
+                            height: 10, 
+                            borderRadius: '50%', 
+                            bgcolor: whatsappStatus.authenticated ? '#84cc16' : '#f59e0b',
+                            boxShadow: whatsappStatus.authenticated ? '0 0 10px #84cc16' : '0 0 10px #f59e0b'
+                          }} />
+                          {whatsappStatus.authenticated ? 'Docker WhatsApp Active & Connected' : 'Docker WhatsApp Connection Required'}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: whatsappStatus.authenticated ? '#15803d' : '#b45309', fontWeight: 600 }}>
+                          {whatsappStatus.authenticated 
+                            ? 'Your local WAHA Docker container is authorized and responding to messages.'
+                            : 'Scan the QR code below or enter an 8-character pairing code to connect your WhatsApp number.'}
+                        </Typography>
+                      </Box>
+
+                      {whatsappStatus.authenticated && (
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          color="error"
+                          onClick={handleWhatsappLogout}
+                          disabled={loadingWhatsapp}
+                          sx={{ 
+                            borderRadius: '6px', 
+                            fontWeight: 700, 
+                            fontSize: '0.75rem',
+                            borderColor: '#fca5a5', 
+                            color: '#dc2626', 
+                            bgcolor: '#ffffff',
+                            '&:hover': { bgcolor: '#fef2f2', borderColor: '#ef4444' },
+                            textTransform: 'none',
+                            px: 2,
+                            py: 0.4
+                          }}
+                        >
+                          Disconnect Account
+                        </Button>
+                      )}
+                    </Box>
+                  </Card>
+
+                  {/* Docker Connected View */}
+                  {whatsappStatus.authenticated ? (
+                    <Card elevation={0} sx={{ borderRadius: '8px', border: '1px solid #e2e8f0', p: 2, bgcolor: '#ffffff' }}>
+                      <Grid container spacing={1.5} sx={{ maxWidth: 800, mx: 'auto', mb: 2 }}>
+                        <Grid item xs={12} sm={4}>
+                          <Paper variant="outlined" sx={{ p: 1.5, borderRadius: '8px', textAlign: 'left', bgcolor: '#f8fafc', borderColor: '#e2e8f0', height: '100%' }}>
+                            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, fontSize: '0.68rem' }}>ENGINE PROVIDER</Typography>
+                            <Typography sx={{ fontWeight: 800, color: '#0f172a', fontSize: '0.82rem' }}>
+                              Docker WAHA (Local QR)
+                            </Typography>
+                          </Paper>
+                        </Grid>
+                        <Grid item xs={12} sm={4}>
+                          <Paper variant="outlined" sx={{ p: 1.5, borderRadius: '8px', textAlign: 'left', bgcolor: '#f8fafc', borderColor: '#e2e8f0', height: '100%' }}>
+                            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, fontSize: '0.68rem' }}>LOCAL SERVICE</Typography>
+                            <Typography sx={{ fontWeight: 800, color: '#0f172a', fontSize: '0.82rem' }}>
+                              localhost:3000
+                            </Typography>
+                          </Paper>
+                        </Grid>
+                        <Grid item xs={12} sm={4}>
+                          <Paper variant="outlined" sx={{ p: 1.5, borderRadius: '8px', textAlign: 'left', bgcolor: systemStatus.waha.running ? '#f0fdf4' : '#fef2f2', borderColor: systemStatus.waha.running ? '#86efac' : '#fecaca', height: '100%' }}>
+                            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, fontSize: '0.68rem', display: 'flex', alignItems: 'center', gap: 0.8 }}>
+                              CONTAINER STATUS
+                              <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: systemStatus.waha.running ? '#16a34a' : '#ef4444' }} />
+                            </Typography>
+                            <Typography sx={{ fontWeight: 800, color: systemStatus.waha.running ? '#166534' : '#991b1b', fontSize: '0.82rem' }}>
+                              {systemStatus.waha.running ? 'Running Healthy' : 'Container Stopped'}
+                            </Typography>
+                          </Paper>
+                        </Grid>
+                      </Grid>
+
+                      {/* Throttle Configuration */}
+                      <Box sx={{ maxWidth: 800, mx: 'auto', p: 1.5, borderRadius: '8px', bgcolor: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                        <Typography sx={{ fontWeight: 800, color: '#0f172a', fontSize: '0.82rem', mb: 0.3 }}>
+                          Docker Broadcast Throttle Delay
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1, fontSize: '0.7rem' }}>
+                          Pause duration between each outgoing message in bulk campaigns to prevent WhatsApp account rate limits.
+                        </Typography>
+                        <Stack direction="row" spacing={1.5} alignItems="center">
+                          <TextField
+                            size="small"
+                            type="number"
+                            label="Throttle Seconds"
+                            value={dockerThrottle}
+                            onChange={(e) => setDockerThrottle(e.target.value)}
+                            slotProps={{ input: { sx: { borderRadius: '6px', width: 120, fontSize: '0.8rem' } } }}
                           />
                           <Button
                             variant="contained"
-                            fullWidth
-                            onClick={handleRequestPairingCode}
-                            disabled={requestingCode}
-                            disableElevation
-                            sx={{ 
-                              borderRadius: '12px', 
+                            size="small"
+                            onClick={handleSaveDockerThrottle}
+                            disabled={savingEngine}
+                            sx={{
+                              bgcolor: '#84cc16',
+                              color: '#0f172a',
                               fontWeight: 800,
-                              py: 1.5,
+                              fontSize: '0.75rem',
+                              borderRadius: '6px',
                               textTransform: 'none',
+                              px: 2.5,
+                              py: 0.8,
+                              '&:hover': { bgcolor: '#65a30d' }
+                            }}
+                          >
+                            Save Delay
+                          </Button>
+                        </Stack>
+                      </Box>
+                    </Card>
+                  ) : (
+                    /* Docker Pairing View (Disconnected) */
+                    <Grid container spacing={1.5}>
+                      {/* Option 1: QR Code Card */}
+                      <Grid item xs={12} md={6}>
+                        <Card elevation={0} sx={{ borderRadius: '8px', border: '1px solid #e2e8f0', bgcolor: '#ffffff', height: '100%' }}>
+                          <CardContent sx={{ p: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                            <Box sx={{ 
+                              width: 38, 
+                              height: 38, 
+                              borderRadius: '8px', 
+                              bgcolor: 'rgba(132, 204, 22, 0.15)', 
+                              display: 'flex', 
+                              justifyContent: 'center', 
+                              alignItems: 'center',
+                              mb: 1
+                            }}>
+                              <ChatIcon sx={{ fontSize: 20, color: '#4d7c0f' }} />
+                            </Box>
+                            
+                            <Typography sx={{ fontWeight: 800, mb: 0.3, color: '#0f172a', fontSize: '0.88rem' }}>
+                              Option 1: Scan QR Code
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary" sx={{ maxWidth: 280, mb: 1.5, fontSize: '0.72rem' }}>
+                              WhatsApp &rarr; Linked Devices &rarr; Link a Device, scan QR code below.
+                            </Typography>
+
+                            <Box sx={{ 
+                              width: 170, 
+                              height: 170, 
+                              borderRadius: '8px', 
+                              border: '1px solid #e2e8f0', 
+                              bgcolor: '#ffffff',
+                              display: 'flex', 
+                              justifyContent: 'center', 
+                              alignItems: 'center',
+                              p: 1, 
+                              mb: 1.5
+                            }}>
+                              {loadingQr ? (
+                                <CircularProgress size={28} sx={{ color: '#84cc16' }} />
+                              ) : whatsappQr ? (
+                                <img src={whatsappQr} alt="WhatsApp QR Code" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                              ) : qrError ? (
+                                <Typography variant="caption" color="text.secondary" px={1} sx={{ textAlign: 'center', fontSize: '0.68rem' }}>
+                                  {qrError}
+                                </Typography>
+                              ) : (
+                                <Typography variant="caption" color="text.secondary" px={1} sx={{ fontSize: '0.68rem' }}>
+                                  Press refresh to load QR code.
+                                </Typography>
+                              )}
+                            </Box>
+
+                            <Stack direction="row" spacing={1}>
+                              <Button
+                                variant="outlined"
+                                size="small"
+                                startIcon={<RefreshIcon sx={{ fontSize: 14 }} />}
+                                onClick={fetchWhatsappQr}
+                                disabled={loadingQr}
+                                sx={{ borderRadius: '6px', fontWeight: 700, fontSize: '0.72rem', textTransform: 'none', px: 1.5, borderColor: '#cbd5e1', color: '#334155' }}
+                              >
+                                Refresh QR
+                              </Button>
+                              <Button
+                                variant="contained"
+                                size="small"
+                                startIcon={<RefreshIcon sx={{ fontSize: 14 }} />}
+                                onClick={handleRestartSession}
+                                disabled={restartingSession}
+                                sx={{ borderRadius: '6px', fontWeight: 800, fontSize: '0.72rem', textTransform: 'none', px: 1.5, bgcolor: '#0f172a', color: '#ffffff', '&:hover': { bgcolor: '#1e293b' } }}
+                              >
+                                {restartingSession ? 'Restarting...' : 'Restart'}
+                              </Button>
+                            </Stack>
+                          </CardContent>
+                        </Card>
+                      </Grid>
+
+                      {/* Option 2: Pairing Code Card */}
+                      <Grid item xs={12} md={6}>
+                        <Card elevation={0} sx={{ borderRadius: '8px', border: '1px solid #e2e8f0', bgcolor: '#ffffff', height: '100%' }}>
+                          <CardContent sx={{ p: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                            <Box sx={{ 
+                              width: 38, 
+                              height: 38, 
+                              borderRadius: '8px', 
+                              bgcolor: '#f0fdf4', 
+                              display: 'flex', 
+                              justifyContent: 'center', 
+                              alignItems: 'center',
+                              mb: 1
+                            }}>
+                              <SendIcon sx={{ fontSize: 18, color: '#16a34a', transform: 'rotate(-45deg)' }} />
+                            </Box>
+                            
+                            <Typography sx={{ fontWeight: 800, mb: 0.3, color: '#0f172a', fontSize: '0.88rem' }}>
+                              Option 2: 8-Character Pairing Code
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary" sx={{ maxWidth: 280, mb: 1.5, fontSize: '0.72rem' }}>
+                              Enter phone number (e.g. 919876543210) to receive an 8-character pairing code.
+                            </Typography>
+
+                            <Stack spacing={1} sx={{ width: '100%', maxWidth: 260, mb: 1.5 }}>
+                              <TextField
+                                label="Phone with country code"
+                                size="small"
+                                placeholder="e.g. 919876543210"
+                                value={pairingPhone}
+                                onChange={(e) => setPairingPhone(e.target.value)}
+                                fullWidth
+                                slotProps={{ input: { sx: { borderRadius: '6px', fontSize: '0.8rem' } } }}
+                              />
+                              <Button
+                                variant="contained"
+                                size="small"
+                                fullWidth
+                                onClick={handleRequestPairingCode}
+                                disabled={requestingCode}
+                                sx={{ 
+                                  borderRadius: '6px', 
+                                  fontWeight: 800, 
+                                  fontSize: '0.75rem',
+                                  py: 0.8, 
+                                  textTransform: 'none',
+                                  bgcolor: '#84cc16',
+                                  color: '#0f172a',
+                                  '&:hover': { bgcolor: '#65a30d' }
+                                }}
+                              >
+                                {requestingCode ? 'Requesting Code...' : 'Get Pairing Code'}
+                              </Button>
+                            </Stack>
+
+                            {pairingCode && (
+                              <Paper elevation={0} sx={{ 
+                                bgcolor: '#f0fdf4', 
+                                p: 1.5, 
+                                borderRadius: '8px', 
+                                border: '1px solid #86efac', 
+                                width: '100%', 
+                                maxWidth: 260
+                              }}>
+                                <Typography variant="caption" sx={{ fontWeight: 800, display: 'block', mb: 0.5, color: '#166534', fontSize: '0.68rem' }}>
+                                  ENTER ON PHONE
+                                </Typography>
+                                <Typography sx={{ fontWeight: 900, color: '#14532d', letterSpacing: 3, fontSize: '1.4rem' }}>
+                                  {pairingCode}
+                                </Typography>
+                              </Paper>
+                            )}
+                          </CardContent>
+                        </Card>
+                      </Grid>
+                    </Grid>
+                  )}
+                </Stack>
+              )}
+
+              {/* VIEW 2: META WHATSAPP CLOUD API */}
+              {senderMode === 'META' && (
+                <Stack spacing={1.5}>
+                  <Card elevation={0} sx={{ borderRadius: '8px', border: '1px solid #e2e8f0', bgcolor: '#ffffff', maxWidth: 750, mx: 'auto', width: '100%' }}>
+                    <CardContent sx={{ p: 2 }}>
+                      <Stack direction="row" spacing={1.2} sx={{ alignItems: 'center', mb: 1.5 }}>
+                        <Box sx={{ width: 32, height: 32, borderRadius: '6px', bgcolor: 'rgba(132, 204, 22, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <CloudIcon sx={{ color: '#4d7c0f', fontSize: 18 }} />
+                        </Box>
+                        <Box>
+                          <Typography sx={{ fontWeight: 800, color: '#0f172a', fontSize: '0.9rem' }}>
+                            Meta Cloud API Credentials
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+                            App ID, Phone Number ID, and Permanent Token from Meta Portal
+                          </Typography>
+                        </Box>
+                      </Stack>
+
+                      <Stack spacing={1.2}>
+                        <Box sx={{ p: 1.2, bgcolor: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <Box>
+                            <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: '#0f172a' }}>
+                              Meta Cloud API Engine State
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+                              Governed centrally by Renic Soft Master HQ (Single source of truth)
+                            </Typography>
+                          </Box>
+                          <Chip
+                            label={senderMode === 'META' ? 'ACTIVE & ENABLED' : 'INACTIVE (DOCKER ACTIVE)'}
+                            size="small"
+                            sx={{
+                              bgcolor: senderMode === 'META' ? '#dcfce7' : '#f1f5f9',
+                              color: senderMode === 'META' ? '#166534' : '#64748b',
+                              fontWeight: 800,
+                              fontSize: '0.68rem',
+                              border: '1px solid',
+                              borderColor: senderMode === 'META' ? '#86efac' : '#cbd5e1'
+                            }}
+                          />
+                        </Box>
+
+                        <Grid container spacing={1.2}>
+                          <Grid item xs={6}>
+                            <TextField
+                              label="Meta App ID"
+                              size="small"
+                              fullWidth
+                              value={metaConfig.metaAppId || ''}
+                              onChange={(e) => handleMetaConfigChange('metaAppId', e.target.value)}
+                              slotProps={{ input: { sx: { borderRadius: '6px', fontSize: '0.8rem' } } }}
+                            />
+                          </Grid>
+                          <Grid item xs={6}>
+                            <TextField
+                              label="Phone Number ID"
+                              size="small"
+                              fullWidth
+                              value={metaConfig.metaPhoneNumberId || ''}
+                              onChange={(e) => handleMetaConfigChange('metaPhoneNumberId', e.target.value)}
+                              disabled={!metaConfig.metaApiEnabled}
+                              slotProps={{ input: { sx: { borderRadius: '6px', fontSize: '0.8rem' } } }}
+                            />
+                          </Grid>
+                        </Grid>
+
+                        <TextField
+                          label="Meta App Secret"
+                          size="small"
+                          fullWidth
+                          type="password"
+                          value={metaConfig.metaAppSecret || ''}
+                          onChange={(e) => handleMetaConfigChange('metaAppSecret', e.target.value)}
+                          disabled={!metaConfig.metaApiEnabled}
+                          slotProps={{ input: { sx: { borderRadius: '6px', fontSize: '0.8rem' } } }}
+                        />
+
+                        <TextField
+                          label="Permanent Access Token"
+                          size="small"
+                          fullWidth
+                          type="password"
+                          value={metaConfig.metaAccessToken || ''}
+                          onChange={(e) => handleMetaConfigChange('metaAccessToken', e.target.value)}
+                          disabled={!metaConfig.metaApiEnabled}
+                          slotProps={{ input: { sx: { borderRadius: '6px', fontSize: '0.8rem' } } }}
+                        />
+
+                        <Grid container spacing={1.2}>
+                          <Grid item xs={6}>
+                            <TextField
+                              label="WABA ID"
+                              size="small"
+                              fullWidth
+                              value={metaConfig.metaBusinessAccountId || ''}
+                              onChange={(e) => handleMetaConfigChange('metaBusinessAccountId', e.target.value)}
+                              disabled={!metaConfig.metaApiEnabled}
+                              slotProps={{ input: { sx: { borderRadius: '6px', fontSize: '0.8rem' } } }}
+                            />
+                          </Grid>
+                          <Grid item xs={6}>
+                            <TextField
+                              label="Webhook Verify Token"
+                              size="small"
+                              fullWidth
+                              value={metaConfig.metaWebhookVerifyToken || ''}
+                              onChange={(e) => handleMetaConfigChange('metaWebhookVerifyToken', e.target.value)}
+                              disabled={!metaConfig.metaApiEnabled}
+                              slotProps={{ input: { sx: { borderRadius: '6px', fontSize: '0.8rem' } } }}
+                            />
+                          </Grid>
+                        </Grid>
+
+                        <Box sx={{ mt: 1, display: 'flex', gap: 1.5 }}>
+                          <Button
+                            variant="contained"
+                            size="small"
+                            startIcon={<SaveIcon sx={{ fontSize: 16 }} />}
+                            onClick={handleSaveMetaConfig}
+                            disabled={savingConfig || !metaConfig.metaApiEnabled}
+                            sx={{ 
+                              borderRadius: '6px', 
+                              fontWeight: 800, 
+                              fontSize: '0.78rem',
+                              textTransform: 'none',
+                              px: 2.5,
+                              py: 0.6,
                               bgcolor: '#84cc16',
                               color: '#0f172a',
                               '&:hover': { bgcolor: '#65a30d' }
                             }}
                           >
-                            {requestingCode ? 'Requesting Code...' : 'Get Pairing Code'}
+                            {savingConfig ? 'Saving...' : 'Save Meta Config'}
                           </Button>
-                        </Stack>
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            startIcon={<CloudIcon sx={{ fontSize: 16 }} />}
+                            onClick={handleTestMetaConnection}
+                            disabled={metaTesting || !metaConfig.metaApiEnabled}
+                            sx={{ 
+                              borderRadius: '6px', 
+                              fontWeight: 700, 
+                              fontSize: '0.78rem',
+                              textTransform: 'none',
+                              px: 2.5,
+                              py: 0.6,
+                              borderColor: '#84cc16',
+                              color: '#0f172a',
+                              '&:hover': { borderColor: '#65a30d', bgcolor: 'rgba(132, 204, 22, 0.08)' }
+                            }}
+                          >
+                            {metaTesting ? 'Testing...' : 'Test Connection'}
+                          </Button>
+                        </Box>
 
-                        {pairingCode && (
-                          <Paper elevation={0} sx={{ 
-                            bgcolor: '#EFF6FF', 
-                            p: 3, 
-                            borderRadius: '16px', 
-                            border: '1px solid #BFDBFE', 
-                            width: '100%', 
-                            maxWidth: 300,
-                            boxShadow: '0 4px 12px rgba(37, 99, 235, 0.05)'
-                          }}>
-                            <Typography variant="caption" color="primary" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.8, display: 'block', mb: 1.5 }}>
-                              Enter Code on Phone
-                            </Typography>
-                            <Typography variant="h4" sx={{ fontWeight: 850, color: '#1E40AF', letterSpacing: 4 }}>
-                              {pairingCode}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 2, lineHeight: 1.4 }}>
-                              Tap "Link with Phone Number" on your WhatsApp mobile application to link.
-                            </Typography>
-                          </Paper>
+                        {metaTestResult && (
+                          <Alert
+                            severity={metaTestResult.success ? 'success' : 'error'}
+                            sx={{ mt: 1, py: 0.3, borderRadius: '6px', '& .MuiAlert-message': { fontSize: '0.75rem' } }}
+                          >
+                            {metaTestResult.message}
+                          </Alert>
                         )}
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                </Grid>
+                      </Stack>
+                    </CardContent>
+                  </Card>
+                </Stack>
               )}
             </Box>
           )}
-        </Box>
-      )}
 
-      {/* Tab 4: Meta API Configuration */}
-      {activeTab === 3 && (
-        <Box sx={{
-          '@keyframes tabFadeIn': {
-            from: { opacity: 0, transform: 'translateY(6px)' },
-            to: { opacity: 1, transform: 'translateY(0)' }
-          },
-          animation: 'tabFadeIn 0.25s cubic-bezier(0.25, 0.8, 0.25, 1) forwards',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 3.5
-        }}>
-          {/* Meta API Status Card */}
-          <Card elevation={0} sx={{ borderRadius: '16px', border: '1px solid', borderColor: metaConfig.metaApiEnabled ? '#A7F3D0' : '#FDE68A', overflow: 'hidden' }}>
-            <Box sx={{
-              p: 4,
-              background: metaConfig.metaApiEnabled
-                ? 'linear-gradient(135deg, #ECFDF5 0%, #F0FDF4 100%)'
-                : 'linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%)',
-              display: 'flex',
-              flexDirection: { xs: 'column', sm: 'row' },
-              justifyContent: 'space-between',
-              alignItems: { xs: 'flex-start', sm: 'center' },
-              gap: 2
-            }}>
-              <Box>
-                <Typography variant="h5" sx={{ fontWeight: 800, color: metaConfig.metaApiEnabled ? '#065F46' : '#92400E', mb: 0.5, display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                  <Box sx={{
-                    width: 12,
-                    height: 12,
-                    borderRadius: '50%',
-                    bgcolor: metaConfig.metaApiEnabled ? '#10B981' : '#F59E0B',
-                    boxShadow: metaConfig.metaApiEnabled ? '0 0 12px #10B981' : '0 0 12px #F59E0B',
-                    animation: 'pulse 2s infinite'
-                  }} />
-                  {metaConfig.metaApiEnabled ? 'Meta API Connected' : 'Meta API Not Configured'}
-                </Typography>
-                <Typography variant="body2" sx={{ color: metaConfig.metaApiEnabled ? '#047857' : '#B45309', fontWeight: 500 }}>
-                  {metaConfig.metaApiEnabled
-                    ? 'Bulk messages will be sent via Meta WhatsApp Cloud API. Docker/WAHA fallback is disabled.'
-                    : 'Configure your Meta API credentials to send bulk messages via WhatsApp Cloud API. If not configured, the system will fall back to Docker/WAHA.'}
-                </Typography>
-              </Box>
-
-              {metaConfig.metaApiEnabled && (
-                <Button
-                  variant="outlined"
-                  color="error"
-                  onClick={() => {
-                    setMetaConfig(prev => ({ ...prev, metaApiEnabled: false }));
-                    handleSaveMetaConfig();
-                  }}
-                  sx={{
-                    borderRadius: '10px',
-                    fontWeight: 700,
-                    borderColor: '#FCA5A5',
-                    color: '#DC2626',
-                    bgcolor: '#FFFFFF',
-                    '&:hover': { bgcolor: '#FEF2F2', borderColor: '#EF4444' },
-                    textTransform: 'none',
-                    px: 3
-                  }}
-                >
-                  Disable Meta API
-                </Button>
-              )}
-            </Box>
-          </Card>
-
-          {/* Lead Handoff / Forwarding Card */}
-          <Card elevation={0} sx={{ borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', bgcolor: '#ffffff' }}>
-            <CardContent sx={{ p: 4 }}>
-              <Stack direction="row" spacing={2} sx={{ alignItems: 'center', mb: 3 }}>
-                <Box sx={{ width: 40, height: 40, borderRadius: '10px', bgcolor: '#ECFDF5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <ForwardIcon sx={{ color: '#059669', fontSize: 20 }} />
-                </Box>
-                <Box>
-                  <Typography variant="h6" sx={{ fontWeight: 800, color: '#1e293b' }}>
-                    Lead Handoff — Forward Replies to WhatsApp
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    When a customer replies to your Meta campaign number, a handoff message is sent to them from your QR-logged WhatsApp so your staff can continue the chat there
-                  </Typography>
-                </Box>
-              </Stack>
-
-              <Stack spacing={2.5}>
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={!!metaConfig.metaForwardReplies}
-                      onChange={(e) => handleMetaConfigChange('metaForwardReplies', e.target.checked)}
-                      color="success"
-                      disabled={!metaConfig.metaApiEnabled}
-                    />
-                  }
-                  label="Forward customer replies to my WhatsApp (connected in the WhatsApp Login tab)"
-                />
-
-                <TextField
-                  label="Handoff Message"
-                  fullWidth
-                  multiline
-                  minRows={2}
-                  value={metaConfig.metaHandoffMessage}
-                  onChange={(e) => handleMetaConfigChange('metaHandoffMessage', e.target.value)}
-                  disabled={!metaConfig.metaApiEnabled || !metaConfig.metaForwardReplies}
-                  helperText="Use {name} for the customer name. Sent from Meta when first message is received."
-                  slotProps={{ input: { sx: { borderRadius: '12px' } } }}
-                />
-
-                <TextField
-                  label="Auto-Reply Message"
-                  fullWidth
-                  multiline
-                  minRows={2}
-                  value={metaConfig.metaAutoReplyMessage || ''}
-                  onChange={(e) => handleMetaConfigChange('metaAutoReplyMessage', e.target.value)}
-                  disabled={!metaConfig.metaApiEnabled || !metaConfig.metaForwardReplies}
-                  helperText="Use {name} for the customer name. Sent from your logged-in WhatsApp (WAHA) as the first reply."
-                  slotProps={{ input: { sx: { borderRadius: '12px' } } }}
-                />
-
-                <Alert
-                  severity={whatsappStatus.authenticated ? 'success' : 'warning'}
-                  icon={<ForwardIcon fontSize="inherit" />}
-                  sx={{ borderRadius: '12px' }}
-                >
-                  {whatsappStatus.authenticated
-                    ? 'WhatsApp Login (QR session) is connected — handoff messages will be sent from your QR-scanned number.'
-                    : 'WhatsApp Login (QR session) is not connected yet. Go to the "WhatsApp Login" tab and scan the QR code or use a pairing code first.'}
-                </Alert>
-              </Stack>
-            </CardContent>
-          </Card>
-
-          {/* Meta API Configuration Form */}
-          <Grid container spacing={3.5}>
-            {/* Basic Credentials */}
-            <Grid item xs={12} md={6}>
-              <Card elevation={0} sx={{ borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', bgcolor: '#ffffff', height: '100%' }}>
-                <CardContent sx={{ p: 4 }}>
-                  <Stack direction="row" spacing={2} sx={{ alignItems: 'center', mb: 3 }}>
-                    <Box sx={{ width: 40, height: 40, borderRadius: '10px', bgcolor: 'rgba(132, 204, 22, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <CloudIcon sx={{ color: '#4d7c0f', fontSize: 20 }} />
-                    </Box>
-                    <Box>
-                      <Typography variant="h6" sx={{ fontWeight: 800, color: '#1e293b' }}>
-                        Basic Credentials
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        Enter your Meta App credentials and WhatsApp Business Account details
-                      </Typography>
-                    </Box>
-                  </Stack>
-
-                  <Stack spacing={2.5}>
-                    <FormControlLabel
-                      control={
-                        <Switch
-                          checked={metaConfig.metaApiEnabled}
-                          onChange={(e) => handleMetaConfigChange('metaApiEnabled', e.target.checked)}
-                          color="success"
-                        />
-                      }
-                      label="Enable Meta API for bulk messaging"
-                    />
-
-                    <TextField
-                      label="Meta App ID"
-                      fullWidth
-                      value={metaConfig.metaAppId}
-                      onChange={(e) => handleMetaConfigChange('metaAppId', e.target.value)}
-                      placeholder="e.g. 123456789012345"
-                      disabled={!metaConfig.metaApiEnabled}
-                      slotProps={{ input: { sx: { borderRadius: '12px' } } }}
-                    />
-
-                    <TextField
-                      label="Meta App Secret"
-                      fullWidth
-                      type="password"
-                      value={metaConfig.metaAppSecret}
-                      onChange={(e) => handleMetaConfigChange('metaAppSecret', e.target.value)}
-                      placeholder="Enter your Meta App Secret"
-                      disabled={!metaConfig.metaApiEnabled}
-                      slotProps={{ input: { sx: { borderRadius: '12px' } } }}
-                    />
-
-                    <TextField
-                      label="Phone Number ID"
-                      fullWidth
-                      value={metaConfig.metaPhoneNumberId}
-                      onChange={(e) => handleMetaConfigChange('metaPhoneNumberId', e.target.value)}
-                      placeholder="e.g. 123456789012345"
-                      disabled={!metaConfig.metaApiEnabled}
-                      helperText="The WhatsApp Business phone number ID from Meta Developer Portal"
-                      slotProps={{ input: { sx: { borderRadius: '12px' } } }}
-                    />
-
-                    <TextField
-                      label="Business Account ID"
-                      fullWidth
-                      value={metaConfig.metaBusinessAccountId}
-                      onChange={(e) => handleMetaConfigChange('metaBusinessAccountId', e.target.value)}
-                      placeholder="e.g. 123456789012345"
-                      disabled={!metaConfig.metaApiEnabled}
-                      slotProps={{ input: { sx: { borderRadius: '12px' } } }}
-                    />
-                  </Stack>
-                </CardContent>
-              </Card>
-            </Grid>
-
-            {/* Access Token & Security */}
-            <Grid item xs={12} md={6}>
-              <Card elevation={0} sx={{ borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', bgcolor: '#ffffff', height: '100%' }}>
-                <CardContent sx={{ p: 4 }}>
-                  <Stack direction="row" spacing={2} sx={{ alignItems: 'center', mb: 3 }}>
-                    <Box sx={{ width: 40, height: 40, borderRadius: '10px', bgcolor: '#E0F2FE', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <KeyIcon sx={{ color: '#0369A1', fontSize: 20 }} />
-                    </Box>
-                    <Box>
-                      <Typography variant="h6" sx={{ fontWeight: 800, color: '#1e293b' }}>
-                        Access Token & Security
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        Configure the access token and webhook verification token
-                      </Typography>
-                    </Box>
-                  </Stack>
-
-                  <Stack spacing={2.5}>
-                    <TextField
-                      label="Meta Access Token"
-                      fullWidth
-                      type="password"
-                      value={metaConfig.metaAccessToken}
-                      onChange={(e) => handleMetaConfigChange('metaAccessToken', e.target.value)}
-                      placeholder="Enter your Meta permanent access token"
-                      disabled={!metaConfig.metaApiEnabled}
-                      helperText="Use a permanent system user access token from Meta Business Manager"
-                      slotProps={{ input: { sx: { borderRadius: '12px' } } }}
-                    />
-
-                    <TextField
-                      label="Webhook Verify Token"
-                      fullWidth
-                      value={metaConfig.metaWebhookVerifyToken}
-                      onChange={(e) => handleMetaConfigChange('metaWebhookVerifyToken', e.target.value)}
-                      placeholder="e.g. renic_meta_verify_token_2026"
-                      disabled={!metaConfig.metaApiEnabled}
-                      helperText="A secret token for webhook verification"
-                      slotProps={{ input: { sx: { borderRadius: '12px' } } }}
-                    />
-                  </Stack>
-
-                  <Box sx={{ mt: 4, display: 'flex', gap: 2 }}>
-                    <Button
-                      variant="contained"
-                      startIcon={<SaveIcon />}
-                      onClick={handleSaveMetaConfig}
-                      disabled={savingConfig || !metaConfig.metaApiEnabled}
-                      sx={{ 
-                        borderRadius: '12px', 
-                        fontWeight: 800, 
-                        textTransform: 'none',
-                        px: 3.5,
-                        py: 1.2,
-                        bgcolor: '#84cc16',
-                        color: '#0f172a',
-                        '&:hover': { bgcolor: '#65a30d' }
-                      }}
-                    >
-                      {savingConfig ? 'Saving...' : 'Save Meta Config'}
-                    </Button>
-                    <Button
-                      variant="outlined"
-                      startIcon={<CloudIcon />}
-                      onClick={handleTestMetaConnection}
-                      disabled={metaTesting || !metaConfig.metaApiEnabled}
-                      sx={{ 
-                        borderRadius: '12px', 
-                        fontWeight: 700, 
-                        textTransform: 'none',
-                        px: 3.5,
-                        py: 1.2,
-                        borderWidth: 1.5,
-                        '&:hover': { borderWidth: 1.5 }
-                      }}
-                    >
-                      {metaTesting ? 'Testing...' : 'Test Connection'}
-                    </Button>
-                  </Box>
-
-                  {metaTestResult && (
-                    <Alert
-                      severity={metaTestResult.success ? 'success' : 'error'}
-                      sx={{ mt: 3, borderRadius: '12px' }}
-                    >
-                      {metaTestResult.message}
-                    </Alert>
-                  )}
-                </CardContent>
-              </Card>
-            </Grid>
-          </Grid>
-        </Box>
-      )}
-
-      {/* Tab 5: API & OAuth 2.0 Credentials */}
-      {activeTab === 4 && (
-        <Box sx={{ width: '100%' }}>
-          <Grid container spacing={3.5} sx={{
-            '@keyframes tabFadeIn': {
-              from: { opacity: 0, transform: 'translateY(6px)' },
-              to: { opacity: 1, transform: 'translateY(0)' }
-            },
-            animation: 'tabFadeIn 0.25s cubic-bezier(0.25, 0.8, 0.25, 1) forwards'
-          }}>
-            {/* Credentials Card */}
-            <Grid item xs={12} md={7}>
+          {/* Tab 2: API & OAuth 2.0 Credentials */}
+          {activeTab === 2 && (
+            <Box sx={{ width: '100%', maxWidth: 600, mx: 'auto' }}>
               <Card sx={{ 
-                borderRadius: '16px', 
+                borderRadius: '8px', 
                 border: '1px solid #e2e8f0', 
-                boxShadow: '0 4px 12px -2px rgba(0,0,0,0.05)',
                 bgcolor: '#ffffff',
-                p: { xs: 2.5, sm: 3 }
+                p: 2
               }}>
                 <CardContent sx={{ p: 0 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                      <Box sx={{ width: 40, height: 40, borderRadius: '10px', bgcolor: 'rgba(132, 204, 22, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <KeyIcon sx={{ color: '#65a30d', fontSize: 22 }} />
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Box sx={{ width: 32, height: 32, borderRadius: '6px', bgcolor: 'rgba(132, 204, 22, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <KeyIcon sx={{ color: '#65a30d', fontSize: 18 }} />
                       </Box>
                       <Box>
-                        <Typography variant="h6" sx={{ fontWeight: 800, color: '#0f172a', fontSize: '1.1rem' }}>
+                        <Typography sx={{ fontWeight: 800, color: '#0f172a', fontSize: '0.95rem' }}>
                           OAuth 2.0 Client Credentials
                         </Typography>
-                        <Typography variant="caption" sx={{ color: '#64748b' }}>
-                          Standard RFC 6749 Client Credentials for Renic Soft Master Security & API Authentication
+                        <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.7rem' }}>
+                          Authenticate this workspace with your tenant credentials
                         </Typography>
                       </Box>
                     </Box>
                     <Chip 
-                      label={!oauthEnforced ? 'Permissive Mode — Optional' : (oauthStatus?.verified ? 'OAuth 2.0 Verified & Active' : 'OAuth Enforced — Action Required')} 
+                      label={!oauthEnforced ? 'Optional' : (oauthStatus?.verified ? 'Verified & Active' : 'Action Required')} 
                       size="small" 
                       sx={{ 
+                        height: 20,
                         bgcolor: !oauthEnforced ? '#f1f5f9' : (oauthStatus?.verified ? '#dcfce7' : '#ffedd5'), 
                         color: !oauthEnforced ? '#64748b' : (oauthStatus?.verified ? '#166534' : '#c2410c'), 
                         fontWeight: 800, 
-                        fontSize: '0.75rem',
+                        fontSize: '0.68rem',
                         border: !oauthEnforced ? '1px solid #cbd5e1' : (oauthStatus?.verified ? '1px solid #86efac' : '1px solid #fdba74')
                       }} 
                     />
                   </Box>
 
-                  {oauthEnforced && !oauthStatus?.verified && (
-                    <Alert severity="warning" sx={{ mb: 2.5, borderRadius: '10px' }}>
-                      <Typography variant="caption" sx={{ fontWeight: 700, display: 'block' }}>
-                        OAuth 2.0 Enforcement Active
-                      </Typography>
-                      <Typography variant="caption" sx={{ color: '#9a3412', display: 'block', mt: 0.3 }}>
-                        Renic Soft Master HQ has strictly enforced OAuth authentication. Other screens are currently locked. Enter your provisioned Client ID &amp; Secret and click &quot;Verify Credentials&quot; to unlock.
-                      </Typography>
+                  {oauthStatus?.verified && (
+                    <Alert severity="success" sx={{ mb: 1.5, py: 0.3, borderRadius: '6px', '& .MuiAlert-message': { fontSize: '0.75rem' } }}>
+                      <strong>OAuth 2.0 Active</strong> — Credentials verified with Renic Soft. All automation features unlocked.
                     </Alert>
                   )}
 
-                  {oauthEnforced && oauthStatus?.verified && (
-                    <Alert severity="success" sx={{ mb: 2.5, borderRadius: '10px' }}>
-                      <Typography variant="caption" sx={{ fontWeight: 700, display: 'block' }}>
-                        OAuth 2.0 Machine-to-Machine Security Verified &amp; Active
-                      </Typography>
-                      <Typography variant="caption" sx={{ color: '#166534', display: 'block', mt: 0.3 }}>
-                        Valid tokens verified with Renic Soft Master HQ. All automation features and workflows unlocked.
-                      </Typography>
-                    </Alert>
-                  )}
-
-                  <Stack spacing={2.5}>
+                  <Stack spacing={1.5}>
                     <Box>
-                      <Typography variant="caption" sx={{ fontWeight: 700, color: '#475569', mb: 0.8, display: 'block' }}>
+                      <Typography variant="caption" sx={{ fontWeight: 700, color: '#475569', mb: 0.4, display: 'block', fontSize: '0.72rem' }}>
                         Client ID
                       </Typography>
                       <TextField
@@ -2073,14 +1449,14 @@ export default function Settings() {
                         onChange={(e) => setTenantClientId(e.target.value)}
                         slotProps={{
                           input: {
-                            sx: { fontFamily: 'monospace', fontSize: '0.9rem', bgcolor: '#f8fafc', fontWeight: 600 }
+                            sx: { fontFamily: 'monospace', fontSize: '0.8rem', bgcolor: '#f8fafc', fontWeight: 600, borderRadius: '6px' }
                           }
                         }}
                       />
                     </Box>
 
                     <Box>
-                      <Typography variant="caption" sx={{ fontWeight: 700, color: '#475569', mb: 0.8, display: 'block' }}>
+                      <Typography variant="caption" sx={{ fontWeight: 700, color: '#475569', mb: 0.4, display: 'block', fontSize: '0.72rem' }}>
                         Client Secret
                       </Typography>
                       <TextField
@@ -2092,23 +1468,27 @@ export default function Settings() {
                         onChange={(e) => setTenantClientSecret(e.target.value)}
                         slotProps={{
                           input: {
-                            sx: { fontFamily: 'monospace', bgcolor: '#f8fafc' }
+                            sx: { fontFamily: 'monospace', bgcolor: '#f8fafc', borderRadius: '6px', fontSize: '0.8rem' }
                           }
                         }}
                       />
                     </Box>
 
-                    <Box sx={{ display: 'flex', gap: 1.5 }}>
+                    <Box sx={{ display: 'flex', gap: 1, pt: 0.5 }}>
                       <Button
                         variant="contained"
+                        size="small"
                         disabled={verifyingOauth || !tenantClientId.trim() || !tenantClientSecret.trim()}
                         onClick={handleVerifyOauth}
                         sx={{
                           bgcolor: '#84cc16',
                           color: '#0f172a',
                           fontWeight: 800,
+                          fontSize: '0.78rem',
                           textTransform: 'none',
-                          px: 3,
+                          px: 2.5,
+                          py: 0.6,
+                          borderRadius: '6px',
                           '&:hover': { bgcolor: '#65a30d' }
                         }}
                       >
@@ -2116,131 +1496,27 @@ export default function Settings() {
                       </Button>
                       <Button
                         variant="outlined"
+                        size="small"
                         disabled={savingOauth}
                         onClick={handleSaveOauthCredentials}
                         sx={{
                           borderColor: '#cbd5e1',
                           color: '#334155',
                           fontWeight: 700,
+                          fontSize: '0.78rem',
                           textTransform: 'none',
+                          borderRadius: '6px',
                           '&:hover': { borderColor: '#94a3b8' }
                         }}
                       >
                         {savingOauth ? 'Saving...' : 'Save Credentials'}
                       </Button>
                     </Box>
-
-                    <Box sx={{ mt: 1.5, p: 1.5, bgcolor: '#f8fafc', borderRadius: 2, border: '1px dashed #cbd5e1' }}>
-                      <Typography variant="caption" sx={{ color: '#0f172a', display: 'flex', alignItems: 'center', gap: 0.8, fontWeight: 700 }}>
-                        <span>🛡️</span> Security &amp; Token Architecture:
-                      </Typography>
-                      <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mt: 0.5, lineHeight: 1.45 }}>
-                        OAuth 2.0 Client credentials authorize external API integrations (Tally, ERP, POS) and secure tenant software access. Credentials can be generated in Renic Soft Master Cockpit.
-                      </Typography>
-                    </Box>
-
-                    <Box sx={{ pt: 1 }}>
-                      <Typography variant="caption" sx={{ fontWeight: 700, color: '#475569', mb: 1, display: 'block' }}>
-                        Permitted OAuth 2.0 Scopes
-                      </Typography>
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                        {(oauthData.scopes.length > 0 ? oauthData.scopes : [
-                          'messages:send', 'messages:read', 'catalog:read', 'templates:read', 'customers:read'
-                        ]).map((scope) => (
-                          <Chip 
-                            key={scope} 
-                            label={scope} 
-                            size="small" 
-                            sx={{ 
-                              bgcolor: '#f1f5f9', 
-                              color: '#334155', 
-                              fontFamily: 'monospace', 
-                              fontSize: '0.75rem',
-                              fontWeight: 600,
-                              border: '1px solid #e2e8f0' 
-                            }} 
-                          />
-                        ))}
-                      </Box>
-                    </Box>
                   </Stack>
                 </CardContent>
               </Card>
-            </Grid>
-
-            {/* Developer Integration Guide */}
-            <Grid item xs={12} md={5}>
-              <Card sx={{ 
-                borderRadius: '16px', 
-                border: '1px solid #e2e8f0', 
-                boxShadow: '0 4px 12px -2px rgba(0,0,0,0.05)',
-                bgcolor: '#0f172a',
-                color: '#ffffff',
-                p: { xs: 2.5, sm: 3 }
-              }}>
-                <CardContent sx={{ p: 0 }}>
-                  <Typography variant="h6" sx={{ fontWeight: 800, color: '#ffffff', mb: 1, fontSize: '1rem', display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <span style={{ color: '#84cc16' }}>⚡</span> Integration Guide (Tally / ERP)
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: '#94a3b8', mb: 2, display: 'block' }}>
-                    Step 1: Obtain a temporary 1-hour Bearer Token using your credentials:
-                  </Typography>
-
-                  <Box sx={{ 
-                    p: 1.5, 
-                    borderRadius: '8px', 
-                    bgcolor: 'rgba(0,0,0,0.4)', 
-                    fontFamily: 'monospace', 
-                    fontSize: '0.72rem', 
-                    color: '#a7f3d0',
-                    overflowX: 'auto',
-                    border: '1px solid rgba(255,255,255,0.08)',
-                    mb: 2
-                  }}>
-                    {`curl -X POST ${window.location.origin}/api/v1/oauth/token \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "grant_type": "client_credentials",
-    "client_id": "${oauthData.clientId || 'YOUR_CLIENT_ID'}",
-    "client_secret": "YOUR_CLIENT_SECRET"
-  }'`}
-                  </Box>
-
-                  <Typography variant="caption" sx={{ color: '#94a3b8', mb: 1, display: 'block' }}>
-                    Step 2: Dispatch WhatsApp message with your token:
-                  </Typography>
-
-                  <Box sx={{ 
-                    p: 1.5, 
-                    borderRadius: '8px', 
-                    bgcolor: 'rgba(0,0,0,0.4)', 
-                    fontFamily: 'monospace', 
-                    fontSize: '0.72rem', 
-                    color: '#93c5fd',
-                    overflowX: 'auto',
-                    border: '1px solid rgba(255,255,255,0.08)'
-                  }}>
-                    {`curl -X POST ${window.location.origin}/api/messages \\
-  -H "Authorization: Bearer <ACCESS_TOKEN>" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "to": "919876543210",
-    "message": "Your invoice INV-001 is ready!"
-  }'`}
-                  </Box>
-
-                  <Box sx={{ mt: 2.5, p: 1.5, borderRadius: '8px', bgcolor: 'rgba(132, 204, 22, 0.1)', border: '1px solid rgba(132, 204, 22, 0.2)' }}>
-                    <Typography variant="caption" sx={{ color: '#bef264', fontWeight: 700, display: 'block' }}>
-                      🔒 Zero-Knowledge Security Active
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: '#e2e8f0', fontSize: '0.7rem' }}>
-                      Tokens auto-expire every 3600 seconds. If an ERP system is compromised, regenerate your secret above to revoke all active tokens immediately.
-                    </Typography>
-                  </Box>
-                </CardContent>
-              </Card>
-            </Grid>
-          </Grid>
+            </Box>
+          )}
         </Box>
       )}
 
@@ -2249,7 +1525,83 @@ export default function Settings() {
         onClose={() => setSnackbar({ ...snackbar, open: false })}
         message={snackbar.message}
         severity={snackbar.severity}
+        anchorOrigin={snackbar.anchorOrigin || { vertical: 'bottom', horizontal: 'right' }}
       />
+
+      {/* Centered Box Format Toast / Dialog for Invalid Credentials */}
+      <Dialog
+        open={oauthAlertBox.open}
+        onClose={() => setOauthAlertBox({ ...oauthAlertBox, open: false })}
+        PaperProps={{
+          sx: {
+            borderRadius: '24px',
+            p: 1.5,
+            maxWidth: 500,
+            width: '92%',
+            boxShadow: '0 30px 80px rgba(0,0,0,0.35)',
+            border: '2px solid #ef4444',
+            bgcolor: '#ffffff',
+            textAlign: 'center'
+          }
+        }}
+      >
+        <DialogTitle sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5, pt: 3 }}>
+          <Box sx={{
+            width: 68,
+            height: 68,
+            borderRadius: '50%',
+            bgcolor: '#fee2e2',
+            color: '#dc2626',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 10px 25px rgba(239, 68, 68, 0.25)',
+            border: '2px solid #f87171'
+          }}>
+            <ShieldIcon sx={{ fontSize: 38 }} />
+          </Box>
+          <Typography variant="h6" sx={{ fontWeight: 850, color: '#991b1b', fontSize: '1.2rem', mt: 0.5 }}>
+            {oauthAlertBox.title}
+          </Typography>
+        </DialogTitle>
+        <DialogContent sx={{ px: 3, py: 1 }}>
+          <Box sx={{
+            bgcolor: '#fef2f2',
+            border: '1px solid #fecaca',
+            borderRadius: '14px',
+            p: 2.5,
+            mb: 2,
+            textAlign: 'left'
+          }}>
+            <Typography variant="body2" sx={{ color: '#7f1d1d', fontWeight: 600, lineHeight: 1.6, fontSize: '0.92rem' }}>
+              {oauthAlertBox.message}
+            </Typography>
+          </Box>
+          <Typography variant="caption" sx={{ color: '#64748b', display: 'block', fontSize: '0.8rem' }}>
+            🚨 A security event was logged &amp; dispatched to <strong>Renic Soft Master HQ</strong> for platform auditing.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ justifyContent: 'center', pb: 3, px: 3 }}>
+          <Button
+            variant="contained"
+            onClick={() => setOauthAlertBox({ ...oauthAlertBox, open: false })}
+            sx={{
+              bgcolor: '#dc2626',
+              color: '#ffffff',
+              fontWeight: 800,
+              borderRadius: '12px',
+              px: 4,
+              py: 1.2,
+              fontSize: '0.92rem',
+              textTransform: 'none',
+              boxShadow: '0 6px 20px rgba(220, 38, 38, 0.35)',
+              '&:hover': { bgcolor: '#b91c1c' }
+            }}
+          >
+            Acknowledge &amp; Dismiss
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

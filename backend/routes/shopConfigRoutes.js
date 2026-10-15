@@ -2,15 +2,27 @@ const express = require('express');
 const router = express.Router();
 const ShopConfig = require('../models/ShopConfig');
 const MetaService = require('../services/MetaService');
+const { getModel } = require('../middlewares/tenantContext');
+
+function getTargetShopConfig() {
+  try {
+    return getModel('ShopConfig');
+  } catch (e) {
+    return ShopConfig;
+  }
+}
 
 // Get current AI Settings
 router.get('/ai-settings', async (req, res) => {
   try {
+    const TargetShopConfig = getTargetShopConfig();
     const userId = req.userId || req.user?._id || process.env.DEFAULT_USER_ID; 
-    let config = await ShopConfig.findOne({ userId });
-    
+    let config = await TargetShopConfig.findOne({ userId });
     if (!config) {
-      config = new ShopConfig({ userId });
+      config = await TargetShopConfig.findOne({});
+    }
+    if (!config) {
+      config = new TargetShopConfig({ userId });
       await config.save();
     }
 
@@ -54,11 +66,14 @@ router.post('/ai-settings', async (req, res) => {
 // Get Meta API Config
 router.get('/meta-config', async (req, res) => {
   try {
+    const TargetShopConfig = getTargetShopConfig();
     const userId = req.userId || req.user?._id || process.env.DEFAULT_USER_ID;
-    let config = await ShopConfig.findOne({ userId });
-    
+    let config = await TargetShopConfig.findOne({ userId });
     if (!config) {
-      config = new ShopConfig({ userId });
+      config = await TargetShopConfig.findOne({});
+    }
+    if (!config) {
+      config = new TargetShopConfig({ userId });
       await config.save();
     }
 
@@ -82,12 +97,12 @@ router.get('/meta-config', async (req, res) => {
   }
 });
 
-// Update Meta API Config
+// Update Meta API Config (Credentials only - engine mode is decided by Renic Soft Master HQ)
 router.post('/meta-config', async (req, res) => {
   try {
+    const TargetShopConfig = getTargetShopConfig();
     const userId = req.userId || req.user?._id || process.env.DEFAULT_USER_ID;
     const {
-      metaApiEnabled,
       metaAppId,
       metaAppSecret,
       metaPhoneNumberId,
@@ -96,11 +111,12 @@ router.post('/meta-config', async (req, res) => {
       metaBusinessAccountId
     } = req.body;
 
-    await ShopConfig.findOneAndUpdate(
+    // Strict Rule: metaApiEnabled and whatsappSenderMode are governed ONLY by Renic Soft Master HQ.
+    // Client cannot override or decide engine state from client side.
+    await TargetShopConfig.findOneAndUpdate(
       { userId: userId },
       { 
         $set: {
-          metaApiEnabled,
           metaAppId,
           metaAppSecret,
           metaPhoneNumberId,
@@ -114,7 +130,7 @@ router.post('/meta-config', async (req, res) => {
       { new: true, upsert: true }
     );
 
-    res.json({ success: true, message: 'Meta API config saved successfully' });
+    res.json({ success: true, message: 'Meta API credentials saved successfully' });
   } catch (error) {
     console.error('Error saving Meta config:', error);
     res.status(500).json({ success: false, error: 'Failed to save Meta config' });
@@ -124,6 +140,7 @@ router.post('/meta-config', async (req, res) => {
 // Test Meta API Connection
 router.post('/meta-test', async (req, res) => {
   try {
+    const TargetShopConfig = getTargetShopConfig();
     const userId = req.userId || req.user?._id || process.env.DEFAULT_USER_ID;
     const config = await MetaService.getMetaConfig(userId);
 
@@ -145,7 +162,7 @@ router.post('/meta-test', async (req, res) => {
     const displayPhoneNumber = response.data?.display_phone_number || '';
     const verifiedName = response.data?.verified_name || '';
 
-    await ShopConfig.findOneAndUpdate(
+    await TargetShopConfig.findOneAndUpdate(
       { userId },
       { 
         $set: { 
@@ -213,6 +230,62 @@ router.get('/system-status', async (req, res) => {
   } catch (error) {
     console.error('Error fetching system status:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch system status' });
+  }
+});
+
+
+// Get WhatsApp Sender & Engine Settings
+router.get('/whatsapp-engine', async (req, res) => {
+  try {
+    const TargetShopConfig = getTargetShopConfig();
+    const userId = req.userId || req.user?._id || process.env.DEFAULT_USER_ID;
+    let config = await TargetShopConfig.findOne({ userId });
+    if (!config) {
+      config = await TargetShopConfig.findOne({});
+    }
+    if (!config) {
+      config = await ShopConfig.findOne({});
+    }
+    res.json({
+      success: true,
+      whatsappSenderMode: config?.whatsappSenderMode || (config?.metaApiEnabled ? 'META' : 'DOCKER'),
+      dockerThrottleSeconds: config?.dockerThrottleSeconds || 6,
+      metaApiEnabled: config?.metaApiEnabled || false
+    });
+  } catch (error) {
+    console.error('Error fetching WhatsApp engine config:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch WhatsApp engine config' });
+  }
+});
+
+// Update WhatsApp Sender & Engine Operational Settings (Throttle only - engine mode is decided by Renic Soft Master HQ)
+router.post('/whatsapp-engine', async (req, res) => {
+  try {
+    const TargetShopConfig = getTargetShopConfig();
+    const userId = req.userId || req.user?._id || process.env.DEFAULT_USER_ID;
+    const { dockerThrottleSeconds } = req.body;
+    const update = {};
+    if (dockerThrottleSeconds !== undefined) {
+      update.dockerThrottleSeconds = Number(dockerThrottleSeconds) || 6;
+    }
+
+    // Strict Rule: whatsappSenderMode and metaApiEnabled are NOT modifiable by client.
+    // They are governed 100% by Renic Soft Master HQ.
+    const updated = await TargetShopConfig.findOneAndUpdate(
+      { userId },
+      { $set: update },
+      { new: true, upsert: true }
+    );
+
+    res.json({
+      success: true,
+      message: 'WhatsApp Engine operational settings saved successfully',
+      whatsappSenderMode: updated.whatsappSenderMode,
+      dockerThrottleSeconds: updated.dockerThrottleSeconds
+    });
+  } catch (error) {
+    console.error('Error saving WhatsApp engine config:', error);
+    res.status(500).json({ success: false, error: 'Failed to save WhatsApp engine config' });
   }
 });
 

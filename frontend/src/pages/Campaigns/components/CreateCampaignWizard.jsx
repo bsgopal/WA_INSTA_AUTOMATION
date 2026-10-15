@@ -34,6 +34,10 @@ import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import SendIcon from '@mui/icons-material/Send';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import TemplateIcon from '@mui/icons-material/ViewQuilt';
+import FullscreenIcon from '@mui/icons-material/Fullscreen';
+import FullscreenExitIcon from '@mui/icons-material/FullscreenExit';
+import SaveIcon from '@mui/icons-material/Save';
+
 import apiClient from '../../../api/client';
 import renicIcon from '../../../assets/logo-icon.jpeg';
 
@@ -60,10 +64,6 @@ const CAMPAIGN_PRESETS = [
   }
 ];
 
-/**
- * MobilePreview Component
- * Realistic WhatsApp Phone Simulator with live message formatting
- */
 const MobilePreview = ({ data }) => {
   const content = data.messageContent || '';
   const isImageMode = data.messageType === 'MEDIA';
@@ -80,7 +80,7 @@ const MobilePreview = ({ data }) => {
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
-      .replace(/\*([^*]+)\*/g, '<strong>$1</strong>')
+      .replace(/\*([^\*]+)\*/g, '<strong>$1</strong>')
       .replace(/_([^_]+)_/g, '<em>$1</em>')
       .replace(/`([^`]+)`/g, '<code>$1</code>');
 
@@ -99,13 +99,13 @@ const MobilePreview = ({ data }) => {
       sx={{
         width: '100%',
         maxWidth: '280px',
-        height: '460px',
+        height: '440px',
         bgcolor: '#efeae2',
         backgroundImage: 'radial-gradient(#d1d5db 0.75px, transparent 0.75px)',
         backgroundSize: '12px 12px',
-        border: '7px solid #0f172a',
-        borderRadius: '26px',
-        boxShadow: '0 20px 35px -8px rgba(15, 23, 42, 0.35)',
+        border: '6px solid #0f172a',
+        borderRadius: '24px',
+        boxShadow: '0 16px 30px -8px rgba(15, 23, 42, 0.35)',
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
@@ -113,30 +113,30 @@ const MobilePreview = ({ data }) => {
         margin: '0 auto'
       }}
     >
-      {/* Top Phone Speaker Notch */}
+      {/* Notch */}
       <Box
         sx={{
           position: 'absolute',
           top: 0,
           left: '50%',
           transform: 'translateX(-50%)',
-          width: '84px',
-          height: '12px',
+          width: '75px',
+          height: '10px',
           bgcolor: '#0f172a',
-          borderBottomLeftRadius: '8px',
-          borderBottomRightRadius: '8px',
+          borderBottomLeftRadius: '6px',
+          borderBottomRightRadius: '6px',
           zIndex: 5
         }}
       />
 
-      {/* WhatsApp Header Strip */}
+      {/* Header Strip */}
       <Box
         sx={{
           bgcolor: '#0f172a',
           color: '#ffffff',
-          pt: 2,
-          pb: 1,
-          px: 1.25,
+          pt: 1.5,
+          pb: 0.8,
+          px: 1.2,
           display: 'flex',
           alignItems: 'center',
           gap: 1,
@@ -149,27 +149,16 @@ const MobilePreview = ({ data }) => {
           component="img"
           src={renicIcon}
           alt="Renic"
-          sx={{
-            width: 26,
-            height: 26,
-            borderRadius: '6px',
-            bgcolor: '#ffffff',
-            p: 0.2,
-            objectFit: 'contain'
-          }}
+          sx={{ width: 24, height: 24, borderRadius: '6px', bgcolor: '#ffffff', p: 0.2, objectFit: 'contain' }}
         />
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Stack direction="row" alignItems="center" spacing={0.5}>
-            <Typography
-              variant="body2"
-              noWrap
-              sx={{ fontWeight: 800, color: '#ffffff', fontSize: '11px', lineHeight: 1.1 }}
-            >
+            <Typography variant="body2" noWrap sx={{ fontWeight: 800, color: '#ffffff', fontSize: '10.5px', lineHeight: 1.1 }}>
               RENIC TECH Business
             </Typography>
-            <CheckCircleIcon sx={{ fontSize: 12, color: '#84cc16' }} />
+            <CheckCircleIcon sx={{ fontSize: 11, color: '#84cc16' }} />
           </Stack>
-          <Typography variant="caption" sx={{ color: '#84cc16', fontSize: '8.5px', display: 'block', lineHeight: 1, fontWeight: 700 }}>
+          <Typography variant="caption" sx={{ color: '#84cc16', fontSize: '8px', display: 'block', lineHeight: 1, fontWeight: 700 }}>
             online • official business account
           </Typography>
         </Box>
@@ -186,11 +175,10 @@ const MobilePreview = ({ data }) => {
           overflowY: 'auto'
         }}
       >
-        {/* Message bubble */}
         <Box
           sx={{
             alignSelf: 'flex-start',
-            maxWidth: '94%',
+            maxWidth: '95%',
             bgcolor: '#ffffff',
             color: '#0f172a',
             borderRadius: '10px',
@@ -201,17 +189,16 @@ const MobilePreview = ({ data }) => {
             mb: 1
           }}
         >
-          {/* Media preview */}
           {isImageMode && (
             <Box sx={{ mb: 1, borderRadius: '6px', overflow: 'hidden', border: '1px solid #e2e8f0', bgcolor: '#f1f5f9' }}>
               {data.mediaType === 'document' || data.mediaMimeType === 'application/pdf' || (data.mediaFileName && data.mediaFileName.toLowerCase().endsWith('.pdf')) ? (
-                <Box sx={{ p: 1.25, display: 'flex', alignItems: 'center', gap: 1.2, bgcolor: '#f8fafc', borderLeft: '4px solid #ef4444' }}>
-                  <PictureAsPdfIcon sx={{ fontSize: 30, color: '#ef4444', flexShrink: 0 }} />
+                <Box sx={{ p: 1, display: 'flex', alignItems: 'center', gap: 1, bgcolor: '#f8fafc', borderLeft: '4px solid #ef4444' }}>
+                  <PictureAsPdfIcon sx={{ fontSize: 24, color: '#ef4444', flexShrink: 0 }} />
                   <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Typography variant="body2" noWrap sx={{ fontWeight: 700, fontSize: '11px', color: '#0f172a' }}>
+                    <Typography variant="body2" noWrap sx={{ fontWeight: 700, fontSize: '10px', color: '#0f172a' }}>
                       {data.mediaFileName || 'Document.pdf'}
                     </Typography>
-                    <Typography variant="caption" sx={{ fontSize: '9px', color: '#64748b', fontWeight: 600, display: 'block' }}>
+                    <Typography variant="caption" sx={{ fontSize: '8px', color: '#64748b', fontWeight: 600, display: 'block' }}>
                       PDF DOCUMENT • READY TO SEND
                     </Typography>
                   </Box>
@@ -220,29 +207,27 @@ const MobilePreview = ({ data }) => {
                 <Box
                   component="img"
                   src={data.mediaPreviewData || data.mediaUrl}
-                  alt="Campaign Media Banner"
-                  sx={{ width: '100%', maxHeight: '110px', objectFit: 'cover', display: 'block' }}
+                  alt="Banner"
+                  sx={{ width: '100%', maxHeight: '100px', objectFit: 'cover', display: 'block' }}
                 />
               ) : (
-                <Box sx={{ height: '85px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', bgcolor: '#f8fafc', color: '#94a3b8' }}>
-                  <ImageIcon sx={{ fontSize: 24, color: '#94a3b8' }} />
-                  <Typography variant="caption" sx={{ fontSize: '9px', mt: 0.5, fontWeight: 600 }}>Image / PDF Media Preview</Typography>
+                <Box sx={{ height: '70px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', bgcolor: '#f8fafc', color: '#94a3b8' }}>
+                  <ImageIcon sx={{ fontSize: 20, color: '#94a3b8' }} />
+                  <Typography variant="caption" sx={{ fontSize: '8px', mt: 0.5, fontWeight: 600 }}>Media Preview</Typography>
                 </Box>
               )}
             </Box>
           )}
 
-          {/* Text Content */}
           <Box sx={{ pb: 0.5 }}>
             {formatMessageText(content)}
           </Box>
 
-          {/* Timestamp & read receipts */}
           <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 0.3, mt: 0.25 }}>
             <Typography variant="caption" sx={{ fontSize: '8px', color: '#64748b' }}>
               {timeString}
             </Typography>
-            <Typography variant="caption" sx={{ color: '#0284c7', fontWeight: 900, fontSize: '10px', lineHeight: 1 }}>
+            <Typography variant="caption" sx={{ color: '#0284c7', fontWeight: 900, fontSize: '9px', lineHeight: 1 }}>
               ✓✓
             </Typography>
           </Box>
@@ -252,89 +237,83 @@ const MobilePreview = ({ data }) => {
   );
 };
 
-const defaultFormData = {
-  name: '',
-  type: 'ONE_TIME',
-  targetSegment: 'ALL',
-  messageType: 'TEXT',
-  mediaType: 'none',
-  mediaUrl: '',
-  mediaPreviewData: '',
-  mediaMimeType: '',
-  mediaFileName: '',
-  messageContent: '',
-  metaTemplateName: '',
-  metaTemplateLanguage: 'en_US',
-  messageTemplate: ''
-};
+export default function CreateCampaignWizard({
+  open,
+  onClose,
+  onComplete,
+  loading = false,
+  asPanel = false,
+  isMaximized = false,
+  onToggleMaximize = () => {}
+}) {
+  const [formData, setFormData] = useState({
+    name: '',
+    targetSegment: 'ALL',
+    messageType: 'TEXT',
+    messageContent: '',
+    mediaUrl: '',
+    mediaPreviewData: '',
+    mediaType: 'none',
+    mediaMimeType: '',
+    mediaFileName: '',
+    messageTemplate: '',
+    metaTemplateName: '',
+    metaTemplateLanguage: 'en_US',
+    type: 'ONE_TIME'
+  });
 
-const CreateCampaignWizard = React.memo(({
-  open = false,
-  onClose = () => {},
-  onComplete = () => {},
-  loading = false
-}) => {
-  const [formData, setFormData] = useState(defaultFormData);
-  const [errors, setErrors] = useState({});
-  const [templateMode, setTemplateMode] = useState('CUSTOM'); // 'PREDEFINED' | 'CUSTOM'
-  const [metaEnabled, setMetaEnabled] = useState(false);
   const [templates, setTemplates] = useState([]);
-  const [metaTemplates, setMetaTemplates] = useState([]);
-  const [templatesLoading, setTemplatesLoading] = useState(false);
+  const [segments, setSegments] = useState([
+    { id: 'ALL', name: 'All Customers (Complete Database)', count: 0 },
+    { id: 'VIP', name: 'VIP Champions (High Spenders)', count: 0 },
+    { id: 'LOYAL', name: 'Loyal Regulars (Frequent Buyers)', count: 0 },
+    { id: 'POTENTIAL', name: 'Potential High Value', count: 0 },
+    { id: 'AT_RISK', name: 'At-Risk / Cart Abandoners', count: 0 }
+  ]);
   const [uploadingMedia, setUploadingMedia] = useState(false);
+  const [errors, setErrors] = useState({});
 
   useEffect(() => {
     if (open) {
-      setFormData(defaultFormData);
-      setTemplateMode('CUSTOM');
+      fetchTemplates();
+      fetchAudienceSegments();
+      setFormData({
+        name: '',
+        targetSegment: 'ALL',
+        messageType: 'TEXT',
+        messageContent: '',
+        mediaUrl: '',
+        mediaPreviewData: '',
+        mediaType: 'none',
+        mediaMimeType: '',
+        mediaFileName: '',
+        messageTemplate: '',
+        metaTemplateName: '',
+        metaTemplateLanguage: 'en_US',
+        type: 'ONE_TIME'
+      });
       setErrors({});
-      loadAvailableTemplates();
     }
   }, [open]);
 
-  const loadAvailableTemplates = async () => {
+  const fetchTemplates = async () => {
     try {
-      setTemplatesLoading(true);
-      const [tRes, mRes, shopRes] = await Promise.all([
-        apiClient.get('/templates').catch(() => ({ data: [] })),
-        apiClient.get('/templates/meta').catch(() => ({ data: [] })),
-        apiClient.get('/shop-config/meta').catch(() => ({ data: {} }))
-      ]);
-      setTemplates(Array.isArray(tRes.data) ? tRes.data : tRes.data?.templates || []);
-      setMetaTemplates(Array.isArray(mRes.data) ? mRes.data : []);
-      setMetaEnabled(Boolean(shopRes.data?.config?.metaApiEnabled || shopRes.data?.metaApiEnabled));
-    } catch (e) {
-      console.warn('Templates load note:', e);
-    } finally {
-      setTemplatesLoading(false);
+      const response = await apiClient.get('/templates');
+      setTemplates(response.data || []);
+    } catch (error) {
+      console.error('Failed to fetch templates:', error);
     }
   };
 
-  const handleSelectTemplate = (templateId) => {
-    const selectedTpl = templates.find(t => t._id === templateId);
-    if (!selectedTpl) {
-      setFormData(prev => ({
-        ...prev,
-        messageTemplate: ''
-      }));
-      return;
+  const fetchAudienceSegments = async () => {
+    try {
+      const response = await apiClient.get('/customers/stats/rfm-segments');
+      if (response.data && response.data.segments) {
+        setSegments(response.data.segments);
+      }
+    } catch (error) {
+      console.error('Failed to fetch segments:', error);
     }
-
-    const tplImage = selectedTpl.mediaUrl || selectedTpl.headerUrl || selectedTpl.imageUrl || selectedTpl.mediaPreviewData || '';
-    const hasImage = !!tplImage || selectedTpl.type === 'MEDIA' || selectedTpl.mediaType === 'image';
-
-    setFormData(prev => ({
-      ...prev,
-      messageTemplate: selectedTpl._id,
-      name: prev.name || selectedTpl.name,
-      messageContent: selectedTpl.content || '',
-      messageType: hasImage ? 'MEDIA' : (selectedTpl.type || 'TEXT'),
-      mediaUrl: tplImage,
-      mediaPreviewData: selectedTpl.mediaPreviewData || (tplImage.startsWith('data:') ? tplImage : ''),
-      mediaType: hasImage ? 'image' : 'none',
-      mediaFileName: selectedTpl.mediaFileName || (hasImage ? `${selectedTpl.name || 'template'}-media.png` : '')
-    }));
-    setErrors({});
   };
 
   const handleApplyPreset = (preset) => {
@@ -344,7 +323,6 @@ const CreateCampaignWizard = React.memo(({
       messageContent: preset.content,
       targetSegment: preset.segment || prev.targetSegment
     }));
-    setErrors({});
   };
 
   const handleInsertVariable = (variableTag) => {
@@ -423,28 +401,14 @@ const CreateCampaignWizard = React.memo(({
     onComplete(payload);
   };
 
-  return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      maxWidth="lg"
-      fullWidth
-      PaperProps={{
-        sx: {
-          borderRadius: '16px',
-          maxHeight: '90vh',
-          boxShadow: '0 25px 60px -15px rgba(15, 23, 42, 0.4)',
-          overflow: 'hidden',
-          display: 'flex',
-          flexDirection: 'column'
-        }
-      }}
-    >
-      {/* Header */}
+  // Main Wizard Form Content (Rendered either as in-page Panel or Modal Dialog)
+  const wizardContent = (
+    <Box sx={{ bgcolor: '#ffffff', borderRadius: asPanel ? '16px' : 0, overflow: 'hidden', border: asPanel ? '1px solid #e2e8f0' : 'none', boxShadow: asPanel ? '0 4px 20px rgba(0,0,0,0.06)' : 'none' }}>
+      {/* Header Bar */}
       <Box
         sx={{
-          px: 3,
-          py: 2,
+          px: 2.5,
+          py: 1.75,
           bgcolor: '#0f172a',
           color: '#ffffff',
           display: 'flex',
@@ -462,37 +426,71 @@ const CreateCampaignWizard = React.memo(({
           />
           <Box>
             <Stack direction="row" alignItems="center" spacing={1}>
-              <Typography variant="h6" sx={{ fontWeight: 800, color: '#ffffff', fontSize: '1.05rem' }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#ffffff', fontSize: '0.95rem' }}>
                 Create WhatsApp Campaign Broadcast
               </Typography>
               <Chip
-                label="SELLER HUB"
+                label="Two-Column Mode"
                 size="small"
                 sx={{
                   bgcolor: 'rgba(132, 204, 22, 0.15)',
                   color: '#84cc16',
                   fontWeight: 800,
-                  fontSize: '0.68rem',
+                  fontSize: '0.65rem',
                   height: 20
                 }}
               />
             </Stack>
-            <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.75rem' }}>
-              Compose rich promotional messages, pick e-commerce presets, and preview live on WhatsApp.
+            <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.72rem' }}>
+              Compose rich promotional messages &amp; preview live on WhatsApp simulator
             </Typography>
           </Box>
         </Box>
 
-        <IconButton onClick={onClose} size="small" sx={{ color: '#94a3b8', '&:hover': { color: '#ffffff' } }}>
-          <CloseIcon fontSize="small" />
-        </IconButton>
+        <Stack direction="row" spacing={1} alignItems="center">
+          {asPanel && (
+            <Tooltip title={isMaximized ? "Restore split layout" : "Maximize view"}>
+              <IconButton
+                size="small"
+                onClick={onToggleMaximize}
+                sx={{ color: '#94a3b8', bgcolor: 'rgba(255,255,255,0.05)', '&:hover': { color: '#ffffff', bgcolor: 'rgba(255,255,255,0.1)' } }}
+              >
+                {isMaximized ? <FullscreenExitIcon fontSize="small" /> : <FullscreenIcon fontSize="small" />}
+              </IconButton>
+            </Tooltip>
+          )}
+
+          <Button
+            variant="contained"
+            startIcon={<SaveIcon />}
+            onClick={handleSubmit}
+            disabled={loading}
+            size="small"
+            sx={{
+              bgcolor: '#84cc16',
+              color: '#0f172a',
+              fontWeight: 800,
+              fontSize: '0.8rem',
+              borderRadius: '8px',
+              px: 2,
+              height: 32,
+              '&:hover': { bgcolor: '#65a30d', color: '#ffffff' }
+            }}
+          >
+            {loading ? 'Creating...' : 'Save Draft'}
+          </Button>
+
+          <IconButton onClick={onClose} size="small" sx={{ color: '#94a3b8', '&:hover': { color: '#ffffff' } }}>
+            <CloseIcon fontSize="small" />
+          </IconButton>
+        </Stack>
       </Box>
 
       {/* Quick Presets Strip */}
       <Box
         sx={{
-          px: 3,
-          py: 1.25,
+          px: 2.5,
+          py: 1,
           bgcolor: '#f1f5f9',
           borderBottom: '1px solid #e2e8f0',
           display: 'flex',
@@ -501,467 +499,237 @@ const CreateCampaignWizard = React.memo(({
           overflowX: 'auto'
         }}
       >
-        <Typography variant="caption" sx={{ fontWeight: 800, color: '#475569', whiteSpace: 'nowrap', fontSize: '0.72rem' }}>
-          ⚡ QUICK PRESETS:
+        <Typography variant="caption" sx={{ fontWeight: 800, color: '#64748b', fontSize: '0.7rem', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
+          ⚡ 1-Click Presets:
         </Typography>
-        {CAMPAIGN_PRESETS.map((preset) => (
-          <Chip
-            key={preset.name}
-            label={preset.name}
-            size="small"
-            onClick={() => handleApplyPreset(preset)}
-            clickable
-            sx={{
-              bgcolor: '#ffffff',
-              border: '1px solid #cbd5e1',
-              fontWeight: 700,
-              fontSize: '0.75rem',
-              color: '#0f172a',
-              transition: 'all 0.15s ease',
-              '&:hover': {
-                bgcolor: '#0f172a',
-                color: '#84cc16',
-                borderColor: '#0f172a'
-              }
-            }}
-          />
-        ))}
+        <Stack direction="row" spacing={0.8} flexWrap="nowrap">
+          {CAMPAIGN_PRESETS.map((preset, index) => (
+            <Chip
+              key={index}
+              label={preset.name}
+              size="small"
+              onClick={() => handleApplyPreset(preset)}
+              clickable
+              sx={{
+                bgcolor: '#ffffff',
+                border: '1px solid #cbd5e1',
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                height: 24,
+                '&:hover': { bgcolor: '#84cc16', color: '#0f172a', borderColor: '#84cc16' }
+              }}
+            />
+          ))}
+        </Stack>
       </Box>
 
-      {/* Main Body Grid */}
-      <DialogContent sx={{ p: 3, overflowY: 'auto', bgcolor: '#f8fafc' }}>
+      {/* Body Grid: Left Controls + Right WhatsApp Simulator */}
+      <Box sx={{ p: 2.5, maxHeight: asPanel ? 'calc(100vh - 270px)' : 'calc(80vh - 120px)', overflowY: 'auto' }}>
         <Grid container spacing={3}>
-          {/* Left Column: Form Controls (62%) */}
-          <Grid item xs={12} md={7} lg={7.5}>
+          {/* Left Controls */}
+          <Grid item xs={12} md={7}>
             <Stack spacing={2.5}>
-              {/* Campaign Name & Type */}
-              <Grid container spacing={2}>
-                <Grid item xs={12} sm={8}>
-                  <TextField
-                    fullWidth
-                    label="Campaign Title"
-                    required
-                    size="small"
-                    placeholder="e.g., Weekend Flash Sale 2026"
-                    value={formData.name}
-                    onChange={(e) => {
-                      setFormData({ ...formData, name: e.target.value });
-                      if (errors.name) setErrors({ ...errors, name: '' });
-                    }}
-                    error={!!errors.name}
-                    helperText={errors.name}
-                    sx={{ '& .MuiOutlinedInput-root': { bgcolor: '#ffffff', borderRadius: '10px' } }}
-                  />
-                </Grid>
-                <Grid item xs={12} sm={4}>
-                  <FormControl fullWidth size="small">
-                    <InputLabel>Broadcast Type</InputLabel>
-                    <Select
-                      value={formData.type}
-                      label="Broadcast Type"
-                      onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                      sx={{ bgcolor: '#ffffff', borderRadius: '10px' }}
-                    >
-                      <MenuItem value="ONE_TIME">⚡ One-Time Blast</MenuItem>
-                      <MenuItem value="AUTOMATED">🤖 Automated Drip</MenuItem>
-                      <MenuItem value="RECURRING">🔄 Weekly Schedule</MenuItem>
-                    </Select>
-                  </FormControl>
-                </Grid>
-              </Grid>
+              {/* Campaign Name */}
+              <TextField
+                label="Campaign Broadcast Name *"
+                fullWidth
+                size="small"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                error={!!errors.name}
+                helperText={errors.name}
+                placeholder="e.g., Festival Gold Rush 50% Off Blast"
+              />
 
               {/* Target Audience Segment */}
               <FormControl fullWidth size="small">
-                <InputLabel>Target Customer Audience</InputLabel>
+                <InputLabel>Target Audience Segment</InputLabel>
                 <Select
                   value={formData.targetSegment}
-                  label="Target Customer Audience"
+                  label="Target Audience Segment"
                   onChange={(e) => setFormData({ ...formData, targetSegment: e.target.value })}
-                  sx={{ bgcolor: '#ffffff', borderRadius: '10px' }}
                 >
-                  <MenuItem value="ALL">👥 All Customers (Broadcast Blast)</MenuItem>
-                  <MenuItem value="VIP">⭐ VIP Customers (Top Spenders)</MenuItem>
-                  <MenuItem value="LOYAL">💎 Loyal Customers (Frequent Shoppers)</MenuItem>
-                  <MenuItem value="NEW">✨ New Inquiries / Leads</MenuItem>
-                  <MenuItem value="AT_RISK">⚠️ At Risk / Abandoned Cart</MenuItem>
+                  {segments.map((seg) => (
+                    <MenuItem key={seg.id} value={seg.id}>
+                      {seg.name} {seg.count ? `(${seg.count} contacts)` : ''}
+                    </MenuItem>
+                  ))}
                 </Select>
               </FormControl>
 
-              {/* Top-Level Mode Selector: Predefined Template vs Custom Campaign */}
-              <Paper
-                elevation={0}
-                sx={{
-                  p: 2,
-                  borderRadius: '12px',
-                  bgcolor: '#ffffff',
-                  border: '1px solid #cbd5e1',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
-                }}
-              >
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#0f172a', fontSize: '0.85rem' }}>
-                    Campaign Message Source:
-                  </Typography>
-                  <Chip
-                    label={!metaEnabled ? '🐳 WhatsApp Direct (Docker Engine)' : '⚡ Meta Cloud API'}
-                    size="small"
-                    sx={{
-                      height: 20,
-                      fontSize: '0.68rem',
-                      fontWeight: 800,
-                      bgcolor: !metaEnabled ? 'rgba(56, 189, 248, 0.15)' : 'rgba(132, 204, 22, 0.15)',
-                      color: !metaEnabled ? '#0284c7' : '#65a30d'
-                    }}
-                  />
-                </Box>
-
-                <Grid container spacing={1.5}>
-                  <Grid item xs={12} sm={6}>
-                    <Button
-                      fullWidth
-                      variant={templateMode === 'PREDEFINED' ? 'contained' : 'outlined'}
-                      onClick={() => setTemplateMode('PREDEFINED')}
-                      startIcon={<TemplateIcon />}
-                      sx={{
-                        borderRadius: '10px',
-                        textTransform: 'none',
-                        fontWeight: 800,
-                        fontSize: '0.825rem',
-                        py: 1,
-                        bgcolor: templateMode === 'PREDEFINED' ? '#0f172a' : '#f8fafc',
-                        color: templateMode === 'PREDEFINED' ? '#84cc16' : '#334155',
-                        borderColor: templateMode === 'PREDEFINED' ? '#0f172a' : '#cbd5e1',
-                        '&:hover': {
-                          bgcolor: templateMode === 'PREDEFINED' ? '#1e293b' : '#ffffff',
-                          borderColor: '#0f172a'
-                        }
-                      }}
-                    >
-                      Predefined Template
-                    </Button>
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <Button
-                      fullWidth
-                      variant={templateMode === 'CUSTOM' ? 'contained' : 'outlined'}
-                      onClick={() => setTemplateMode('CUSTOM')}
-                      startIcon={<AutoAwesomeIcon />}
-                      sx={{
-                        borderRadius: '10px',
-                        textTransform: 'none',
-                        fontWeight: 800,
-                        fontSize: '0.825rem',
-                        py: 1,
-                        bgcolor: templateMode === 'CUSTOM' ? '#0f172a' : '#f8fafc',
-                        color: templateMode === 'CUSTOM' ? '#84cc16' : '#334155',
-                        borderColor: templateMode === 'CUSTOM' ? '#0f172a' : '#cbd5e1',
-                        '&:hover': {
-                          bgcolor: templateMode === 'CUSTOM' ? '#1e293b' : '#ffffff',
-                          borderColor: '#0f172a'
-                        }
-                      }}
-                    >
-                      Custom Campaign Copy
-                    </Button>
-                  </Grid>
-                </Grid>
-
-                {templateMode === 'PREDEFINED' && (
-                  <Box sx={{ mt: 2, pt: 1.5, borderTop: '1px solid #f1f5f9' }}>
-                    <FormControl fullWidth size="small">
-                      <InputLabel>Choose Predefined Template</InputLabel>
-                      <Select
-                        value={formData.messageTemplate}
-                        label="Choose Predefined Template"
-                        onChange={(e) => handleSelectTemplate(e.target.value)}
-                        sx={{ bgcolor: '#ffffff', borderRadius: '10px' }}
-                      >
-                        <MenuItem value="">
-                          <em>-- Choose an Approved Template --</em>
-                        </MenuItem>
-                        {templates.map((tpl) => (
-                          <MenuItem key={tpl._id} value={tpl._id}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: 1 }}>
-                              <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                                {tpl.name}
-                              </Typography>
-                              <Stack direction="row" spacing={0.5}>
-                                {(tpl.mediaUrl || tpl.imageUrl || tpl.headerUrl || tpl.type === 'MEDIA') && (
-                                  <Chip label="🖼️ Has Image" size="small" sx={{ height: 18, fontSize: '0.62rem', bgcolor: '#e0f2fe', color: '#0369a1', fontWeight: 800 }} />
-                                )}
-                                <Chip label={tpl.category || tpl.type || 'MARKETING'} size="small" sx={{ height: 18, fontSize: '0.62rem', fontWeight: 700 }} />
-                              </Stack>
-                            </Box>
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-
-                    {formData.messageTemplate && (
-                      <Alert severity="success" sx={{ mt: 1.5, borderRadius: '8px', fontSize: '0.78rem', py: 0.5 }}>
-                        Template copy {formData.mediaUrl ? 'and promotional image banner ' : ''}auto-appended!
-                      </Alert>
-                    )}
-                  </Box>
-                )}
-              </Paper>
-
-              {/* Message Content & Formatting */}
+              {/* Message Mode Tabs */}
               <Box>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#0f172a', fontSize: '0.85rem' }}>
-                    WhatsApp Message Copy
+                <Typography variant="caption" sx={{ fontWeight: 800, color: '#475569', display: 'block', mb: 0.8, textTransform: 'uppercase' }}>
+                  Select Broadcast Mode:
+                </Typography>
+                <Stack direction="row" spacing={1}>
+                  <Button
+                    size="small"
+                    variant={formData.messageType === 'TEXT' ? 'contained' : 'outlined'}
+                    onClick={() => setFormData(prev => ({ ...prev, messageType: 'TEXT' }))}
+                    sx={{
+                      textTransform: 'none',
+                      fontWeight: 700,
+                      fontSize: '0.78rem',
+                      borderRadius: '8px',
+                      bgcolor: formData.messageType === 'TEXT' ? '#0f172a' : 'transparent',
+                      color: formData.messageType === 'TEXT' ? '#84cc16' : '#64748b',
+                      borderColor: '#cbd5e1'
+                    }}
+                  >
+                    📝 Text Message
+                  </Button>
+                  <Button
+                    size="small"
+                    variant={formData.messageType === 'MEDIA' ? 'contained' : 'outlined'}
+                    onClick={() => setFormData(prev => ({ ...prev, messageType: 'MEDIA' }))}
+                    sx={{
+                      textTransform: 'none',
+                      fontWeight: 700,
+                      fontSize: '0.78rem',
+                      borderRadius: '8px',
+                      bgcolor: formData.messageType === 'MEDIA' ? '#0f172a' : 'transparent',
+                      color: formData.messageType === 'MEDIA' ? '#84cc16' : '#64748b',
+                      borderColor: '#cbd5e1'
+                    }}
+                  >
+                    🖼️ Image / PDF Media Banner
+                  </Button>
+                </Stack>
+              </Box>
+
+              {/* Media Upload Area */}
+              {formData.messageType === 'MEDIA' && (
+                <Paper elevation={0} sx={{ p: 2, bgcolor: '#f8fafc', border: '1px dashed #cbd5e1', borderRadius: '12px' }}>
+                  <Typography variant="caption" sx={{ fontWeight: 800, color: '#0f172a', display: 'block', mb: 1 }}>
+                    Attach Promotional Banner / Catalog PDF:
                   </Typography>
-                  <Stack direction="row" spacing={0.5} alignItems="center">
-                    <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.72rem', mr: 0.5 }}>
-                      Insert:
-                    </Typography>
-                    <Chip
-                      label="{{customer_name}}"
-                      size="small"
-                      onClick={() => handleInsertVariable('{{customer_name}}')}
-                      sx={{ fontSize: '0.7rem', height: 22, bgcolor: '#e2e8f0', cursor: 'pointer' }}
-                    />
-                    <Chip
-                      label="{{offer_code}}"
-                      size="small"
-                      onClick={() => handleInsertVariable('{{offer_code}}')}
-                      sx={{ fontSize: '0.7rem', height: 22, bgcolor: '#e2e8f0', cursor: 'pointer' }}
-                    />
+
+                  {formData.mediaPreviewData ? (
+                    <Stack direction="row" spacing={2} alignItems="center">
+                      <Box component="img" src={formData.mediaPreviewData} alt="Preview" sx={{ width: 64, height: 64, objectFit: 'cover', borderRadius: '8px' }} />
+                      <Box sx={{ flex: 1 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 700, fontSize: '0.8rem' }}>{formData.mediaFileName || 'Attached Banner'}</Typography>
+                        <Typography variant="caption" sx={{ color: '#64748b' }}>Media will be dispatched with message</Typography>
+                      </Box>
+                      <Button size="small" color="error" onClick={() => setFormData(prev => ({ ...prev, mediaPreviewData: '', mediaUrl: '', mediaFileName: '' }))}>
+                        Remove
+                      </Button>
+                    </Stack>
+                  ) : (
+                    <Button variant="outlined" component="label" startIcon={<CloudUploadIcon />} disabled={uploadingMedia} size="small" sx={{ textTransform: 'none', fontWeight: 700 }}>
+                      {uploadingMedia ? 'Uploading...' : 'Upload Image / PDF File'}
+                      <input hidden type="file" accept="image/*,application/pdf" onChange={handleMediaUpload} />
+                    </Button>
+                  )}
+                </Paper>
+              )}
+
+              {/* Variable Tokens Helper */}
+              <Box>
+                <Stack direction="row" justifyContent="space-between" alignItems="center" mb={0.5}>
+                  <Typography variant="caption" sx={{ fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>
+                    Personalization Tokens:
+                  </Typography>
+                  <Stack direction="row" spacing={0.5}>
+                    {['{{customer_name}}', '{{discount_code}}', '{{order_id}}'].map((tag) => (
+                      <Chip
+                        key={tag}
+                        label={tag}
+                        size="small"
+                        onClick={() => handleInsertVariable(tag)}
+                        clickable
+                        sx={{
+                          fontFamily: 'monospace',
+                          fontSize: '0.68rem',
+                          height: 20,
+                          bgcolor: '#f1f5f9',
+                          border: '1px solid #cbd5e1'
+                        }}
+                      />
+                    ))}
                   </Stack>
-                </Box>
+                </Stack>
+
                 <TextField
+                  label="Message Content *"
                   fullWidth
                   multiline
                   rows={6}
-                  placeholder="Type your WhatsApp message copy here... Use *bold* for emphasis, _italics_ for subtitles, or select an e-commerce preset above."
                   value={formData.messageContent}
-                  onChange={(e) => {
-                    setFormData({ ...formData, messageContent: e.target.value });
-                    if (errors.messageContent) setErrors({ ...errors, messageContent: '' });
-                  }}
+                  onChange={(e) => setFormData({ ...formData, messageContent: e.target.value })}
                   error={!!errors.messageContent}
-                  helperText={errors.messageContent || 'Supports standard WhatsApp markdown (*bold*, _italic_, `code`).'}
-                  sx={{ '& .MuiOutlinedInput-root': { bgcolor: '#ffffff', borderRadius: '10px' } }}
+                  helperText={errors.messageContent || 'Supports WhatsApp formatting: *bold*, _italic_, `monospace`'}
+                  placeholder="Type promotional broadcast message..."
+                  sx={{ mt: 1 }}
                 />
               </Box>
-
-              {/* Media Attachment (Optional - Image or PDF) */}
-              <Box sx={{ p: 2, bgcolor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    {formData.mediaType === 'document' ? (
-                      <PictureAsPdfIcon sx={{ color: '#ef4444', fontSize: 20 }} />
-                    ) : (
-                      <ImageIcon sx={{ color: '#84cc16', fontSize: 20 }} />
-                    )}
-                    <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#0f172a', fontSize: '0.85rem' }}>
-                      Promotional Media / PDF (Optional)
-                    </Typography>
-                  </Box>
-                  <Chip
-                    label={
-                      formData.messageType === 'MEDIA'
-                        ? (formData.mediaType === 'document' ? 'PDF Mode Active' : 'Image Mode Active')
-                        : 'Text Only'
-                    }
-                    size="small"
-                    sx={{
-                      bgcolor: formData.messageType === 'MEDIA'
-                        ? (formData.mediaType === 'document' ? 'rgba(239, 68, 68, 0.12)' : 'rgba(132, 204, 22, 0.15)')
-                        : '#f1f5f9',
-                      color: formData.messageType === 'MEDIA'
-                        ? (formData.mediaType === 'document' ? '#dc2626' : '#4d7c0f')
-                        : '#64748b',
-                      fontWeight: 700,
-                      fontSize: '0.7rem'
-                    }}
-                  />
-                </Box>
-
-                {!formData.mediaUrl ? (
-                  <Box
-                    component="label"
-                    sx={{
-                      p: 2.5,
-                      border: '2px dashed #cbd5e1',
-                      borderRadius: '10px',
-                      bgcolor: '#f8fafc',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 1.5,
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                      '&:hover': { bgcolor: 'rgba(132, 204, 22, 0.05)', borderColor: '#84cc16' }
-                    }}
-                  >
-                    <input type="file" accept="image/*,application/pdf" hidden onChange={handleMediaUpload} />
-                    <CloudUploadIcon sx={{ color: '#64748b', fontSize: 28 }} />
-                    <Box>
-                      <Typography variant="body2" sx={{ fontWeight: 700, color: '#0f172a', fontSize: '0.825rem' }}>
-                        {uploadingMedia ? 'Uploading media...' : 'Click to upload promotional image or PDF'}
-                      </Typography>
-                      <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.72rem' }}>
-                        PNG, JPG, JPEG or PDF (Max 15MB)
-                      </Typography>
-                    </Box>
-                  </Box>
-                ) : (
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 1, bgcolor: '#f8fafc', borderRadius: '10px' }}>
-                    {formData.mediaType === 'document' ? (
-                      <Box sx={{
-                        width: 60,
-                        height: 60,
-                        borderRadius: '8px',
-                        bgcolor: 'rgba(239, 68, 68, 0.1)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        border: '1px solid rgba(239, 68, 68, 0.2)'
-                      }}>
-                        <PictureAsPdfIcon sx={{ color: '#ef4444', fontSize: 32 }} />
-                      </Box>
-                    ) : (
-                      <Box
-                        component="img"
-                        src={formData.mediaPreviewData || formData.mediaUrl}
-                        alt="Banner"
-                        sx={{ width: 60, height: 60, borderRadius: '8px', objectFit: 'cover', border: '1px solid #e2e8f0' }}
-                      />
-                    )}
-                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Typography variant="body2" noWrap sx={{ fontWeight: 700, color: '#0f172a', fontSize: '0.825rem' }}>
-                        {formData.mediaFileName || (formData.mediaType === 'document' ? 'Document.pdf' : 'Uploaded Banner')}
-                      </Typography>
-                      <Typography variant="caption" sx={{ color: '#059669', fontWeight: 700, display: 'block' }}>
-                        ✓ Ready to dispatch with WhatsApp message
-                      </Typography>
-                    </Box>
-                    <Button
-                      size="small"
-                      color="error"
-                      variant="outlined"
-                      startIcon={<DeleteIcon />}
-                      onClick={() => setFormData(prev => ({
-                        ...prev,
-                        mediaUrl: '',
-                        mediaPreviewData: '',
-                        mediaType: 'none',
-                        messageType: 'TEXT',
-                        mediaFileName: '',
-                        mediaMimeType: ''
-                      }))}
-                      sx={{ textTransform: 'none', fontWeight: 700, borderRadius: '8px' }}
-                    >
-                      Remove
-                    </Button>
-                  </Box>
-                )}
-              </Box>
-
-              {/* Meta Cloud Template Link - ONLY shown when Meta is configured & enabled */}
-              {metaEnabled && (
-                <Accordion elevation={0} sx={{ border: '1px solid #e2e8f0', borderRadius: '12px !important', '&:before': { display: 'none' } }}>
-                  <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem' }}>
-                      ⚡ Meta Cloud API Template Link (Optional)
-                    </Typography>
-                  </AccordionSummary>
-                  <AccordionDetails sx={{ pt: 0 }}>
-                    <FormControl fullWidth size="small">
-                      <InputLabel>Meta Cloud Template</InputLabel>
-                      <Select
-                        value={formData.metaTemplateName}
-                        label="Meta Cloud Template"
-                        onChange={(e) => setFormData(prev => ({ ...prev, metaTemplateName: e.target.value }))}
-                      >
-                        <MenuItem value="">None (Direct Broadcast)</MenuItem>
-                        {metaTemplates.map(m => (
-                          <MenuItem key={m.name} value={m.name}>{m.name}</MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                  </AccordionDetails>
-                </Accordion>
-              )}
             </Stack>
           </Grid>
 
-          {/* Right Column: Live Mobile WhatsApp Simulator (38%) */}
-          <Grid item xs={12} md={5} lg={4.5}>
-            <Box
-              sx={{
-                p: 2.5,
-                borderRadius: '16px',
-                border: '1px solid #e2e8f0',
-                bgcolor: '#ffffff',
-                boxShadow: '0 4px 16px -2px rgba(15, 23, 42, 0.06)',
-                textAlign: 'center'
-              }}
-            >
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, mb: 1.5 }}>
-                <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#84cc16' }} />
-                <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#0f172a', fontSize: '0.85rem' }}>
-                  Live Customer WhatsApp Preview
+          {/* Right Phone Simulator Preview */}
+          <Grid item xs={12} md={5}>
+            <Paper elevation={0} sx={{ p: 2, bgcolor: '#f8fafc', borderRadius: '16px', border: '1px solid #e2e8f0', textAlign: 'center', position: 'sticky', top: 10 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+                <Typography variant="caption" sx={{ fontWeight: 800, color: '#0f172a', textTransform: 'uppercase' }}>
+                  📱 Real-Time WhatsApp Simulator
                 </Typography>
+                <Chip label="LIVE PREVIEW" size="small" sx={{ height: 18, fontSize: '0.6rem', fontWeight: 800, bgcolor: '#84cc16', color: '#0f172a' }} />
               </Box>
 
               <MobilePreview data={formData} />
-
-              <Box sx={{ mt: 2, p: 1.25, bgcolor: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-                <Typography variant="caption" sx={{ color: '#475569', fontWeight: 700, fontSize: '0.75rem', display: 'block' }}>
-                  🚀 Broadcast Audience: {formData.targetSegment === 'ALL' ? 'All Customers (~1,250 contacts)' : `${formData.targetSegment} Segment`}
-                </Typography>
-              </Box>
-            </Box>
+            </Paper>
           </Grid>
         </Grid>
-      </DialogContent>
+      </Box>
 
       {/* Footer Actions */}
-      <DialogActions sx={{ px: 3, py: 2, bgcolor: '#ffffff', borderTop: '1px solid #e2e8f0', gap: 1.5 }}>
-        <Button
-          onClick={onClose}
-          sx={{
-            textTransform: 'none',
-            fontWeight: 700,
-            borderRadius: '8px',
-            color: '#475569',
-            px: 2.5,
-            height: '38px'
-          }}
-        >
+      <Box sx={{ p: 2, px: 2.5, bgcolor: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Button onClick={onClose} sx={{ color: '#64748b', textTransform: 'none', fontWeight: 700 }}>
           Cancel
         </Button>
+
         <Button
           variant="contained"
+          startIcon={<SendIcon />}
           onClick={handleSubmit}
           disabled={loading}
-          startIcon={loading ? <CircularProgress size={18} color="inherit" /> : <SendIcon sx={{ fontSize: 16 }} />}
           sx={{
             bgcolor: '#84cc16',
             color: '#0f172a',
-            fontWeight: 900,
-            fontSize: '0.875rem',
-            px: 3.5,
-            height: '40px',
-            borderRadius: '10px',
-            boxShadow: '0 4px 14px rgba(132, 204, 22, 0.45)',
-            '&:hover': {
-              bgcolor: '#65a30d',
-              color: '#ffffff',
-              boxShadow: '0 6px 18px rgba(101, 163, 13, 0.55)'
-            }
+            fontWeight: 800,
+            fontSize: '0.85rem',
+            borderRadius: '8px',
+            px: 3,
+            '&:hover': { bgcolor: '#65a30d', color: '#ffffff' }
           }}
         >
-          {loading ? 'Creating Campaign...' : 'Launch Campaign Broadcast'}
+          {loading ? 'Creating...' : 'Save & Launch Broadcast'}
         </Button>
-      </DialogActions>
+      </Box>
+    </Box>
+  );
+
+  if (asPanel) {
+    return wizardContent;
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="lg"
+      fullWidth
+      PaperProps={{
+        sx: {
+          borderRadius: '16px',
+          maxHeight: '90vh',
+          boxShadow: '0 25px 60px -15px rgba(15, 23, 42, 0.4)',
+          overflow: 'hidden'
+        }
+      }}
+    >
+      {wizardContent}
     </Dialog>
   );
-});
-
-CreateCampaignWizard.displayName = 'CreateCampaignWizard';
-
-export default CreateCampaignWizard;
+}

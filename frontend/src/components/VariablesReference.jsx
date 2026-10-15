@@ -326,7 +326,7 @@ const VariablesReference = ({ open, onClose, onInsertVariable }) => {
             <Box sx={{ borderTop: '2px solid #eee', pt: 3, mt: 3 }}>
               <h3>💡 Usage Tips</h3>
               <ul style={{ fontSize: '14px', lineHeight: '1.8' }}>
-                <li><strong>Format:</strong> Use double curly braces: <code>{{'{{'}}variable{{'}}'}}</code></li>
+                <li><strong>Format:</strong> Use double curly braces: <code>{"{{"}variable{"}}"}</code></li>
                 <li><strong>Store Info:</strong> Automatically pulls from your Shop Configuration</li>
                 <li><strong>Pricing:</strong> Rates update automatically when you change them in settings</li>
                 <li><strong>Conditional:</strong> Hide/show content based on customer type</li>
@@ -338,9 +338,9 @@ const VariablesReference = ({ open, onClose, onInsertVariable }) => {
             <Box sx={{ backgroundColor: '#f0f8ff', p: 2, borderRadius: '8px', mt: 2 }}>
               <strong>📝 Example Templates:</strong>
               <div style={{ fontSize: '13px', marginTop: '8px', fontFamily: 'monospace' }}>
-                <div>Welcome to {'{{'}}shop_name{{'}}'}}, {{'{{'}}customer_name{{'}}'}}! 👋</div>
-                <div style={{ marginTop: '8px' }}>Today's 22K rate: {'{{'}}gold_rate_22k{{'}}'}} per gram</div>
-                <div style={{ marginTop: '8px' }}>Order {'{{'}}order_id{{'}}'}} confirmed! Delivery: {'{{'}}delivery_date{{'}}'}</div>
+                <div>Welcome to {"{{"}shop_name{"}}"}, {"{{"}customer_name{"}}"}! 👋</div>
+                <div style={{ marginTop: '8px' }}>Today's 22K rate: {"{{"}gold_rate_22k{"}}"} per gram</div>
+                <div style={{ marginTop: '8px' }}>Order {"{{"}order_id{"}}"} confirmed! Delivery: {"{{"}delivery_date{"}}"}</div>
               </div>
             </Box>
           </>

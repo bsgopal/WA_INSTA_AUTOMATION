@@ -668,10 +668,11 @@ class AIChatHandler {
       const Workflow = require('../models/Workflow');
       const workflowEngine = require('./workflowEngine');
 
+      const userQuery = userId || customer?.userId;
       const activeWorkflows = await Workflow.find({
-        userId,
-        status: 'ACTIVE'
-      });
+        ...(userQuery ? { $or: [{ userId: userQuery }, { userId: customer?.userId }] } : {}),
+        status: { $in: ['ACTIVE', 'active'] }
+      }).sort({ priority: -1, updatedAt: -1 });
 
       if (!activeWorkflows || activeWorkflows.length === 0) {
         return null;
@@ -1169,9 +1170,36 @@ class AIChatHandler {
         leadScore.score = Math.max(leadScore.score, 9.5);
       }
 
-      // Step 8: PRIORITY TRIGGER EVALUATION (Workflows -> Response Rules -> AI)
+      // Step 8: PRIORITY TRIGGER EVALUATION (Appointment Bot -> Workflows -> Response Rules -> AI)
       console.log('\n🚀 Step 8: Evaluating Automated Flow & Rule Triggers...');
       
+      // 8.0: Check Appointment Booking Bot Engine (Interactive Dynamic State Machine)
+      try {
+        const appointmentBotEngine = require('./appointmentBotEngine');
+        const appointmentResult = await appointmentBotEngine.handleAppointmentMessage({
+          userId,
+          customer,
+          phoneNumber,
+          messageText: triggerText,
+          interactiveReply: options.interactiveReply,
+          channel
+        });
+        if (appointmentResult && appointmentResult.handled) {
+          console.log(`✅ Appointment Booking Engine handled message from ${phoneNumber}`);
+          return {
+            success: true,
+            customerId: customer._id,
+            inboundMessageId: inboundMessage._id,
+            conversationId: conversation._id,
+            messageType: 'APPOINTMENT_BOT_HANDLED',
+            appointmentId: appointmentResult.appointmentId || null,
+            processingTime: new Date()
+          };
+        }
+      } catch (aptErr) {
+        console.warn('⚠️ Appointment Bot evaluation error:', aptErr.message);
+      }
+
       // 8.1: Check Interactive Button / List selections
       const selectedId = options.interactiveReply?.id || null;
       let ruleMatch = await this.findActionForInteractiveSelection(selectedId, triggerText, userId, customer);

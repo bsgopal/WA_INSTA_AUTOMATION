@@ -21,7 +21,12 @@ import {
   InputLabel,
   CircularProgress,
   ToggleButtonGroup,
-  ToggleButton
+  ToggleButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Menu
 } from '@mui/material';
 
 // Icons
@@ -53,6 +58,11 @@ import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import PanToolIcon from '@mui/icons-material/PanTool';
 import MouseIcon from '@mui/icons-material/Mouse';
 import FlashOnIcon from '@mui/icons-material/FlashOn';
+import MenuBookIcon from '@mui/icons-material/MenuBook';
+import HelpIcon from '@mui/icons-material/Help';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import WorkflowDocumentationGuide from '../Documentation/WorkflowDocumentationGuide';
 import { useNavigate } from 'react-router-dom';
 import SmartTagToolbar from '../SmartTagToolbar';
 import { broadcastWorkspaceEvent } from '../../utils/workspaceSync';
@@ -156,6 +166,197 @@ function KeywordConfigEditor({ node, onChange }) {
   );
 }
 
+
+// ========================================================
+// PRESET WORKFLOW STARTER TEMPLATES
+// ========================================================
+const PRESET_WORKFLOW_TEMPLATES = {
+  MINIMAL: {
+    id: 'MINIMAL',
+    name: 'Basic Greeting Flow',
+    description: 'Clean starter with Start Trigger, Welcome Message, and End Flow',
+    nodes: [
+      {
+        id: 'node_start',
+        type: 'START',
+        label: 'Start Trigger',
+        position: { x: 80, y: 220 },
+        config: { triggerType: 'KEYWORD', keywords: ['hi', 'hello', 'hey', 'start'], matchType: 'CONTAINS' }
+      },
+      {
+        id: 'node_welcome',
+        type: 'SEND_TEXT',
+        label: 'Welcome Message & Options',
+        position: { x: 380, y: 220 },
+        config: {
+          message: 'Hello {{customerName}}! Welcome to our store 🌟\nHow can we help you today?',
+          buttons: [
+            { id: 'b1', title: '1. 📅 Book Appointment', value: 'Book' },
+            { id: 'b2', title: '2. 🛍️ View Services', value: 'Services' },
+            { id: 'b3', title: '3. 💬 Talk to Agent', value: 'Support' }
+          ]
+        }
+      },
+      {
+        id: 'node_end',
+        type: 'END',
+        label: 'End Flow',
+        position: { x: 740, y: 220 },
+        config: { terminationType: 'COMPLETE' }
+      }
+    ],
+    edges: [
+      { id: 'edge_start_welcome', fromNodeId: 'node_start', fromPort: 'out', toNodeId: 'node_welcome', toPort: 'in', label: '' },
+      { id: 'edge_welcome_end', fromNodeId: 'node_welcome', fromPort: 'out', toNodeId: 'node_end', toPort: 'in', label: '' }
+    ]
+  },
+  APPOINTMENT: {
+    id: 'APPOINTMENT',
+    name: 'Appointment Booking Flow',
+    description: 'Guided appointment scheduling with service selection and confirmation',
+    nodes: [
+      {
+        id: 'node_start',
+        type: 'START',
+        label: 'Start Trigger',
+        position: { x: 80, y: 220 },
+        config: { triggerType: 'KEYWORD', keywords: ['book', 'appointment', 'slot', 'schedule'], matchType: 'CONTAINS' }
+      },
+      {
+        id: 'node_service_select',
+        type: 'SEND_TEXT',
+        label: 'Choose Service',
+        position: { x: 380, y: 160 },
+        config: {
+          message: 'Please choose the service you would like to book with us:',
+          buttons: [
+            { id: 'b_s1', title: '1. Consultation (30m)', value: 'Consultation' },
+            { id: 'b_s2', title: '2. Comprehensive (1h)', value: 'Comprehensive' }
+          ]
+        }
+      },
+      {
+        id: 'node_confirm',
+        type: 'SEND_TEXT',
+        label: 'Booking Confirmation',
+        position: { x: 720, y: 160 },
+        config: {
+          message: 'Thank you {{customerName}}! Your appointment request has been recorded. Our specialist will confirm your slot shortly.',
+          buttons: []
+        }
+      },
+      {
+        id: 'node_end',
+        type: 'END',
+        label: 'End Flow',
+        position: { x: 1040, y: 220 },
+        config: { terminationType: 'COMPLETE' }
+      }
+    ],
+    edges: [
+      { id: 'edge_1', fromNodeId: 'node_start', fromPort: 'out', toNodeId: 'node_service_select', toPort: 'in', label: '' },
+      { id: 'edge_2', fromNodeId: 'node_service_select', fromPort: 'out', toNodeId: 'node_confirm', toPort: 'in', label: '' },
+      { id: 'edge_3', fromNodeId: 'node_confirm', fromPort: 'out', toNodeId: 'node_end', toPort: 'in', label: '' }
+    ]
+  },
+  STORE_MENU: {
+    id: 'STORE_MENU',
+    name: 'Interactive Store Menu',
+    description: 'Multi-category interactive catalog flow with button branches',
+    nodes: [
+      {
+        id: 'node_start',
+        type: 'START',
+        label: 'Start Trigger',
+        position: { x: 60, y: 220 },
+        config: { triggerType: 'KEYWORD', keywords: ['hi', 'hello', 'hey', 'menu', 'catalog'], matchType: 'CONTAINS' }
+      },
+      {
+        id: 'node_menu_card',
+        type: 'SEND_TEXT',
+        label: 'Welcome & Menu Card',
+        position: { x: 220, y: 150 },
+        config: {
+          message: 'Namaste! Welcome to our store 💎\nPlease select a category or type your choice:',
+          buttons: [
+            { id: 'b1', title: '1. 💍 Category A', value: 'Category A' },
+            { id: 'b2', title: '2. 📿 Category B', value: 'Category B' },
+            { id: 'b3', title: '3. 🛍️ Full Catalog', value: 'Catalog' }
+          ]
+        }
+      },
+      {
+        id: 'node_cat_a',
+        type: 'SEND_TEXT',
+        label: 'Category A Details',
+        position: { x: 600, y: 30 },
+        config: {
+          message: '✨ Explore our featured Category A items. Type "details" for more info!',
+          buttons: [{ id: 'b_info', title: 'More Info', value: 'Info' }]
+        }
+      },
+      {
+        id: 'node_cat_b',
+        type: 'SEND_TEXT',
+        label: 'Category B Details',
+        position: { x: 600, y: 220 },
+        config: {
+          message: '📿 Explore our premium Category B collection.',
+          buttons: []
+        }
+      },
+      {
+        id: 'node_catalog_card',
+        type: 'CATALOG',
+        label: '🛍️ Full Catalog Link',
+        position: { x: 600, y: 410 },
+        config: {
+          message: '🛍️ Browse our complete collection online:\nhttps://ourstore.example/catalog',
+          catalogUrl: 'https://ourstore.example/catalog'
+        }
+      },
+      {
+        id: 'node_end',
+        type: 'END',
+        label: 'End Flow',
+        position: { x: 960, y: 220 },
+        config: { terminationType: 'COMPLETE' }
+      }
+    ],
+    edges: [
+      { id: 'edge_start_menu', fromNodeId: 'node_start', fromPort: 'out', toNodeId: 'node_menu_card', toPort: 'in', label: '' },
+      { id: 'edge_b1_a', fromNodeId: 'node_menu_card', fromPort: 'b1', toNodeId: 'node_cat_a', toPort: 'in', label: '1. Option A' },
+      { id: 'edge_b2_b', fromNodeId: 'node_menu_card', fromPort: 'b2', toNodeId: 'node_cat_b', toPort: 'in', label: '2. Option B' },
+      { id: 'edge_b3_c', fromNodeId: 'node_menu_card', fromPort: 'b3', toNodeId: 'node_catalog_card', toPort: 'in', label: '3. Catalog' },
+      { id: 'edge_a_end', fromNodeId: 'node_cat_a', fromPort: 'out', toNodeId: 'node_end', toPort: 'in', label: '' },
+      { id: 'edge_b_end', fromNodeId: 'node_cat_b', fromPort: 'out', toNodeId: 'node_end', toPort: 'in', label: '' },
+      { id: 'edge_c_end', fromNodeId: 'node_catalog_card', fromPort: 'out', toNodeId: 'node_end', toPort: 'in', label: '' }
+    ]
+  },
+  BLANK: {
+    id: 'BLANK',
+    name: 'Blank Canvas',
+    description: 'Empty starter canvas with only Start and End nodes',
+    nodes: [
+      {
+        id: 'node_start',
+        type: 'START',
+        label: 'Start Trigger',
+        position: { x: 100, y: 220 },
+        config: { triggerType: 'KEYWORD', keywords: ['hi', 'hello', 'menu'], matchType: 'CONTAINS' }
+      },
+      {
+        id: 'node_end',
+        type: 'END',
+        label: 'End Flow',
+        position: { x: 500, y: 220 },
+        config: { terminationType: 'COMPLETE' }
+      }
+    ],
+    edges: []
+  }
+};
+
 export default function SapDmProcessDesigner({
   initialData = {},
   onSave,
@@ -168,12 +369,14 @@ export default function SapDmProcessDesigner({
   const navigate = useNavigate();
 
   // Process Title & Metadata
-  const [title, setTitle] = useState(initialData.name || (isWorkflow ? 'MENU_CATALOG_WORKFLOW' : 'JEWELRY_INTERACTIVE_FLOW'));
+  const [title, setTitle] = useState(initialData.name || (isWorkflow ? 'NEW_PROCESS_WORKFLOW' : 'NEW_INTERACTIVE_FLOW'));
   const [status, setStatus] = useState(initialData.status || 'ACTIVE');
   const [saving, setSaving] = useState(false);
+  const [docGuideOpen, setDocGuideOpen] = useState(false);
+  const [templateMenuAnchor, setTemplateMenuAnchor] = useState(null);
 
   // ========================================================
-  // 2D NODES & EDGES STATE
+  // 2D NODES & EDGES STATE (Clean Starter by Default)
   // ========================================================
   const [nodes, setNodes] = useState(() => {
     if (initialData.nodes && initialData.nodes.length > 0) {
@@ -182,91 +385,26 @@ export default function SapDmProcessDesigner({
         position: n.position || { x: 80 + idx * 240, y: 180 }
       }));
     }
-    // Default starter flow with 2D positions
-    return [
-      {
-        id: 'node_start',
-        type: 'START',
-        label: 'Start Trigger',
-        position: { x: 60, y: 220 },
-        config: {
-          triggerType: initialData.triggerType || 'KEYWORD',
-          keywords: initialData.triggerValue ? [initialData.triggerValue] : ['hi', 'hello', 'hey', 'menu', 'start'],
-          matchType: 'CONTAINS'
-        }
-      },
-      {
-        id: 'node_menu_card',
-        type: 'SEND_TEXT',
-        label: 'Welcome & Menu Card',
-        position: { x: 220, y: 150 },
-        config: {
-          message: 'Namaste! Welcome to our store 💎\nPlease select a category or type your choice:',
-          buttons: [
-            { id: 'b1', title: '1. 💍 Rings', value: 'Rings' },
-            { id: 'b2', title: '2. 📿 Necklaces', value: 'Necklaces' },
-            { id: 'b3', title: '3. 🛍️ Full Catalog', value: 'Catalog' }
-          ]
-        }
-      },
-      {
-        id: 'node_rings_card',
-        type: 'SEND_TEXT',
-        label: '💍 Rings Catalog',
-        position: { x: 600, y: 30 },
-        config: {
-          message: '✨ Here are our best-selling Diamond & Gold Rings:\n1. Solitaire Classic ($499)\n2. Eternity Diamond Band ($799)\nType "size" to check your ring size!',
-          buttons: [
-            { id: 'b_size', title: 'Check Ring Size', value: 'Size' }
-          ]
-        }
-      },
-      {
-        id: 'node_necklaces_card',
-        type: 'SEND_TEXT',
-        label: '📿 Necklaces Collection',
-        position: { x: 600, y: 220 },
-        config: {
-          message: '📿 Explore our Handcrafted Royal Necklaces:\n1. Pearl Pendant ($299)\n2. Gold Choker ($1,299)\nWould you like custom engraving on your necklace?',
-          buttons: []
-        }
-      },
-      {
-        id: 'node_catalog_card',
-        type: 'CATALOG',
-        label: '🛍️ Full Store Catalog',
-        position: { x: 600, y: 410 },
-        config: {
-          message: '🛍️ Browse our complete 2026 Collection online:\nhttps://renicjewels.com/catalog\nOur team is also on standby to assist you!',
-          catalogUrl: 'https://renicjewels.com/catalog'
-        }
-      },
-      {
-        id: 'node_end',
-        type: 'END',
-        label: 'End Flow',
-        position: { x: 960, y: 220 },
-        config: {
-          terminationType: 'COMPLETE'
-        }
-      }
-    ];
+    // Clean default starter
+    return PRESET_WORKFLOW_TEMPLATES.MINIMAL.nodes;
   });
 
   const [edges, setEdges] = useState(() => {
     if (initialData.edges && initialData.edges.length > 0) {
       return initialData.edges;
     }
-    return [
-      { id: 'edge_start_menu', fromNodeId: 'node_start', fromPort: 'out', toNodeId: 'node_menu_card', toPort: 'in', label: '' },
-      { id: 'edge_b1_rings', fromNodeId: 'node_menu_card', fromPort: 'b1', toNodeId: 'node_rings_card', toPort: 'in', label: '1. Rings' },
-      { id: 'edge_b2_necklaces', fromNodeId: 'node_menu_card', fromPort: 'b2', toNodeId: 'node_necklaces_card', toPort: 'in', label: '2. Necklaces' },
-      { id: 'edge_b3_catalog', fromNodeId: 'node_menu_card', fromPort: 'b3', toNodeId: 'node_catalog_card', toPort: 'in', label: '3. Catalog' },
-      { id: 'edge_rings_end', fromNodeId: 'node_rings_card', fromPort: 'out', toNodeId: 'node_end', toPort: 'in', label: '' },
-      { id: 'edge_necklaces_end', fromNodeId: 'node_necklaces_card', fromPort: 'out', toNodeId: 'node_end', toPort: 'in', label: '' },
-      { id: 'edge_catalog_end', fromNodeId: 'node_catalog_card', fromPort: 'out', toNodeId: 'node_end', toPort: 'in', label: '' }
-    ];
+    return PRESET_WORKFLOW_TEMPLATES.MINIMAL.edges;
   });
+
+  const handleApplyTemplate = (templateKey) => {
+    const tpl = PRESET_WORKFLOW_TEMPLATES[templateKey];
+    if (!tpl) return;
+    pushPastState();
+    setNodes(tpl.nodes);
+    setEdges(tpl.edges);
+    setTemplateMenuAnchor(null);
+    showUndoToast(`Loaded "${tpl.name}" template`);
+  };
 
   // Selected State
   const [selectedNodeId, setSelectedNodeId] = useState('node_menu_card');
@@ -901,13 +1039,16 @@ export default function SapDmProcessDesigner({
   const handleSaveClick = async () => {
     setSaving(true);
     try {
+      const startNode = nodes.find(n => n.type === 'START');
       const payload = {
         name: title,
         status,
         nodes,
         edges,
-        triggerType: nodes.find(n => n.type === 'START')?.config?.triggerType || 'KEYWORD',
-        triggerValue: nodes.find(n => n.type === 'START')?.config?.keywords?.[0] || '',
+        edgeRouting: globalEdgeStyle,
+        triggerType: startNode?.config?.triggerType || 'KEYWORD',
+        triggerKeywords: startNode?.config?.keywords || [],
+        triggerValue: startNode?.config?.keywords?.join(', ') || '',
         actionType: nodes.find(n => n.type === 'SEND_TEXT')?.type || 'SEND_TEXT',
         responseMessage: nodes.find(n => n.type === 'SEND_TEXT')?.config?.message || ''
       };
@@ -1161,11 +1302,90 @@ export default function SapDmProcessDesigner({
             </Tooltip>
           </Box>
 
+          {/* Starter Template Selector */}
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<AutoAwesomeIcon sx={{ fontSize: 15, color: '#D97706' }} />}
+            onClick={(e) => setTemplateMenuAnchor(e.currentTarget)}
+            sx={{
+              borderColor: '#CBD5E1',
+              color: '#334155',
+              fontWeight: 700,
+              textTransform: 'none',
+              bgcolor: '#FFFFFF',
+              px: 1.5,
+              display: { xs: 'none', sm: 'inline-flex' },
+              '&:hover': { bgcolor: '#F8FAFC', borderColor: '#94A3B8' }
+            }}
+          >
+            Templates
+          </Button>
+          <Menu
+            anchorEl={templateMenuAnchor}
+            open={Boolean(templateMenuAnchor)}
+            onClose={() => setTemplateMenuAnchor(null)}
+            PaperProps={{ sx: { borderRadius: '10px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', minWidth: 240 } }}
+          >
+            <Box sx={{ px: 2, py: 1 }}>
+              <Typography variant="caption" sx={{ fontWeight: 800, color: '#64748B', textTransform: 'uppercase' }}>
+                Starter Templates
+              </Typography>
+            </Box>
+            <Divider />
+            <MenuItem onClick={() => handleApplyTemplate('MINIMAL')}>
+              <Box>
+                <Typography variant="body2" sx={{ fontWeight: 700, color: '#0F172A' }}>🌟 Basic Greeting Flow</Typography>
+                <Typography variant="caption" sx={{ color: '#64748B', display: 'block' }}>Trigger + Welcome + End</Typography>
+              </Box>
+            </MenuItem>
+            <MenuItem onClick={() => handleApplyTemplate('APPOINTMENT')}>
+              <Box>
+                <Typography variant="body2" sx={{ fontWeight: 700, color: '#0F172A' }}>📅 Appointment Booking</Typography>
+                <Typography variant="caption" sx={{ color: '#64748B', display: 'block' }}>Service selection + Confirmation</Typography>
+              </Box>
+            </MenuItem>
+            <MenuItem onClick={() => handleApplyTemplate('STORE_MENU')}>
+              <Box>
+                <Typography variant="body2" sx={{ fontWeight: 700, color: '#0F172A' }}>🛍️ Interactive Store Menu</Typography>
+                <Typography variant="caption" sx={{ color: '#64748B', display: 'block' }}>Multi-option interactive buttons</Typography>
+              </Box>
+            </MenuItem>
+            <Divider />
+            <MenuItem onClick={() => handleApplyTemplate('BLANK')}>
+              <Box>
+                <Typography variant="body2" sx={{ fontWeight: 700, color: '#DC2626' }}>📄 Start Blank Canvas</Typography>
+                <Typography variant="caption" sx={{ color: '#64748B', display: 'block' }}>Empty canvas with Start & End only</Typography>
+              </Box>
+            </MenuItem>
+          </Menu>
+
+          {/* Workflow Documentation / User Guide Helper Button */}
+          <Tooltip title="Enterprise Workflow Documentation & User Guide">
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<MenuBookIcon sx={{ fontSize: 16, color: '#0284C7' }} />}
+              onClick={() => setDocGuideOpen(true)}
+              sx={{
+                borderColor: '#BAE6FD',
+                color: '#0369A1',
+                fontWeight: 700,
+                textTransform: 'none',
+                bgcolor: '#F0F9FF',
+                px: 1.5,
+                '&:hover': { bgcolor: '#E0F2FE', borderColor: '#7DD3FC' }
+              }}
+            >
+              Workflow Guide
+            </Button>
+          </Tooltip>
+
           <Button
             variant="contained"
             size="small"
             startIcon={<PlayArrowIcon sx={{ fontSize: 16 }} />}
-            sx={{ bgcolor: '#0284C7', color: '#FFF', fontWeight: 700, textTransform: 'none', px: 2 }}
+            sx={{ bgcolor: '#0284C7', color: '#FFF !important', fontWeight: 700, textTransform: 'none', px: 2 }}
             onClick={() => {
               setRightPanelOpen(true);
               setRightPanelTab(1);
@@ -2493,6 +2713,67 @@ export default function SapDmProcessDesigner({
           )}
         </Box>
       </Box>
+
+      {/* Documentation Guide Modal */}
+      <Dialog
+        open={docGuideOpen}
+        onClose={() => setDocGuideOpen(false)}
+        maxWidth="lg"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: '16px',
+            maxHeight: '90vh',
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column'
+          }
+        }}
+      >
+        <DialogTitle
+          sx={{
+            p: 2,
+            bgcolor: '#0F172A',
+            color: '#FFFFFF',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between'
+          }}
+        >
+          <Stack direction="row" alignItems="center" spacing={1.5}>
+            <MenuBookIcon sx={{ color: '#38BDF8' }} />
+            <Typography variant="h6" sx={{ fontWeight: 800, color: '#FFFFFF', fontSize: '1rem' }}>
+              Process Flow Designer — Interactive User Manual & Reference
+            </Typography>
+          </Stack>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Button
+              size="small"
+              variant="contained"
+              startIcon={<OpenInNewIcon sx={{ fontSize: 14 }} />}
+              onClick={() => {
+                const url = `${window.location.origin}${window.location.pathname}#/workflow-guide`;
+                window.open(url, '_blank');
+              }}
+              sx={{ bgcolor: '#0284C7', color: '#FFFFFF !important', fontWeight: 700, textTransform: 'none', px: 1.8, fontSize: '0.78rem' }}
+            >
+              Open in New Tab
+            </Button>
+            <IconButton size="small" onClick={() => setDocGuideOpen(false)} sx={{ color: '#94A3B8', '&:hover': { color: '#FFF' } }}>
+              <CloseIcon fontSize="small" />
+            </IconButton>
+          </Stack>
+        </DialogTitle>
+        <DialogContent sx={{ p: 2.5, bgcolor: '#F8FAFC', overflowY: 'auto' }}>
+          <WorkflowDocumentationGuide
+            inModal={true}
+            onOpenNewTab={() => {
+              const url = `${window.location.origin}${window.location.pathname}#/workflow-guide`;
+              window.open(url, '_blank');
+            }}
+          />
+        </DialogContent>
+      </Dialog>
 
       {/* Undo Toast */}
       {undoToast && (

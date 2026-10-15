@@ -5,7 +5,8 @@
   "type": "module",
   "main": "main.cjs",
   "scripts": {
-    "dev": "vite",
+    "dev": "concurrently --kill-others --names \"BACKEND,FRONTEND\" --prefix-colors \"green,blue\" \"cd ../backend && npm run dev\" \"vite\"",
+    "dev:frontend": "vite",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
@@ -13,7 +14,9 @@
     "stage:backend": "node stage-backend.cjs",
     "dist": "node stage-backend.cjs && electron-builder"
   },
-  "dependencies": {},
+  "dependencies": {
+    "xlsx": "^0.18.5"
+  },
   "devDependencies": {
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
@@ -28,6 +31,7 @@
     "@types/react-window": "^1.8.8",
     "@vitejs/plugin-react": "^6.0.1",
     "axios": "^1.16.1",
+    "concurrently": "^10.0.5",
     "electron": "^33.0.0",
     "electron-builder": "^24.13.0",
     "eslint": "^10.3.0",

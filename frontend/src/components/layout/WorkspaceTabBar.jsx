@@ -33,51 +33,93 @@ import DashboardIcon from '@mui/icons-material/Dashboard';
 import ViewQuiltIcon from '@mui/icons-material/ViewQuilt';
 import MessageIcon from '@mui/icons-material/Message';
 import AssessmentIcon from '@mui/icons-material/Assessment';
+import ReceiptIcon from '@mui/icons-material/Receipt';
 
 import { subscribeToWorkspaceEvents } from '../../utils/workspaceSync';
+import { useTenant } from '../../context/TenantContext';
 
 // All available applications/workspaces that can be opened as tabs (SAP DM style)
 const AVAILABLE_MODULES = [
   { id: 'dashboard', label: '📊 Dashboard', path: '/', icon: <DashboardIcon fontSize="small" sx={{ color: '#38bdf8' }} /> },
+  { id: 'appointments', label: '📅 Calendar & Bookings', path: '/appointments', icon: <DashboardIcon fontSize="small" sx={{ color: '#10b981' }} /> },
+  { id: 'appointment-services', label: '🩺 Services Catalog', path: '/appointment-services', icon: <StorefrontIcon fontSize="small" sx={{ color: '#10b981' }} /> },
+  { id: 'appointment-staff', label: '👨‍⚕️ Staff Directory', path: '/appointment-staff', icon: <PeopleIcon fontSize="small" sx={{ color: '#3b82f6' }} /> },
+  { id: 'appointment-settings', label: '⚙️ Booking Rules & Shifts', path: '/appointment-settings', icon: <SettingsIcon fontSize="small" sx={{ color: '#64748b' }} /> },
   { id: 'conversations', label: '💬 Conversations', path: '/conversations', icon: <ChatIcon fontSize="small" sx={{ color: '#8b5cf6' }} /> },
-  { id: 'rules', label: '📜 Response Rules', path: '/response-rules', icon: <RuleIcon fontSize="small" sx={{ color: '#10b981' }} /> },
   { id: 'workflows', label: '🎨 Flow Studio', path: '/workflows', icon: <AccountTreeIcon fontSize="small" sx={{ color: '#3b82f6' }} /> },
   { id: 'campaigns', label: '📢 Campaigns', path: '/campaigns', icon: <CampaignIcon fontSize="small" sx={{ color: '#f59e0b' }} /> },
+  { id: 'campaign-history', label: '📜 Campaign History', path: '/campaign-history', icon: <CampaignIcon fontSize="small" sx={{ color: '#d97706' }} /> },
   { id: 'customers', label: '👥 Customers CRM', path: '/customers', icon: <PeopleIcon fontSize="small" sx={{ color: '#06b6d4' }} /> },
   { id: 'catalog', label: '🛍️ Catalog', path: '/catalog', icon: <StorefrontIcon fontSize="small" sx={{ color: '#ec4899' }} /> },
   { id: 'templates', label: '📋 Templates', path: '/templates', icon: <ViewQuiltIcon fontSize="small" sx={{ color: '#a855f7' }} /> },
   { id: 'quick-replies', label: '⚡ Quick Replies', path: '/quick-replies', icon: <MessageIcon fontSize="small" sx={{ color: '#14b8a6' }} /> },
   { id: 'messages', label: '✉️ Messages', path: '/messages', icon: <MessageIcon fontSize="small" sx={{ color: '#6366f1' }} /> },
-  { id: 'ai-features', label: '🤖 AI Features', path: '/ai-features', icon: <SmartToyIcon fontSize="small" sx={{ color: '#84cc16' }} /> },
   { id: 'analytics', label: '📈 Analytics', path: '/analytics', icon: <AssessmentIcon fontSize="small" sx={{ color: '#22c55e' }} /> },
   { id: 'settings', label: '⚙️ Settings', path: '/settings', icon: <SettingsIcon fontSize="small" sx={{ color: '#94a3b8' }} /> }
 ];
 
-const DEFAULT_WORKSPACE_TABS = [
-  { id: 'rules', label: '📜 Response Rules', path: '/response-rules' },
-  { id: 'workflows', label: '🎨 Flow Studio', path: '/workflows' },
-  { id: 'conversations', label: '💬 Conversations', path: '/conversations' },
-  { id: 'campaigns', label: '📢 Campaigns', path: '/campaigns' },
-  { id: 'customers', label: '👥 Customers CRM', path: '/customers' }
-];
+const isModuleAllowed = (modPath, permissions = {}) => {
+  if (!permissions || Object.keys(permissions).length === 0) return true;
+  if (modPath === '/appointments' && permissions.appointments === false && permissions.appointmentBooking === false) return false;
+  if (modPath === '/appointment-services' && permissions.appointmentServices === false && permissions.appointmentBooking === false) return false;
+  if (modPath === '/appointment-staff' && permissions.appointmentStaff === false && permissions.appointmentBooking === false) return false;
+  if (modPath === '/appointment-settings' && permissions.appointmentSettings === false && permissions.appointmentBooking === false) return false;
+  if (modPath === '/workflows' && permissions.workflows === false) return false;
+  if (modPath === '/response-rules' && permissions.responseRules === false) return false;
+  if (modPath === '/ai-features' && (permissions.aiFeatures === false || permissions.aiAgent === false)) return false;
+  if (modPath === '/catalog' && permissions.catalog === false) return false;
+  if (modPath === '/templates' && permissions.templates === false) return false;
+  if (modPath === '/quick-replies' && permissions.quickReplies === false) return false;
+  if (modPath === '/campaigns' && (permissions.campaigns === false || permissions.bulkBroadcast === false)) return false;
+  if (modPath === '/campaign-history' && (permissions.campaigns === false || permissions.bulkBroadcast === false)) return false;
+  if (modPath === '/analytics' && (permissions.analytics === false || permissions.exportReports === false)) return false;
+  if (modPath === '/quotations' && permissions.quotations === false) return false;
+  if (modPath === '/conversations' && permissions.conversations === false && permissions.liveChat === false) return false;
+  if (modPath === '/messages' && permissions.messages === false && permissions.liveChat === false) return false;
+  if (modPath === '/settings' && permissions.settings === false) return false;
+  return true;
+};
 
 export default function WorkspaceTabBar() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { screenPermissions } = useTenant();
+
+  const allowedModules = AVAILABLE_MODULES.filter(m => isModuleAllowed(m.path, screenPermissions));
 
   const [tabs, setTabs] = useState(() => {
     try {
       const saved = localStorage.getItem('renic_workspace_tabs');
       if (saved) {
         const parsed = JSON.parse(saved);
-        // Normalize any old /rules path to /response-rules
         return parsed.map(t => t.path === '/rules' ? { ...t, path: '/response-rules' } : t);
       }
-      return DEFAULT_WORKSPACE_TABS;
+      return [
+        { id: 'dashboard', label: '📊 Dashboard', path: '/' }
+      ];
     } catch (e) {
-      return DEFAULT_WORKSPACE_TABS;
+      return [
+        { id: 'dashboard', label: '📊 Dashboard', path: '/' }
+      ];
     }
   });
+
+  // Purge any tabs that become unauthorized due to dynamic license change
+  useEffect(() => {
+    setTabs(prevTabs => {
+      const valid = prevTabs.filter(t => isModuleAllowed(t.path, screenPermissions));
+      if (valid.length === 0 && allowedModules.length > 0) {
+        const fallback = [allowedModules[0]];
+        localStorage.setItem('renic_workspace_tabs', JSON.stringify(fallback));
+        return fallback;
+      }
+      if (valid.length !== prevTabs.length) {
+        localStorage.setItem('renic_workspace_tabs', JSON.stringify(valid));
+        return valid;
+      }
+      return prevTabs;
+    });
+  }, [screenPermissions]);
 
   const [addMenuAnchor, setAddMenuAnchor] = useState(null);
   const [tabContextMenu, setTabContextMenu] = useState(null);
@@ -100,7 +142,7 @@ export default function WorkspaceTabBar() {
     const current = location.pathname;
     if (!current || current === '/login' || current === '/register') return;
 
-    const matchedMod = AVAILABLE_MODULES.find(mod => {
+    const matchedMod = allowedModules.find(mod => {
       if (mod.path === '/') {
         return current === '/';
       }
@@ -110,7 +152,7 @@ export default function WorkspaceTabBar() {
       return current.startsWith(mod.path);
     });
 
-    if (matchedMod) {
+    if (matchedMod && isModuleAllowed(matchedMod.path, screenPermissions)) {
       setTabs(prevTabs => {
         const exists = prevTabs.find(t => t.id === matchedMod.id || t.path === matchedMod.path);
         if (!exists) {
@@ -123,7 +165,7 @@ export default function WorkspaceTabBar() {
         return prevTabs;
       });
     }
-  }, [location.pathname]);
+  }, [location.pathname, screenPermissions]);
 
   const handleCloseTab = (e, tabId) => {
     if (e && e.stopPropagation) e.stopPropagation();
@@ -229,7 +271,6 @@ export default function WorkspaceTabBar() {
               }}
               sx={{
                 textDecoration: 'none',
-                color: 'inherit',
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: 0.75,
@@ -324,7 +365,7 @@ export default function WorkspaceTabBar() {
             </Typography>
           </Box>
 
-          {AVAILABLE_MODULES.map((mod) => (
+          {allowedModules.map((mod) => (
             <MenuItem
               key={mod.id}
               onClick={() => handleAddNewTab(mod)}

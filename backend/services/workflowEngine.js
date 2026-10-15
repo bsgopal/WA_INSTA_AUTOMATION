@@ -31,6 +31,72 @@ const executeWorkflow = async (workflowId, customerId, context = {}) => {
     let executionContext = { ...context, customer };
     const trace = [];
 
+    // 2D Visual Flow Designer Nodes & Edges Execution
+    if (workflow.nodes && workflow.nodes.length > 0 && workflow.edges && workflow.edges.length > 0) {
+      const startNode = workflow.nodes.find(n => n.type === 'START') || workflow.nodes[0];
+      const firstEdge = workflow.edges.find(e => e.fromNodeId === startNode.id);
+      const targetNode = workflow.nodes.find(n => n.id === firstEdge?.toNodeId) || workflow.nodes.find(n => n.type === 'SEND_TEXT' || n.type === 'CATALOG');
+
+      if (targetNode) {
+        console.log(`⚡ Executing 2D Visual Workflow Node: "${targetNode.label}" (${targetNode.type})`);
+        let messageText = targetNode.config?.message || 'Namaste! How can we assist you today?';
+        let catalogUrl = targetNode.config?.catalogUrl || null;
+        if (targetNode.type === 'CATALOG' && catalogUrl) {
+          messageText = `🛍️ Product Catalog:\n${catalogUrl}\n\n${targetNode.config?.message || ''}`.trim();
+        }
+
+        const buttons = (targetNode.config?.buttons || []).map(b => ({
+          label: b.title,
+          value: b.value || b.title,
+          type: 'QUICK_REPLY',
+          actionType: 'QUICK_REPLY'
+        }));
+
+        const personalizedMessage = await aiSmartFeatures.personalizeMessage(messageText, customer, executionContext);
+        const targetNumber = customer.whatsappNumber || customer.phone;
+
+        if (!context.testMode && targetNumber) {
+          const sendRes = await WhatsAppService.sendMessage(
+            targetNumber,
+            personalizedMessage,
+            {
+              buttons: buttons.length > 0 ? buttons : null,
+              userId: customer.userId || workflow.userId
+            }
+          );
+
+          // Log to conversation
+          try {
+            const aiChatHandler = require('./aiChatHandler');
+            const ShopConfig = require('../models/ShopConfig');
+            const shop = await ShopConfig.findOne({ userId: customer.userId || workflow.userId });
+            const displayNum = shop?.metaDisplayPhoneNumber || shop?.contactPhone || '';
+            await aiChatHandler.logOutboundMessage(
+              customer.userId || workflow.userId,
+              customer._id,
+              personalizedMessage,
+              'whatsapp',
+              sendRes?.externalMessageId,
+              null,
+              { businessPhoneNumber: displayNum }
+            );
+          } catch (logErr) {
+            console.error('[Workflow Visual Log Error]:', logErr.message);
+          }
+        }
+
+        trace.push({
+          nodeId: targetNode.id,
+          label: targetNode.label,
+          type: targetNode.type,
+          success: true,
+          messageText: personalizedMessage,
+          buttons
+        });
+      }
+    }
+
+    // Sequential steps execution (if steps configured)
     while (currentStepId) {
       const step = workflow.steps.find(s => s.id === currentStepId);
       
@@ -103,6 +169,8 @@ const executeStep = async (step, customer, context, workflow) => {
   try {
     switch (step.type) {
       case 'SEND_MESSAGE':
+      case 'SEND_TEXT':
+      case 'CATALOG':
       case 'RESPONSE_RULE':
       case 'SEND_TEMPLATE':
       case 'QUICK_REPLY':
@@ -115,6 +183,7 @@ const executeStep = async (step, customer, context, workflow) => {
         return await executeParallelSplit(step, customer, context);
 
       case 'WAIT':
+      case 'WAIT_TIMER':
         return await executeWait(step, context);
 
       case 'CONDITION':
@@ -127,6 +196,7 @@ const executeStep = async (step, customer, context, workflow) => {
         return await executeTag(step, customer, context);
 
       case 'AI_ACTION':
+      case 'AI_SCRIPT':
         return await executeAIAction(step, customer, context);
 
       case 'WEBHOOK':

@@ -16,14 +16,19 @@ const WorkflowSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Category'
   },
+  priority: {
+    type: Number,
+    default: 1
+  },
   
   // Trigger Configuration
   trigger: {
     type: {
       type: String,
-      enum: ['MANUAL', 'SCHEDULED', 'EVENT', 'WEBHOOK', 'CUSTOMER_ACTION', 'RESPONSE_RULE_SELECTION'],
-      required: true
+      default: 'KEYWORD'
     },
+    keywords: [String],
+    value: String,
     event: String, // 'customer_created', 'message_received', 'purchase_made', etc.
     schedule: {
       frequency: String, // 'daily', 'weekly', 'monthly'
@@ -41,13 +46,12 @@ const WorkflowSchema = new mongoose.Schema({
     }]
   },
   
-  // Workflow Steps
+  // Workflow Steps (flat or sequential)
   steps: [{
     id: String,
     type: {
       type: String,
-      enum: ['SEND_MESSAGE', 'WAIT', 'CONDITION', 'UPDATE_CUSTOMER', 'TAG', 'WEBHOOK', 'AI_ACTION', 'RESPONSE_RULE', 'SEND_TEMPLATE', 'QUICK_REPLY'],
-      required: true
+      default: 'SEND_MESSAGE'
     },
     name: String,
     config: mongoose.Schema.Types.Mixed,
@@ -59,11 +63,15 @@ const WorkflowSchema = new mongoose.Schema({
     }
   }],
   
+  // 2D Visual Flow Designer Nodes & Edges Graph
+  nodes: [mongoose.Schema.Types.Mixed],
+  edges: [mongoose.Schema.Types.Mixed],
+  
   // Status
   status: {
     type: String,
     enum: ['DRAFT', 'ACTIVE', 'PAUSED', 'ARCHIVED'],
-    default: 'DRAFT'
+    default: 'ACTIVE'
   },
   
   // Execution Stats

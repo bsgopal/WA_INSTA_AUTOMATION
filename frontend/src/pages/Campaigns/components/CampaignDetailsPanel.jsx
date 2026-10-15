@@ -60,7 +60,7 @@ const CampaignDetailsPanel = React.memo(({
   if (!campaign) {
     return (
       <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <DialogTitle component="div" sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Typography variant="h6" sx={{ fontWeight: 700 }}>Campaign Details</Typography>
           <IconButton size="small" onClick={onClose}>
             <CloseIcon />
@@ -119,7 +119,7 @@ const CampaignDetailsPanel = React.memo(({
           )}
         </Box>
 
-        <DialogTitle
+        <DialogTitle component="div"
           sx={{
             pt: 3,
             pb: 2,

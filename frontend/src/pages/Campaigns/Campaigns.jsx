@@ -50,6 +50,7 @@ export default function Campaigns() {
   const [createWizardOpen, setCreateWizardOpen] = useState(false);
   const [editFormOpen, setEditFormOpen] = useState(false);
   const [manualSendOpen, setManualSendOpen] = useState(false);
+  const [isMaximized, setIsMaximized] = useState(false);
   
   // Confirmation dialogs
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -370,7 +371,12 @@ export default function Campaigns() {
         stats={stats}
         onSearch={handleSearch}
         onFilterChange={handleFilterChange}
-        onCreate={() => setCreateWizardOpen(true)}
+        onCreate={() => {
+          setSelectedCampaign(null);
+          setDetailsPanelOpen(false);
+          setEditFormOpen(false);
+          setCreateWizardOpen(true);
+        }}
         searchValue={searchValue}
         filterValue={filterValue}
         viewMode={viewMode}
@@ -378,22 +384,65 @@ export default function Campaigns() {
         loading={loading}
       />
 
-      <Box sx={{ mt: 2 }}>
-        <CampaignList
-          campaigns={filteredCampaigns}
-          loading={loading}
-          viewMode={viewMode}
-          onCreate={() => setCreateWizardOpen(true)}
-          onView={handleViewCampaign}
-          onEdit={handleEditCampaign}
-          onDelete={handleDeleteCampaign}
-          onLaunch={handleLaunchCampaign}
-          onPause={handlePauseCampaign}
-          onResume={handleResumeCampaign}
-          onComplete={handleCompleteCampaign}
-          onSchedule={handleScheduleCampaign}
-          onManualSend={handleManualSendCampaign}
-        />
+      {/* TWO-COLUMN MID-SPLIT LAYOUT CONTAINER */}
+      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', lg: 'row' }, gap: 2.5, alignItems: 'flex-start', mt: 1.5 }}>
+        
+        {/* LEFT COLUMN: CAMPAIGNS FLEET LIST */}
+        <Box
+          sx={{
+            width: createWizardOpen ? (isMaximized ? '0%' : { xs: '100%', lg: '44%', xl: '42%' }) : '100%',
+            display: createWizardOpen && isMaximized ? 'none' : 'block',
+            transition: 'all 0.3s ease',
+            flexShrink: 0
+          }}
+        >
+          <CampaignList
+            campaigns={filteredCampaigns}
+            loading={loading}
+            viewMode={viewMode}
+            onCreate={() => {
+              setSelectedCampaign(null);
+              setDetailsPanelOpen(false);
+              setEditFormOpen(false);
+              setCreateWizardOpen(true);
+            }}
+            onView={handleViewCampaign}
+            onEdit={handleEditCampaign}
+            onDelete={handleDeleteCampaign}
+            onLaunch={handleLaunchCampaign}
+            onPause={handlePauseCampaign}
+            onResume={handleResumeCampaign}
+            onComplete={handleCompleteCampaign}
+            onSchedule={handleScheduleCampaign}
+            onManualSend={handleManualSendCampaign}
+          />
+        </Box>
+
+        {/* RIGHT COLUMN: IN-PAGE CREATE WIZARD */}
+        {createWizardOpen && (
+          <Box
+            sx={{
+              flex: 1,
+              width: '100%',
+              minWidth: 0,
+              bgcolor: '#ffffff',
+              borderRadius: '16px',
+              border: '1px solid #e2e8f0',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
+              overflow: 'hidden'
+            }}
+          >
+            <CreateCampaignWizard
+              open={createWizardOpen}
+              onClose={() => setCreateWizardOpen(false)}
+              onComplete={handleCreateCampaign}
+              loading={loading}
+              asPanel={true}
+              isMaximized={isMaximized}
+              onToggleMaximize={() => setIsMaximized(!isMaximized)}
+            />
+          </Box>
+        )}
       </Box>
 
       {/* Details Panel (Right Side) */}
@@ -412,18 +461,6 @@ onResume={handleResumeCampaign}
         onDelete={handleDeleteCampaign}
         onSchedule={handleScheduleCampaign}
         onManualSend={handleManualSendCampaign}
-        loading={loading}
-      />
-
-      {/* Modals */}
-
-      {/* Create Campaign Wizard (6 steps) */}
-      <CreateCampaignWizard
-        open={createWizardOpen}
-        onClose={() => {
-          setCreateWizardOpen(false);
-        }}
-        onComplete={handleCreateCampaign}
         loading={loading}
       />
 

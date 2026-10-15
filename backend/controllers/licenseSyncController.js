@@ -52,20 +52,29 @@ exports.receiveLicensePush = async (req, res) => {
     const {
       clientName,
       subdomain,
+      customerCode,
       planTier = 'pro',
       billingCycle = '3_MONTHS',
       licenseStart,
       licenseEnd,
       licenseStatus = 'active',
+      emergencyLock = false,
+      screenPermissions = {},
       featurePermissions = {},
+      whatsappSenderMode = 'DOCKER',
+      dockerThrottleSeconds = 6,
       limits = {}
     } = req.body;
 
-    console.log(`[License Sync Ingest]: Received OTA update for '${clientName}' (Subdomain: ${subdomain})`);
+    const mergedPermissions = { ...featurePermissions, ...screenPermissions };
+    const isLocked = emergencyLock || ['locked', 'disabled', 'suspended', 'cancelled', 'inactive', 'revoked'].includes(licenseStatus);
+
+    console.log(`[License Sync Ingest]: Received OTA update for '${clientName}' (Code: ${customerCode || subdomain}, Mode: ${whatsappSenderMode}, Status: ${licenseStatus})`);
 
     // Upsert local License record
     let license = await License.findOne({
       $or: [
+        { customerCode: customerCode || '' },
         { subdomain: (subdomain || '').toLowerCase() },
         { companyName: clientName }
       ]
@@ -79,24 +88,27 @@ exports.receiveLicensePush = async (req, res) => {
         lastName: 'Admin',
         phone: req.body.contact || '9345578103',
         companyName: clientName || 'Renic Client',
+        customerCode: customerCode || subdomain || '',
         password: 'ACTIVE_VIA_OTA',
         subdomain: (subdomain || '').toLowerCase(),
         planTier,
         billingCycle,
         licenseStart: licenseStart ? new Date(licenseStart) : new Date(),
         licenseEnd: licenseEnd ? new Date(licenseEnd) : new Date(Date.now() + 90 * 24 * 3600 * 1000),
-        featurePermissions,
+        featurePermissions: mergedPermissions,
         limits,
         isUsed: true,
         lastSyncAt: new Date()
       });
     } else {
       if (subdomain) license.subdomain = subdomain.toLowerCase();
+      if (customerCode) license.customerCode = customerCode;
+      license.companyName = clientName;
       license.planTier = planTier;
       license.billingCycle = billingCycle;
       if (licenseStart) license.licenseStart = new Date(licenseStart);
       if (licenseEnd) license.licenseEnd = new Date(licenseEnd);
-      license.featurePermissions = { ...license.featurePermissions, ...featurePermissions };
+      license.featurePermissions = mergedPermissions;
       license.limits = { ...license.limits, ...limits };
       license.lastSyncAt = new Date();
     }
@@ -124,25 +136,56 @@ exports.receiveLicensePush = async (req, res) => {
 
     // Update in-memory entitlement cache
     cachedEntitlements = {
-      active: licenseStatus === 'active',
+      active: !isLocked,
+      isLocked,
       subdomain: license.subdomain,
+      customerCode: customerCode || subdomain,
       planTier: license.planTier,
       billingCycle: license.billingCycle,
-      featurePermissions: license.featurePermissions,
+      featurePermissions: mergedPermissions,
+      screenPermissions: mergedPermissions,
+      whatsappSenderMode: whatsappSenderMode.toUpperCase(),
       licenseEnd: license.licenseEnd
     };
 
-    // Update ShopConfig name if applicable
-    await ShopConfig.findOneAndUpdate({}, { shopName: clientName }, { upsert: false });
+    // Update ShopConfig with authoritative HQ values
+    const shopUpdate = {
+      shopName: clientName,
+      whatsappSenderMode: whatsappSenderMode.toUpperCase(),
+      metaApiEnabled: whatsappSenderMode.toUpperCase() === 'META',
+      dockerThrottleSeconds: Number(dockerThrottleSeconds) || 6,
+      screenPermissions: mergedPermissions,
+      featurePermissions: mergedPermissions,
+      customerCode: customerCode || subdomain
+    };
+    await ShopConfig.findOneAndUpdate({}, { $set: shopUpdate }, { upsert: true });
+
+    // If SSE broadcaster is available on app, push live update to all browser tabs
+    try {
+      const app = require('../server');
+      const broadcast = app.get ? app.get('broadcastTenantUpdate') : null;
+      if (typeof broadcast === 'function') {
+        broadcast({
+          type: 'LICENSE_UPDATED',
+          screenPermissions: mergedPermissions,
+          whatsappSenderMode: whatsappSenderMode.toUpperCase(),
+          active: !isLocked,
+          isLocked
+        });
+      }
+    } catch (sseErr) {
+      // Ignore SSE error if not running
+    }
 
     return res.json({
       success: true,
       status: 'SYNCED',
-      message: 'License and feature entitlements updated locally',
+      message: 'License, features, and sender engine mode updated from Renic Soft HQ',
       clientName,
       subdomain: license.subdomain,
+      whatsappSenderMode: whatsappSenderMode.toUpperCase(),
       licenseEnd: license.licenseEnd,
-      features: license.featurePermissions
+      features: mergedPermissions
     });
   } catch (err) {
     console.error('[License Sync Error]:', err);
@@ -155,16 +198,21 @@ exports.receiveLicensePush = async (req, res) => {
  */
 exports.getCurrentLicenseStatus = async (req, res) => {
   try {
-    const license = await License.findOne().sort({ createdAt: -1 });
+    const [license, shop] = await Promise.all([
+      License.findOne().sort({ createdAt: -1 }),
+      ShopConfig.findOne({})
+    ]);
+
+    const activeSenderMode = (shop?.whatsappSenderMode || 'DOCKER').toUpperCase();
+
     if (!license) {
       return res.json({
-        active: true,
-        planTier: 'enterprise',
-        billingCycle: '1_YEAR',
-        daysLeft: 365,
-        isGracePeriod: false,
-        isExpired: false,
-        featurePermissions: cachedEntitlements.featurePermissions
+        active: false,
+        licenseRequired: true,
+        message: 'No active license found. Please provision this instance in Renic Soft Master HQ.',
+        whatsappSenderMode: activeSenderMode,
+        featurePermissions: {},
+        screenPermissions: {}
       });
     }
 
@@ -173,12 +221,16 @@ exports.getCurrentLicenseStatus = async (req, res) => {
     const diffMs = end - now;
     const daysLeft = Math.ceil(diffMs / (24 * 3600 * 1000));
     const isExpired = diffMs < 0;
-    // 3-day grace period
     const isGracePeriod = isExpired && Math.abs(daysLeft) <= 3;
+    const isLocked = Boolean(cachedEntitlements.isLocked);
+
+    const perms = license.featurePermissions || shop?.screenPermissions || cachedEntitlements.featurePermissions || {};
 
     return res.json({
-      active: !isExpired || isGracePeriod,
-      clientName: license.companyName,
+      active: (!isExpired || isGracePeriod) && !isLocked,
+      isLocked,
+      clientName: license.companyName || shop?.shopName,
+      customerCode: license.customerCode || shop?.customerCode,
       subdomain: license.subdomain,
       planTier: license.planTier,
       billingCycle: license.billingCycle,
@@ -187,7 +239,9 @@ exports.getCurrentLicenseStatus = async (req, res) => {
       daysLeft: isExpired ? 0 : daysLeft,
       isGracePeriod,
       isExpired: isExpired && !isGracePeriod,
-      featurePermissions: license.featurePermissions || cachedEntitlements.featurePermissions,
+      whatsappSenderMode: activeSenderMode,
+      featurePermissions: perms,
+      screenPermissions: perms,
       limits: license.limits
     });
   } catch (err) {

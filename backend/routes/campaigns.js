@@ -620,11 +620,38 @@ router.post('/:id/manual-send', async (req, res) => {
       try {
         processedCount++;
         let customerContent = content;
-        const custLang = customer.language || 'en';
-        if (campaign.messageTemplate?.translations?.[custLang]) {
-          customerContent = campaign.messageTemplate.translations[custLang];
-        } else if (campaign.translations?.[custLang]) {
-          customerContent = campaign.translations[custLang];
+        const custLang = (customer.language || 'en').toLowerCase().trim();
+        const langCodeMap = {
+          'tamil': 'ta', 'hindi': 'hi', 'telugu': 'te', 'kannada': 'kn',
+          'malayalam': 'ml', 'marathi': 'mr', 'gujarati': 'gu', 'bengali': 'bn',
+          'punjabi': 'pa', 'odia': 'or', 'urdu': 'ur', 'english': 'en'
+        };
+        const resolvedLang = langCodeMap[custLang] || custLang;
+
+        if (campaign.messageTemplate?.translations?.[resolvedLang]) {
+          customerContent = campaign.messageTemplate.translations[resolvedLang];
+        } else if (campaign.translations?.[resolvedLang]) {
+          customerContent = campaign.translations[resolvedLang];
+        } else if (resolvedLang !== 'en' && resolvedLang !== (campaign.language || 'en').toLowerCase()) {
+          // Dynamic AI auto-translation into customer's preferred language (e.g. Tamil)
+          try {
+            const aiMessageAnalyzer = require('../services/aiMessageAnalyzer');
+            const ShopConfig = require('../models/ShopConfig');
+            const shopConfig = await ShopConfig.findOne({ userId: req.user.id }) || await ShopConfig.findOne({});
+            const aiConfig = {
+              provider: shopConfig?.useAnthropic && shopConfig?.anthropicApiKey ? 'anthropic' : 'gemini',
+              apiKey: (shopConfig?.useAnthropic && shopConfig?.anthropicApiKey) ? shopConfig.anthropicApiKey : (shopConfig?.geminiApiKey || process.env.GEMINI_API_KEY),
+              model: (shopConfig?.useAnthropic && shopConfig?.anthropicApiKey) ? (shopConfig?.anthropicModel || 'claude-3-haiku-20240307') : (shopConfig?.geminiModel || process.env.GEMINI_MODEL || 'gemini-1.5-flash')
+            };
+            if (aiConfig.apiKey) {
+              const translated = await aiMessageAnalyzer.translateText(customerContent, resolvedLang, aiConfig);
+              if (translated && translated.trim()) {
+                customerContent = translated;
+              }
+            }
+          } catch (tErr) {
+            console.warn(`[Campaign Manual Send] Auto-translation to ${resolvedLang} skipped:`, tErr.message);
+          }
         }
 
         const finalContent = await VariableInterpolationService.interpolateVariables(
@@ -919,6 +946,131 @@ router.get('/:id/analytics', async (req, res) => {
   }
 });
 
-// Campaign execution moved to campaignService.js
+// ============ GET CAMPAIGN RECIPIENT LOGS (SENT vs NOT SENT) ============
+router.get('/:id/recipients', async (req, res) => {
+  try {
+    const campaign = await Campaign.findOne({
+      _id: req.params.id,
+      userId: req.user.id
+    }).populate('messageTemplate');
+
+    if (!campaign) {
+      return res.status(404).json({ error: 'Campaign not found' });
+    }
+
+    // Fetch all message logs for this campaign
+    const messages = await Message.find({ campaignId: campaign._id })
+      .populate('customerId', 'firstName lastName phone whatsappNumber email rfmSegment loyaltyTier')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const sentList = [];
+    const notSentList = [];
+
+    messages.forEach(msg => {
+      const cust = msg.customerId || {};
+      const customerName = `${cust.firstName || ''} ${cust.lastName || ''}`.trim() || cust.phone || cust.whatsappNumber || msg.recipientPhone || 'Customer';
+      const phone = cust.whatsappNumber || cust.phone || msg.recipientPhone || '—';
+      const statusUpper = String(msg.status || '').toUpperCase();
+      
+      const record = {
+        _id: msg._id,
+        customerId: cust._id || msg.customerId,
+        customerName,
+        phone,
+        phoneNumber: phone,
+        email: cust.email || '',
+        rfmSegment: cust.rfmSegment || 'Standard',
+        status: statusUpper || 'SENT',
+        channel: msg.channel || 'whatsapp',
+        sentAt: msg.sentAt || msg.createdAt,
+        deliveredAt: msg.deliveredAt,
+        readAt: msg.readAt,
+        failureReason: msg.failureReason || null,
+        error: msg.failureReason || null,
+        messageContent: msg.content || campaign.messageContent || '',
+        externalMessageId: msg.externalMessageId || null
+      };
+
+      // QUEUED rows were accepted and dispatched (they carry an externalMessageId),
+      // so they belong with the sent bucket, not the failure bucket.
+      if (['SENT', 'DELIVERED', 'READ', 'QUEUED'].includes(statusUpper)) {
+        sentList.push(record);
+      } else {
+        notSentList.push(record);
+      }
+    });
+
+    if (messages.length === 0) {
+      // If no Message models directly tied to campaign, retrieve target customers
+      const Customer = require('../models/Customer');
+      const targetQuery = { userId: req.user.id };
+      if (campaign.targetAudience?.segments?.length > 0) {
+        targetQuery.rfmSegment = { $in: campaign.targetAudience.segments };
+      }
+      const targetCustomers = await Customer.find(targetQuery).limit(campaign.totalTargets || 50).lean();
+      
+      const isCompleted = campaign.status === 'COMPLETED' || (campaign.totalSent || 0) > 0;
+
+      targetCustomers.forEach(cust => {
+        const customerName = `${cust.firstName || ''} ${cust.lastName || ''}`.trim() || cust.phone || cust.whatsappNumber || 'Customer';
+        const phone = cust.whatsappNumber || cust.phone || '—';
+        const record = {
+          _id: cust._id,
+          customerId: cust._id,
+          customerName,
+          phone,
+          phoneNumber: phone,
+          email: cust.email || '',
+          rfmSegment: cust.rfmSegment || 'Standard',
+          status: isCompleted ? 'SENT' : (campaign.status || 'DRAFT'),
+          channel: 'whatsapp',
+          sentAt: campaign.completedAt || campaign.sentAt || campaign.createdAt,
+          deliveredAt: null,
+          readAt: null,
+          failureReason: null,
+          error: null,
+          messageContent: campaign.messageContent || ''
+        };
+
+        if (isCompleted) {
+          sentList.push(record);
+        } else {
+          notSentList.push(record);
+        }
+      });
+    }
+
+    const totalCount = sentList.length + notSentList.length;
+
+    res.json({
+      success: true,
+      campaign: {
+        _id: campaign._id,
+        name: campaign.name,
+        status: campaign.status,
+        type: campaign.type,
+        senderMode: campaign.senderMode,
+        createdAt: campaign.createdAt,
+        completedAt: campaign.completedAt,
+        startedAt: campaign.startedAt,
+        totalTargets: campaign.totalTargets || totalCount,
+        totalSent: campaign.totalSent || sentList.length,
+        totalFailed: campaign.totalFailed || notSentList.length,
+        mediaType: campaign.mediaType,
+        mediaUrl: campaign.mediaUrl,
+        templateName: campaign.metaTemplateName || campaign.messageTemplate?.name || null
+      },
+      sentList,
+      notSentList,
+      totalCount,
+      sentCount: sentList.length,
+      notSentCount: notSentList.length
+    });
+  } catch (error) {
+    console.error('Get Campaign Recipients Error:', error);
+    res.status(500).json({ error: 'Failed to fetch campaign recipients', details: error.message });
+  }
+});
 
 module.exports = router;

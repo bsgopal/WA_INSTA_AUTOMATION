@@ -140,11 +140,13 @@ router.post('/send', [
 
     // Send based on channel
     if (channel === 'whatsapp') {
-      const sendOptions = { mediaUrl };
+      const sendOptions = { mediaUrl, userId: req.user.id };
       
       const ShopConfig = require('../models/ShopConfig');
       const shop = await ShopConfig.findOne({ userId: req.user.id });
-      if (shop && shop.metaApiEnabled) {
+      const senderMode = (shop?.whatsappSenderMode || (shop?.metaApiEnabled ? 'META' : 'DOCKER')).toUpperCase();
+
+      if (senderMode === 'META') {
         const hasMedia = !!mediaUrl;
         const templateLang = customer.language || 'en';
         if (hasMedia) {
@@ -166,7 +168,7 @@ router.post('/send', [
       result = await WhatsAppService.sendMessage(
         customer.whatsappNumber,
         finalContent,
-        { ...sendOptions, forceMeta: true }
+        sendOptions
       );
     } else if (channel === 'instagram') {
       const InstagramService = require('../services/InstagramService');
@@ -348,6 +350,7 @@ router.post('/:id/retry', async (req, res) => {
 
     if (message.channel === 'whatsapp') {
       const retryOptions = {
+        userId: req.user.id,
         mediaUrl: message.mediaUrl,
         mediaType: message.mediaType,
         mediaMimeType: message.mediaMimeType,
@@ -358,8 +361,6 @@ router.post('/:id/retry', async (req, res) => {
       const isMetaReengagementFailure = /META_|Re-?engagement/i.test(message.failureReason || '');
       if (isMetaReengagementFailure) {
         retryOptions.forceWaha = true;
-      } else {
-        retryOptions.forceMeta = true;
       }
 
       result = await WhatsAppService.sendMessage(
@@ -521,7 +522,7 @@ router.post('/bulk-send', [
 
         let result;
         if (channel === 'whatsapp') {
-          result = await WhatsAppService.sendMessage(customer.whatsappNumber, finalContent, { forceMeta: true });
+          result = await WhatsAppService.sendMessage(customer.whatsappNumber, finalContent, { userId: req.user.id });
         } else if (channel === 'instagram') {
           const InstagramService = require('../services/InstagramService');
           result = await InstagramService.sendDirectMessage(customer.instagramHandle || customer.phone, finalContent, {});

@@ -7,6 +7,15 @@ const Message = require('../models/Message');
 const Conversation = require('../models/Conversation');
 const ShopConfig = require('../models/ShopConfig');
 const CatalogItem = require('../models/CatalogItem');
+const { getModel } = require('../middlewares/tenantContext');
+
+function getTargetShopConfig() {
+  try {
+    return getModel('ShopConfig');
+  } catch (e) {
+    return ShopConfig;
+  }
+}
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
@@ -135,13 +144,16 @@ router.post('/send-message', async (req, res) => {
       result = await InstagramService.sendDirectMessage(customer.instagramHandle, message);
     } else {
       const WhatsAppService = require('../services/WhatsAppService');
-      const ShopConfig = require('../models/ShopConfig');
-      const shop = await ShopConfig.findOne({ userId });
+      const TargetShopConfig = getTargetShopConfig();
+      let shop = await TargetShopConfig.findOne({ userId });
+      if (!shop) {
+        shop = await TargetShopConfig.findOne({});
+      }
       const sendOptions = { userId };
 
-      if (shop?.metaApiEnabled) {
+      const senderMode = (shop?.whatsappSenderMode || (shop?.metaApiEnabled ? 'META' : 'DOCKER')).toUpperCase();
+      if (senderMode === 'META') {
         const templateLang = customer.language || 'en';
-        sendOptions.forceMeta = true;
         sendOptions.templateName = 'message';
         sendOptions.templateLanguage = templateLang;
         sendOptions.templateParams = [{ type: 'text', text: message }];
@@ -403,15 +415,16 @@ async function scrapeLogoOrBanner(url) {
  */
 router.get('/shop-config', async (req, res) => {
   try {
+    const TargetShopConfig = getTargetShopConfig();
     const userId = req.user?._id;
     let config = null;
 
     if (userId) {
-      config = await ShopConfig.findOne({ userId });
+      config = await TargetShopConfig.findOne({ userId });
     }
     
     if (!config) {
-      config = await ShopConfig.findOne();
+      config = await TargetShopConfig.findOne();
       if (config && userId && !config.userId) {
         config.userId = userId;
         await config.save().catch(() => {});
@@ -420,7 +433,7 @@ router.get('/shop-config', async (req, res) => {
     
     if (!config) {
       try {
-        config = await ShopConfig.create({
+        config = await TargetShopConfig.create({
           userId: userId,
           shopName: 'Renic Jewellers',
           websiteUrl: 'https://kanalli.in/',
@@ -430,13 +443,15 @@ router.get('/shop-config', async (req, res) => {
           goldRate24K: 7850,
           silverRate: 95,
           platinumRate: 3200,
+          whatsappSenderMode: 'DOCKER',
+          metaApiEnabled: false,
           faqs: [
             { question: "What is your gold purity guarantee?", answer: "All our jewelry is BIS Hallmark 916 certified, ensuring 22K gold purity." },
             { question: "Do you offer customization?", answer: "Yes, we custom craft bespoke bridal necklaces, rings, and bangles based on your design preferences." }
           ]
         });
       } catch (createErr) {
-        config = await ShopConfig.findOne();
+        config = await TargetShopConfig.findOne();
       }
     }
     
@@ -475,13 +490,26 @@ router.get('/shop-config', async (req, res) => {
 
 /**
  * PUT /api/ai-chat/shop-config
- * Update shop config
+ * Update shop config (Branding/store details only - governance fields are strictly managed by Renic Soft Master HQ)
  */
 router.put('/shop-config', async (req, res) => {
   try {
+    const TargetShopConfig = getTargetShopConfig();
     const userId = req.user._id;
-    const updateData = req.body;
+    const updateData = { ...req.body };
     
+    // Strict Rule: Governance fields cannot be decided or overridden from client side.
+    delete updateData.whatsappSenderMode;
+    delete updateData.metaApiEnabled;
+    delete updateData.screenPermissions;
+    delete updateData.oauthEnforced;
+    delete updateData.businessType;
+    delete updateData.solutionMode;
+    delete updateData.solutionModes;
+    delete updateData.customTerminology;
+    delete updateData.customerCode;
+    delete updateData.oauthConfig;
+
     // If websiteUrl is updated but catalogImageUrl is empty/missing, autodetect logo
     if (updateData.websiteUrl && (!updateData.catalogImageUrl || updateData.catalogImageUrl.trim() === '')) {
       const scrapedLogo = await scrapeLogoOrBanner(updateData.websiteUrl);
@@ -490,7 +518,7 @@ router.put('/shop-config', async (req, res) => {
       }
     }
     
-    const config = await ShopConfig.findOneAndUpdate(
+    const config = await TargetShopConfig.findOneAndUpdate(
       { userId },
       { $set: updateData },
       { new: true, upsert: true }

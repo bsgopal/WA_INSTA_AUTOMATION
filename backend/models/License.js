@@ -67,11 +67,12 @@ const LicenseSchema = new mongoose.Schema({
   customerCode: {
     type: String,
     trim: true,
+    lowercase: true,
     default: ''
   },
   billingCycle: {
     type: String,
-    enum: ['1_MONTH', '3_MONTHS', '6_MONTHS', '1_YEAR'],
+    enum: ['1_MONTH', '3_MONTHS', '6_MONTHS', '1_YEAR', 'LIFETIME'],
     default: '1_MONTH'
   },
   featurePermissions: {

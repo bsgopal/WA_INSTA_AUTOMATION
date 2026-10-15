@@ -314,13 +314,16 @@ const getSessionStatus = async () => {
       };
     }
 
-    // Auto-logout if FAILED to cleanly reset and prompt for fresh QR code
+    // Auto-restart if FAILED or network dropped to reconnect existing session
     if (response.data.status === 'FAILED') {
-      console.log(`⚠️ Session is FAILED. Logging out session ${SESSION_NAME} to reset stale credentials...`);
+      console.log(`⚠️ Session is FAILED (temporary network drop). Reconnecting session ${SESSION_NAME} using saved credentials...`);
       try {
-        await wahaClient.post(`/sessions/${SESSION_NAME}/logout`);
-        console.log(`✅ Stale session logged out successfully.`);
-        // Fetch status again to get the fresh status (usually SCAN_QR_CODE)
+        await wahaClient.post(`/sessions/${SESSION_NAME}/stop`);
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        await wahaClient.post(`/sessions/${SESSION_NAME}/start`);
+        console.log(`🔄 Session restart triggered to resume WhatsApp connection.`);
+        
+        // Fetch status again after initiating reconnect
         const reResponse = await wahaClient.get(`/sessions/${SESSION_NAME}`);
         return {
           success: true,
@@ -328,8 +331,8 @@ const getSessionStatus = async () => {
           authenticated: reResponse.data.status === 'WORKING',
           phoneNumber: reResponse.data.me?.id || null
         };
-      } catch (logoutErr) {
-        console.error(`❌ Failed to log out failed session: ${logoutErr.message}`);
+      } catch (restartErr) {
+        console.error(`❌ Failed to restart failed session: ${restartErr.message}`);
       }
     }
 
@@ -740,10 +743,15 @@ const sendMessage = async (to, message, options = {}) => {
       };
     }
 
+    // WhatsApp accepted the message and returned an ID, so it has left our
+    // system. Seeding anything weaker than SENT leaves the row stuck forever:
+    // callers write result.status verbatim, and if no delivery receipt ever
+    // arrives there is nothing to advance it. Receipts upgrade SENT ->
+    // DELIVERED -> READ (or FAILED).
     return {
       success: true,
       externalMessageId,
-      status: 'QUEUED',
+      status: 'SENT',
       sentAt: new Date(),
       channel: 'whatsapp',
       to: formattedPhone
@@ -1148,6 +1156,39 @@ const requestPairingCode = async (phoneNumber) => {
   }
 };
 
+/**
+ * Background Session Health Keeper:
+ * Runs periodically to ensure WhatsApp session remains connected.
+ * If status becomes STOPPED or FAILED (e.g. after laptop wake-up or temporary WiFi drop),
+ * it automatically re-starts the session using saved tokens without logging out.
+ */
+let healthWorkerInterval = null;
+const startSessionHealthWorker = () => {
+  if (healthWorkerInterval) return;
+  console.log('🛡️ [WAHA Health Keeper] Session auto-recovery worker started (checks every 30s)');
+
+  healthWorkerInterval = setInterval(async () => {
+    try {
+      const sessionStatus = await wahaClient.get(`/sessions/${SESSION_NAME}`);
+      const st = sessionStatus.data?.status;
+
+      if (st === 'STOPPED' || st === 'FAILED') {
+        console.log(`🔄 [WAHA Health Keeper] Session is ${st}. Auto-reconnecting session "${SESSION_NAME}" using saved credentials...`);
+        if (st === 'FAILED') {
+          try {
+            await wahaClient.post(`/sessions/${SESSION_NAME}/stop`);
+            await new Promise(r => setTimeout(r, 1000));
+          } catch {}
+        }
+        await wahaClient.post(`/sessions/${SESSION_NAME}/start`);
+        console.log(`✅ [WAHA Health Keeper] Auto-restart triggered successfully.`);
+      }
+    } catch (err) {
+      // WAHA container may be temporarily restarting, ignore error
+    }
+  }, 30000);
+};
+
 module.exports = {
   initialize,
   setupWebhook,
@@ -1167,6 +1208,7 @@ module.exports = {
   mapWAHAStatus,
   updateCampaignStatusCounters,
   getContact,
+  startSessionHealthWorker,
   WAHA_API_URL,
   SESSION_NAME
 };

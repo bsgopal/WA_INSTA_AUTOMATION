@@ -145,6 +145,21 @@ const CustomerSchema = new mongoose.Schema({
     default: 'whatsapp'
   },
   
+  // Appointment Telemetry & Metrics
+  totalAppointments: {
+    type: Number,
+    default: 0
+  },
+  completedVisits: {
+    type: Number,
+    default: 0
+  },
+  noShowCount: {
+    type: Number,
+    default: 0
+  },
+  lastAppointmentDate: Date,
+  
   // Tags & Notes
   tags: [String],
   notes: String,

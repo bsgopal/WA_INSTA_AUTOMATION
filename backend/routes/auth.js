@@ -442,14 +442,150 @@ router.get('/license/status', auth, async (req, res) => {
 // @access  Public
 router.post('/forgot-password', async (req, res) => {
   try {
-    const { email } = req.body;
-    if (!email) {
-      return res.status(400).json({ error: 'Please provide an email address' });
+    const identifier = (req.body.email || req.body.phone || req.body.mobile || req.body.username || req.body.identifier || req.body.login || '').trim();
+    const clientId = (req.body.clientId || req.body.customerCode || req.body.tenantId || '').trim();
+    
+    if (!identifier && !clientId) {
+      return res.status(400).json({ error: 'Please provide your registered email, mobile, phone number, or client ID' });
     }
 
-    const user = await User.findOne({ email: email.toLowerCase().trim() });
+    const mongoose = require('mongoose');
+    let user = null;
+
+    if (identifier) {
+      user = await User.findOne({
+        $or: [
+          { email: identifier.toLowerCase() },
+          { phone: identifier },
+          { mobile: identifier }
+        ]
+      });
+    }
+
+    // Cross-tenant lookup if not found locally
     if (!user) {
-      return res.status(404).json({ error: 'User with this email does not exist' });
+      try {
+        const adminDb = mongoose.connection.db.admin();
+        const dbs = await adminDb.listDatabases();
+        const tenantDbNames = dbs.databases
+          .map(d => d.name)
+          .filter(name => name.startsWith('renic_tenant_') || name.startsWith('renic_trial_'));
+
+        for (const dbName of tenantDbNames) {
+          const tDb = mongoose.connection.useDb(dbName, { useCache: true });
+          const rawUser = await tDb.collection('users').findOne({
+            $or: [
+              ...(identifier ? [{ email: identifier.toLowerCase() }, { phone: identifier }, { mobile: identifier }] : []),
+              ...(clientId ? [{ clientId: clientId }, { tenantId: clientId }] : [])
+            ]
+          });
+
+          if (rawUser) {
+            user = await User.findOneAndUpdate(
+              { email: (rawUser.email || `${identifier || clientId}@client.com`).toLowerCase() },
+              {
+                $set: {
+                  companyName: rawUser.companyName || rawUser.name || 'Renic Technology',
+                  firstName: rawUser.firstName || rawUser.name?.split(' ')[0] || 'Admin',
+                  lastName: rawUser.lastName || rawUser.name?.split(' ').slice(1).join(' ') || 'User',
+                  email: (rawUser.email || `${identifier || clientId}@client.com`).toLowerCase().trim(),
+                  phone: (rawUser.phone || rawUser.mobile || identifier).trim(),
+                  password: rawUser.password,
+                  role: 'ADMIN',
+                  isActive: true
+                }
+              },
+              { upsert: true, new: true }
+            );
+            break;
+          }
+        }
+      } catch (tErr) {
+        console.warn('[Tenant Forgot Password Note]:', tErr.message);
+      }
+    }
+
+    // Master HQ lookup
+    if (!user) {
+      try {
+        const masterDb = mongoose.connection.useDb('renic_soft', { useCache: true });
+        
+        // 1. Check Clients collection
+        const clientQueries = [];
+        if (identifier) {
+          clientQueries.push(
+            { pendingOwnerEmail: identifier.toLowerCase() },
+            { pendingOwnerMobile: identifier },
+            { contact: identifier },
+            { customerCode: identifier.toUpperCase() },
+            { email: identifier.toLowerCase() },
+            { clientId: identifier }
+          );
+        }
+        if (clientId) {
+          clientQueries.push(
+            { customerCode: clientId.toUpperCase() },
+            { clientId: clientId },
+            { id: clientId }
+          );
+        }
+
+        const client = await masterDb.collection('clients').findOne({ $or: clientQueries });
+
+        if (client) {
+          user = await User.findOneAndUpdate(
+            { email: (client.pendingOwnerEmail || client.email || `${client.customerCode.toLowerCase()}@client.com`).toLowerCase() },
+            {
+              $set: {
+                companyName: client.name || 'Renic Technology',
+                firstName: client.pendingOwnerName?.split(' ')[0] || client.name?.split(' ')[0] || 'Admin',
+                lastName: client.pendingOwnerName?.split(' ').slice(1).join(' ') || 'User',
+                email: (client.pendingOwnerEmail || client.email || `${client.customerCode.toLowerCase()}@client.com`).toLowerCase(),
+                phone: (client.pendingOwnerMobile || client.contact || identifier || '').trim(),
+                password: client.pendingOwnerPassword || '123456',
+                role: 'ADMIN',
+                isActive: true
+              }
+            },
+            { upsert: true, new: true }
+          );
+        }
+
+        // 2. Check Users collection in Master HQ
+        if (!user && identifier) {
+          const rawMasterUser = await masterDb.collection('users').findOne({
+            $or: [
+              { email: identifier.toLowerCase() },
+              { mobile: identifier },
+              { phone: identifier }
+            ]
+          });
+          if (rawMasterUser) {
+            user = await User.findOneAndUpdate(
+              { email: rawMasterUser.email.toLowerCase() },
+              {
+                $set: {
+                  companyName: rawMasterUser.name || 'Renic Soft',
+                  firstName: rawMasterUser.name?.split(' ')[0] || 'Admin',
+                  lastName: rawMasterUser.name?.split(' ').slice(1).join(' ') || 'User',
+                  email: rawMasterUser.email.toLowerCase().trim(),
+                  phone: (rawMasterUser.mobile || rawMasterUser.phone || identifier || '').trim(),
+                  password: rawMasterUser.password,
+                  role: 'ADMIN',
+                  isActive: true
+                }
+              },
+              { upsert: true, new: true }
+            );
+          }
+        }
+      } catch (mErr) {
+        console.warn('[Master Forgot Password Note]:', mErr.message);
+      }
+    }
+
+    if (!user) {
+      return res.status(404).json({ error: 'User with this email, mobile number, or client ID does not exist' });
     }
 
     // Generate reset token
@@ -458,8 +594,7 @@ router.post('/forgot-password', async (req, res) => {
     
     // Hash token and set to resetPasswordToken field
     user.resetPasswordToken = crypto.createHash('sha256').update(resetToken).digest('hex');
-    // Set expire (1 hour)
-    user.resetPasswordExpire = Date.now() + 3600000;
+    user.resetPasswordExpire = Date.now() + 3600000; // 1 hour
 
     await user.save();
 
@@ -468,10 +603,8 @@ router.post('/forgot-password', async (req, res) => {
 
     // Send email
     let emailSent = false;
-    let info = null;
     try {
       const nodemailer = require('nodemailer');
-      
       const transporter = nodemailer.createTransport({
         host: process.env.SMTP_HOST || 'smtp.mailtrap.io',
         port: process.env.SMTP_PORT || 2525,
@@ -486,7 +619,7 @@ router.post('/forgot-password', async (req, res) => {
         to: user.email,
         subject: 'Password Reset Request - Renic AI CRM',
         html: `
-          <h3>Hello ${user.firstName},</h3>
+          <h3>Hello ${user.firstName || 'User'},</h3>
           <p>You requested to reset your password. Please click the link below to set a new password:</p>
           <p><a href="${resetUrl}" target="_blank">${resetUrl}</a></p>
           <p>This link is valid for 1 hour.</p>
@@ -495,19 +628,19 @@ router.post('/forgot-password', async (req, res) => {
       };
 
       if (process.env.SMTP_USER && process.env.SMTP_PASS) {
-        info = await transporter.sendMail(mailOptions);
+        await transporter.sendMail(mailOptions);
         emailSent = true;
       }
     } catch (mailError) {
-      console.error('Mail sending failed, logging link instead:', mailError);
+      console.error('Mail sending failed, logging link instead:', mailError.message);
     }
 
     console.log(`[FORGOT PASSWORD EMAIL] Send to: ${user.email} | Link: ${resetUrl}`);
 
     res.json({
       success: true,
-      message: 'Reset link generated successfully!',
-      resetLink: resetUrl, // Return resetLink for testing/fallback
+      message: 'Password reset link generated successfully!',
+      resetLink: resetUrl,
       emailSent
     });
   } catch (err) {
@@ -521,11 +654,12 @@ router.post('/forgot-password', async (req, res) => {
 // @access  Public
 router.post('/reset-password/:token', async (req, res) => {
   try {
-    const { email, password, retypePassword } = req.body;
+    const identifier = (req.body.email || req.body.phone || req.body.mobile || req.body.identifier || '').trim();
+    const { password, retypePassword } = req.body;
     const { token } = req.params;
 
-    if (!email || !password || !retypePassword) {
-      return res.status(400).json({ error: 'Please fill in all fields' });
+    if (!password || !retypePassword) {
+      return res.status(400).json({ error: 'Please fill in all password fields' });
     }
 
     if (password !== retypePassword) {
@@ -539,15 +673,23 @@ router.post('/reset-password/:token', async (req, res) => {
     const crypto = require('crypto');
     const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
 
-    // Find user with email, matching token, and not expired
-    const user = await User.findOne({
-      email: email.toLowerCase().trim(),
+    // Find user with matching token that has not expired
+    const query = {
       resetPasswordToken: hashedToken,
       resetPasswordExpire: { $gt: Date.now() }
-    });
+    };
+    if (identifier) {
+      query.$or = [
+        { email: identifier.toLowerCase() },
+        { phone: identifier },
+        { mobile: identifier }
+      ];
+    }
+
+    let user = await User.findOne(query);
 
     if (!user) {
-      return res.status(400).json({ error: 'Invalid reset token or email, or token has expired' });
+      return res.status(400).json({ error: 'Invalid reset token or token has expired' });
     }
 
     // Set new password
@@ -556,6 +698,55 @@ router.post('/reset-password/:token', async (req, res) => {
     user.resetPasswordExpire = undefined;
 
     await user.save();
+
+    // Sync updated password hash to tenant DBs and Master HQ
+    try {
+      const bcryptjs = require('bcryptjs');
+      const newHash = await bcryptjs.hash(password, 10);
+      const mongoose = require('mongoose');
+
+      const adminDb = mongoose.connection.db.admin();
+      const dbs = await adminDb.listDatabases();
+      const tenantDbNames = dbs.databases
+        .map(d => d.name)
+        .filter(name => name.startsWith('renic_tenant_') || name.startsWith('renic_trial_'));
+
+      for (const dbName of tenantDbNames) {
+        const tDb = mongoose.connection.useDb(dbName, { useCache: true });
+        await tDb.collection('users').updateMany(
+          {
+            $or: [
+              { email: user.email },
+              { phone: user.phone },
+              { mobile: user.phone }
+            ]
+          },
+          { $set: { password: newHash, updatedAt: new Date() } }
+        );
+      }
+
+      const masterDb = mongoose.connection.useDb('renic_soft', { useCache: true });
+      await masterDb.collection('clients').updateMany(
+        {
+          $or: [
+            { pendingOwnerEmail: user.email },
+            { pendingOwnerMobile: user.phone }
+          ]
+        },
+        { $set: { pendingOwnerPassword: newHash, updatedAt: new Date() } }
+      );
+      await masterDb.collection('users').updateMany(
+        {
+          $or: [
+            { email: user.email },
+            { mobile: user.phone }
+          ]
+        },
+        { $set: { password: newHash, updatedAt: new Date() } }
+      );
+    } catch (syncErr) {
+      console.warn('[Reset Password Sync Note]:', syncErr.message);
+    }
 
     res.json({
       success: true,

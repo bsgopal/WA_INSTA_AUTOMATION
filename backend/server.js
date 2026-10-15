@@ -73,14 +73,17 @@ app.use('/api/quick-replies', require('./middlewares/auth-middleware'), requireF
 app.use('/api/ai-chat', require('./middlewares/auth-middleware'), require('./routes/aiChat'));
 app.use('/api/response-rules', require('./middlewares/auth-middleware'), requireFeature('responseRules'), require('./routes/responseRules'));
 app.use('/api/knowledge-documents', require('./middlewares/auth-middleware'), require('./routes/knowledgeDocuments'));
-app.use('/api/lists', require('./middlewares/auth-middleware'), require('./routes/lists'));
+app.use('/api/quotations', require('./middlewares/auth-middleware'), require('./routes/quotations'));
+app.use('/api/invoices', require('./middlewares/auth-middleware'), require('./routes/invoices'));
+app.use('/api/appointments', require('./middlewares/auth-middleware'), require('./routes/appointments'));
+app.use('/api/appointment-settings', require('./middlewares/auth-middleware'), require('./routes/appointmentSettings'));
 app.use('/api/webhooks', require('./routes/webhooks'));
 app.use('/api/notifications', require('./routes/notifications'));
 
 // ============ TENANT SSE & OAUTH 2.0 GATING ============
 const sseClients = new Set();
 let cachedScreenPermissions = null;
-let cachedOauthEnforced = false;
+let cachedOauthEnforced = true;
 
 const broadcastTenantUpdate = (data) => {
   const payload = `data: ${JSON.stringify(data)}\n\n`;
@@ -94,10 +97,18 @@ const broadcastTenantUpdate = (data) => {
 };
 app.set('broadcastTenantUpdate', broadcastTenantUpdate);
 
-const getOauthStatus = async () => {
+const getOauthStatus = async (customerCode) => {
   try {
-    const ShopConfig = require('./models/ShopConfig');
-    const config = await ShopConfig.findOne({});
+    let config = null;
+    try {
+      const { getModel } = require('./middlewares/tenantContext');
+      const TenantShopConfig = getModel('ShopConfig');
+      config = await TenantShopConfig.findOne({});
+    } catch (e) {}
+    if (!config) {
+      const ShopConfig = require('./models/ShopConfig');
+      config = await ShopConfig.findOne({});
+    }
     const hasClientId = Boolean(config?.oauthConfig?.clientId?.trim());
     const hasClientSecret = Boolean(config?.oauthConfig?.clientSecret?.trim());
     const configured = hasClientId && hasClientSecret;
@@ -120,15 +131,42 @@ app.get('/api/tenant/stream', async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   if (res.flushHeaders) res.flushHeaders();
 
-  const ShopConfig = require('./models/ShopConfig');
-  const config = await ShopConfig.findOne({});
-  const oauthStatus = await getOauthStatus();
+  let config = null;
+  let license = null;
+  try {
+    const { getModel } = require('./middlewares/tenantContext');
+    const TenantShopConfig = getModel('ShopConfig');
+    config = await TenantShopConfig.findOne({});
+  } catch (e) {}
+
+  try {
+    const { getModel } = require('./middlewares/tenantContext');
+    const TenantLicense = getModel('License');
+    license = await TenantLicense.findOne().sort({ createdAt: -1 });
+  } catch (e) {}
+
+  if (!config) {
+    const ShopConfig = require('./models/ShopConfig');
+    config = await ShopConfig.findOne({});
+  }
+  if (!license) {
+    const License = require('./models/License');
+    license = await License.findOne().sort({ createdAt: -1 });
+  }
+
+  const oauthStatus = await getOauthStatus(req.customerCode);
+  const isActive = Boolean(license && (!license.licenseEnd || new Date(license.licenseEnd) > new Date()) && !config?.emergencyLock);
 
   res.write(`data: ${JSON.stringify({
     type: 'CONNECTED',
+    active: isActive,
+    licenseRequired: !license,
+    isLocked: Boolean(config?.emergencyLock),
+    clientName: license?.companyName || config?.shopName || 'Unassigned Client',
     screenPermissions: config?.screenPermissions || cachedScreenPermissions || {},
     oauthEnforced: config?.oauthEnforced !== undefined ? config.oauthEnforced : cachedOauthEnforced,
-    oauthStatus
+    oauthStatus,
+    whatsappSenderMode: config?.whatsappSenderMode || 'DOCKER'
   })}\n\n`);
 
   sseClients.add(res);
@@ -139,15 +177,47 @@ app.get('/api/tenant/stream', async (req, res) => {
 
 app.get('/api/tenant/screens', async (req, res) => {
   try {
-    const ShopConfig = require('./models/ShopConfig');
-    const config = await ShopConfig.findOne({});
-    const oauthStatus = await getOauthStatus();
+    let config = null;
+    let license = null;
+    try {
+      const { getModel } = require('./middlewares/tenantContext');
+      const TenantShopConfig = getModel('ShopConfig');
+      config = await TenantShopConfig.findOne({});
+    } catch (e) {}
+
+    try {
+      const { getModel } = require('./middlewares/tenantContext');
+      const TenantLicense = getModel('License');
+      license = await TenantLicense.findOne().sort({ createdAt: -1 });
+    } catch (e) {}
+
+    if (!config) {
+      const ShopConfig = require('./models/ShopConfig');
+      config = await ShopConfig.findOne({});
+    }
+    if (!license) {
+      const License = require('./models/License');
+      license = await License.findOne().sort({ createdAt: -1 });
+    }
+
+    const oauthStatus = await getOauthStatus(req.customerCode);
+    const isActive = Boolean(license && (!license.licenseEnd || new Date(license.licenseEnd) > new Date()) && !config?.emergencyLock);
     res.json({
       success: true,
+      active: isActive,
+      licenseRequired: !license,
+      isLocked: Boolean(config?.emergencyLock),
+      clientName: license?.companyName || config?.shopName || 'WhatsApp Automation',
       screenPermissions: config?.screenPermissions || cachedScreenPermissions || {},
       oauthEnforced: config?.oauthEnforced !== undefined ? config.oauthEnforced : cachedOauthEnforced,
       oauthStatus,
-      customerCode: 'WA01'
+      whatsappSenderMode: config?.whatsappSenderMode || 'DOCKER',
+      dockerThrottleSeconds: config?.dockerThrottleSeconds || 6,
+      businessType: config?.businessType || 'salon',
+      solutionMode: config?.solutionMode || 'standalone',
+      solutionModes: config?.solutionModes || ['standalone'],
+      customTerminology: config?.customTerminology || {},
+      customerCode: (license?.customerCode || config?.customerCode || req.customerCode || '').toLowerCase()
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -164,19 +234,44 @@ app.post('/api/settings/verify-oauth', async (req, res) => {
   const cleanClientSecret = clientSecret.trim();
   const hqUrl = process.env.RENIC_HQ_URL || 'http://127.0.0.1:5050';
 
+  let config = null;
+  let license = null;
+  try {
+    const { getModel } = require('./middlewares/tenantContext');
+    const TenantShopConfig = getModel('ShopConfig');
+    config = await TenantShopConfig.findOne({});
+    const TenantLicense = getModel('License');
+    license = await TenantLicense.findOne().sort({ createdAt: -1 });
+  } catch (e) {}
+
+  if (!config) {
+    const ShopConfig = require('./models/ShopConfig');
+    config = await ShopConfig.findOne({});
+  }
+  if (!license) {
+    const License = require('./models/License');
+    license = await License.findOne().sort({ createdAt: -1 });
+  }
+
+  const customerCode = (license?.customerCode || config?.customerCode || req.customerCode || process.env.CUSTOMER_CODE || '').toLowerCase();
+  const clientName = license?.companyName || config?.shopName || 'WhatsApp Automation';
+
   try {
     const axios = require('axios');
     const tokenRes = await axios.post(`${hqUrl}/api/v1/oauth/token`, {
       grant_type: 'client_credentials',
       client_id: cleanClientId,
-      client_secret: cleanClientSecret
-    }, { timeout: 4000 });
+      client_secret: cleanClientSecret,
+      customerCode,
+      clientName
+    }, { timeout: 5000 });
 
     if (tokenRes.data?.access_token) {
-      const ShopConfig = require('./models/ShopConfig');
-      let config = await ShopConfig.findOne({});
       if (!config) {
-        config = new ShopConfig({ userId: new mongoose.Types.ObjectId() });
+        config = new (require('./models/ShopConfig'))({ userId: new mongoose.Types.ObjectId() });
+      }
+      if (!config.userId) {
+        config.userId = new mongoose.Types.ObjectId();
       }
       config.oauthConfig = {
         clientId: cleanClientId,
@@ -184,10 +279,12 @@ app.post('/api/settings/verify-oauth', async (req, res) => {
         verified: true,
         lastVerifiedAt: new Date()
       };
+      config.oauthEnforced = true;
       await config.save();
 
       broadcastTenantUpdate({
         type: 'PERMISSIONS_UPDATED',
+        oauthEnforced: true,
         oauthStatus: {
           configured: true,
           verified: true,
@@ -198,15 +295,15 @@ app.post('/api/settings/verify-oauth', async (req, res) => {
 
       return res.json({
         success: true,
-        message: 'OAuth 2.0 Credentials successfully verified with Renic Soft Master!',
+        message: 'OAuth 2.0 Credentials successfully verified with Renic Soft Master HQ!',
         verified: true,
         expiresIn: tokenRes.data.expires_in
       });
     }
 
-    res.status(400).json({ success: false, error: 'Failed to verify token with Renic Soft Master' });
+    res.status(400).json({ success: false, error: 'Failed to verify token with Renic Soft Master HQ' });
   } catch (err) {
-    const msg = err.response?.data?.message || err.response?.data?.error || err.message;
+    const msg = err.response?.data?.error_description || err.response?.data?.message || err.response?.data?.error || err.message;
     res.status(400).json({ success: false, error: `Verification failed: ${msg}` });
   }
 });
@@ -217,10 +314,22 @@ app.post('/api/settings/oauth-credentials', async (req, res) => {
     const cleanClientId = (clientId || '').trim();
     const cleanClientSecret = (clientSecret || '').trim();
 
-    const ShopConfig = require('./models/ShopConfig');
-    let config = await ShopConfig.findOne({});
+    let config = null;
+    try {
+      const { getModel } = require('./middlewares/tenantContext');
+      const TenantShopConfig = getModel('ShopConfig');
+      config = await TenantShopConfig.findOne({});
+    } catch (e) {}
+
     if (!config) {
-      config = new ShopConfig({ userId: new mongoose.Types.ObjectId() });
+      const ShopConfig = require('./models/ShopConfig');
+      config = await ShopConfig.findOne({});
+      if (!config) {
+        config = new ShopConfig({ userId: new mongoose.Types.ObjectId() });
+      }
+    }
+    if (!config.userId) {
+      config.userId = new mongoose.Types.ObjectId();
     }
 
     const currentClientId = (config?.oauthConfig?.clientId || '').trim();
@@ -239,7 +348,7 @@ app.post('/api/settings/oauth-credentials', async (req, res) => {
     };
     await config.save();
 
-    const oauthStatus = await getOauthStatus();
+    const oauthStatus = await getOauthStatus(req.customerCode);
     broadcastTenantUpdate({
       type: 'PERMISSIONS_UPDATED',
       oauthStatus
@@ -252,20 +361,52 @@ app.post('/api/settings/oauth-credentials', async (req, res) => {
 });
 
 app.post('/api/tenant/sync-push', async (req, res) => {
-  const { screenPermissions, oauthEnforced, clientId, revoked, whatsappSenderMode, dockerThrottleSeconds } = req.body;
+  const { 
+    screenPermissions, 
+    oauthEnforced, 
+    clientId, 
+    revoked, 
+    whatsappSenderMode, 
+    dockerThrottleSeconds,
+    businessType,
+    solutionMode,
+    solutionModes,
+    customTerminology,
+    customerCode
+  } = req.body;
   if (screenPermissions) cachedScreenPermissions = screenPermissions;
   if (oauthEnforced !== undefined) cachedOauthEnforced = !!oauthEnforced;
 
+  let config = null;
   try {
-    const ShopConfig = require('./models/ShopConfig');
-    let config = await ShopConfig.findOne({});
+    const targetCode = (customerCode || req.customerCode || '').trim().toLowerCase();
+    let ShopConfig = null;
+    if (targetCode) {
+      try {
+        const { getModelForTenant } = require('./config/tenantConnectionManager');
+        ShopConfig = getModelForTenant(targetCode, 'ShopConfig');
+      } catch (e) {}
+    }
+    if (!ShopConfig) {
+      ShopConfig = require('./models/ShopConfig');
+    }
+
+    config = await ShopConfig.findOne({});
     if (!config) {
       config = new ShopConfig({ userId: new mongoose.Types.ObjectId() });
     }
+    if (customerCode) config.customerCode = customerCode.toLowerCase();
     if (screenPermissions) config.screenPermissions = screenPermissions;
     if (oauthEnforced !== undefined) config.oauthEnforced = !!oauthEnforced;
-    if (whatsappSenderMode) config.whatsappSenderMode = whatsappSenderMode;
+    if (whatsappSenderMode) {
+      config.whatsappSenderMode = whatsappSenderMode;
+      config.metaApiEnabled = config.whatsappSenderMode === 'META';
+    }
     if (dockerThrottleSeconds !== undefined) config.dockerThrottleSeconds = Number(dockerThrottleSeconds) || 6;
+    if (businessType) config.businessType = businessType;
+    if (solutionMode) config.solutionMode = solutionMode;
+    if (solutionModes) config.solutionModes = solutionModes;
+    if (customTerminology) config.customTerminology = customTerminology;
     if (revoked) {
       if (config.oauthConfig) config.oauthConfig.verified = false;
     }
@@ -277,14 +418,19 @@ app.post('/api/tenant/sync-push', async (req, res) => {
     console.error('[WA_INSTA OTA Live Push] DB update error:', e.message);
   }
 
-  const oauthStatus = await getOauthStatus();
+  const oauthStatus = await getOauthStatus(customerCode || req.customerCode);
   broadcastTenantUpdate({
     type: 'PERMISSIONS_UPDATED',
     screenPermissions: cachedScreenPermissions,
     oauthEnforced: cachedOauthEnforced,
     oauthStatus,
-    whatsappSenderMode: whatsappSenderMode || 'META',
-    dockerThrottleSeconds: Number(dockerThrottleSeconds) || 6
+    whatsappSenderMode: whatsappSenderMode || config?.whatsappSenderMode || 'DOCKER',
+    dockerThrottleSeconds: Number(dockerThrottleSeconds) || config?.dockerThrottleSeconds || 6,
+    businessType: businessType || config?.businessType || 'salon',
+    solutionMode: solutionMode || config?.solutionMode || 'standalone',
+    solutionModes: solutionModes || config?.solutionModes || ['standalone'],
+    customTerminology: customTerminology || config?.customTerminology || {},
+    customerCode: (customerCode || config?.customerCode || req.customerCode || '').toLowerCase()
   });
 
   res.json({ success: true, message: 'WA_INSTA OTA sync received and broadcasted' });
@@ -337,38 +483,11 @@ const startServer = async () => {
     console.log('✅ MongoDB connected successfully');
     console.log(`📍 Connected to: ${process.env.NODE_ENV === 'development' ? 'Local MongoDB' : 'MongoDB Atlas'}`);
 
-    // Seed default admin user (9345578103 / 123456)
-    try {
-      const User = require('./models/User');
-      const adminPhone = '9345578103';
-      const adminEmail = 'admin@renic.com';
-      const rawPassword = '123456';
-      let adminUser = await User.findOne({ phone: adminPhone });
-      
-      if (!adminUser) {
-        adminUser = new User({
-          firstName: 'Admin',
-          lastName: 'Renic',
-          email: adminEmail,
-          phone: adminPhone,
-          password: rawPassword,
-          role: 'PLATFORM_OWNER',
-          companyName: 'Renic Automation',
-          isActive: true
-        });
-        await adminUser.save();
-        console.log(`✅ Admin user seeded successfully: ${adminPhone} / ${rawPassword} (PLATFORM_OWNER)`);
-      } else {
-        if (adminUser.role !== 'PLATFORM_OWNER' || !adminUser.isActive) {
-          adminUser.role = 'PLATFORM_OWNER';
-          adminUser.isActive = true;
-          await adminUser.save();
-        }
-        console.log(`ℹ️ Admin user (${adminPhone}) already active with PLATFORM_OWNER.`);
-      }
-    } catch (seedErr) {
-      console.error('⚠️ Admin user seeding failed:', seedErr.message);
-    }
+    // NO AUTO-SEED: no default/hardcoded admin is created on startup.
+    // Owner and staff users are created when the customer is provisioned in
+    // Renic Soft and are written into that customer's own database, so the
+    // credentials handed to the customer are the only ones that work.
+    console.log('ℹ️ Auto-seed disabled — users are provisioned per customer.');
 
     // Initialize WAHA WhatsApp service
     try {
@@ -453,6 +572,23 @@ const startServer = async () => {
         });
       } catch (err) {
         console.warn(`⚠️ [Auto-Docker] Failed to execute docker command.`);
+      }
+
+      // Initialize WAHA Session Health & Auto-Recovery Worker
+      try {
+        const WAHAService = require('./services/WAHAService');
+        WAHAService.initialize().catch(() => {});
+        WAHAService.startSessionHealthWorker();
+      } catch (wahaErr) {
+        console.warn('⚠️ WAHA Health Worker init skipped:', wahaErr.message);
+      }
+
+      // Initialize Appointment Automated Reminders Cron
+      try {
+        const { initAppointmentReminderCron } = require('./services/appointmentReminderCron');
+        initAppointmentReminderCron();
+      } catch (cronErr) {
+        console.warn('⚠️ Failed to initialize appointment reminder cron:', cronErr.message);
       }
 
       // Auto-start ngrok tunnel if packaged as an EXE or explicitly enabled

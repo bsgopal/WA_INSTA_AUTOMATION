@@ -1292,38 +1292,31 @@ export default function Workflows() {
           initialData={studioWorkflow ? {
             name: studioWorkflow.name,
             status: studioWorkflow.status || 'ACTIVE',
-            triggerValue: studioWorkflow.trigger?.conditions?.[0]?.value || 'inquiry',
-            nodes: studioWorkflow.conditions && studioWorkflow.conditions.length > 0 ? [
-              {
-                id: 'node_trigger',
-                type: 'LIST_SELECT',
-                category: 'triggers',
-                label: studioWorkflow.trigger?.responseRuleName || 'List Selection Trigger',
-                config: { ruleId: studioWorkflow.trigger?.responseRuleId },
-                position: { x: 80, y: 120 }
-              },
-              ...studioWorkflow.conditions.map((cond, i) => ({
-                id: cond.id || `cond_${i}`,
-                type: 'MATCH_CONDITION',
-                category: 'logic',
-                label: `Condition: ${cond.label || cond.value || 'Match'}`,
-                config: { ...cond },
-                position: { x: 400 + i * 320, y: 120 }
-              }))
-            ] : undefined
+            triggerValue: studioWorkflow.trigger?.keywords?.[0] || studioWorkflow.trigger?.conditions?.[0]?.value || 'hi',
+            nodes: (studioWorkflow.nodes && studioWorkflow.nodes.length > 0) ? studioWorkflow.nodes : undefined,
+            edges: (studioWorkflow.edges && studioWorkflow.edges.length > 0) ? studioWorkflow.edges : undefined,
+            edgeRouting: studioWorkflow.edgeRouting || 'bezier'
           } : {
             name: 'New Process Workflow',
             status: 'ACTIVE'
           }}
           onSave={async (dmData) => {
-            const triggerNode = (dmData.nodes || []).find(n => n.category === 'triggers' || n.type === 'KEYWORD') || dmData.nodes?.[0];
+            const triggerNode = (dmData.nodes || []).find(n => n.type === 'START' || n.category === 'triggers' || n.type === 'KEYWORD') || dmData.nodes?.[0];
             const actionNodes = (dmData.nodes || []).filter(n => n.id !== triggerNode?.id);
-            const triggerKeywords = triggerNode?.config?.keywords || (dmData.triggerValue ? [dmData.triggerValue] : ['hi', 'hey', 'hello']);
+            const triggerKeywords = (triggerNode?.config?.keywords && triggerNode.config.keywords.length > 0)
+              ? triggerNode.config.keywords
+              : (dmData.triggerKeywords && dmData.triggerKeywords.length > 0)
+                ? dmData.triggerKeywords
+                : (dmData.triggerValue ? dmData.triggerValue.split(',').map(s => s.trim()).filter(Boolean) : ['hi', 'hello', 'hey', 'menu']);
 
             const payload = {
               name: dmData.name || 'New Automated Workflow',
               description: 'Designed via Visual Flow Studio',
               status: dmData.status || 'ACTIVE',
+              priority: 10,
+              nodes: dmData.nodes || [],
+              edges: dmData.edges || [],
+              edgeRouting: dmData.edgeRouting || 'bezier',
               trigger: {
                 type: 'KEYWORD',
                 keywords: triggerKeywords,

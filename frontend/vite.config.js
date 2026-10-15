@@ -40,7 +40,7 @@ function legacyGridCompat() {
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), legacyGridCompat()],
-  base: './',
+  base: process.env.ELECTRON ? './' : '/',
   server: {
     host: true,
     port: 5173,

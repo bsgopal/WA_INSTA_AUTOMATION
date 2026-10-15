@@ -342,7 +342,12 @@ const forwardMetaReplyToWhatsApp = async ({ phoneNumber, userId, metaPhoneNumber
       }
     }
 
-    let conversation = await Conversation.findOne({
+    // Re-fetch without the metaPhoneNumberId filter: the handoff message is
+    // attached to the customer's conversation regardless of which Meta number
+    // triggered it. `conversation` was already declared above for the dedup
+    // check, so this re-assigns rather than re-declaring (the duplicate `let`
+    // made the whole module fail to parse).
+    conversation = await Conversation.findOne({
       userId,
       customerId: customer._id
     }).sort({ updatedAt: -1 });

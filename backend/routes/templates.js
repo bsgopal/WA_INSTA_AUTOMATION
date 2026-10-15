@@ -542,43 +542,73 @@ router.get('/:id/usage', async (req, res) => {
     const templateId = req.params.id;
     const userId = req.userId || req.user._id;
 
+    const Template = require('../models/Template');
     const Campaign = require('../models/Campaign');
     const Workflow = require('../models/Workflow');
     const ResponseRule = require('../models/ResponseRule');
     const QuickReply = require('../models/QuickReply');
 
+    const template = await Template.findById(templateId);
+    const templateName = template?.name || '';
+
     // 1. Search in Campaigns
+    const campaignOrConditions = [
+      { messageTemplate: templateId },
+      { 'messageTemplate._id': templateId },
+      { templateId: templateId }
+    ];
+    if (templateName) {
+      campaignOrConditions.push({ metaTemplateName: templateName });
+    }
+
     const campaigns = await Campaign.find({
       userId,
-      $or: [
-        { messageTemplate: templateId },
-        { 'messageTemplate._id': templateId },
-        { templateId: templateId }
-      ]
+      $or: campaignOrConditions
     }).select('name type status targetAudience createdAt').lean();
 
     // 2. Search in Workflows
+    const workflowOrConditions = [
+      { 'steps.config.templateId': templateId },
+      { 'steps.config.template': templateId },
+      { 'nodes.config.templateId': templateId }
+    ];
+    if (templateName) {
+      workflowOrConditions.push(
+        { 'steps.config.templateName': templateName },
+        { 'nodes.config.templateName': templateName }
+      );
+    }
+
     const workflows = await Workflow.find({
       userId,
-      $or: [
-        { 'steps.config.templateId': templateId },
-        { 'steps.config.template': templateId }
-      ]
-    }).select('name status trigger createdAt').lean();
+      $or: workflowOrConditions
+    }).select('name status trigger triggerType createdAt').lean();
 
     // 3. Search in Response Rules
+    const ruleOrConditions = [
+      { templateId: templateId },
+      { responseTemplate: templateId },
+      { 'actionPayload.templateId': templateId }
+    ];
+    if (templateName) {
+      ruleOrConditions.push(
+        { 'actionPayload.templateName': templateName },
+        { templateName: templateName }
+      );
+    }
+
     const responseRules = await ResponseRule.find({
       userId,
-      $or: [
-        { templateId: templateId },
-        { responseTemplate: templateId }
-      ]
+      $or: ruleOrConditions
     }).select('name trigger keywords matchType isActive').lean();
 
     // 4. Search in Quick Replies
     const quickReplies = await QuickReply.find({
       userId,
-      templateId: templateId
+      $or: [
+        { templateId: templateId },
+        ...(templateName ? [{ templateName: templateName }] : [])
+      ]
     }).select('text shortcut category').lean();
 
     const totalUsages = campaigns.length + workflows.length + responseRules.length + quickReplies.length;
@@ -586,6 +616,7 @@ router.get('/:id/usage', async (req, res) => {
     res.json({
       success: true,
       templateId,
+      templateName,
       inUse: totalUsages > 0,
       totalUsages,
       usages: {

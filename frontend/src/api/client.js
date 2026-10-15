@@ -16,8 +16,10 @@ apiClient.getRestAPIUrl = (endpointPath) => tenantGateway.getRestAPIUrl(endpoint
 apiClient.interceptors.request.use(
   (config) => {
     const customerCode = tenantGateway.resolveCustomerCode();
+    const clientId = localStorage.getItem('clientId') || customerCode;
     config.headers['X-Customer-Code'] = customerCode;
     config.headers['X-Tenant-Code'] = customerCode;
+    config.headers['X-Client-Id'] = clientId;
 
     const token = localStorage.getItem('oauth_token') || localStorage.getItem('token');
     if (token) {
