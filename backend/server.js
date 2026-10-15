@@ -63,6 +63,21 @@ app.use(async (req, res, next) => {
   next();
 });
 
+// Restore original request URL if rewritten by Vercel serverless function
+app.use((req, res, next) => {
+  if (req.query && req.query.__path !== undefined) {
+    const rawPath = Array.isArray(req.query.__path) ? req.query.__path.join('/') : req.query.__path;
+    req.url = `/${rawPath}`;
+    delete req.query.__path;
+  } else if (req.url === '/api/index.js' || req.url.startsWith('/api/index.js')) {
+    const original = req.headers['x-matched-path'] || req.headers['x-forwarded-uri'] || req.url.replace(/^\/api\/index\.js/, '');
+    if (original) {
+      req.url = original.startsWith('/') ? original : `/${original}`;
+    }
+  }
+  next();
+});
+
 // ============ MIDDLEWARE ============
 app.use(helmet({
   crossOriginResourcePolicy: false,
@@ -85,6 +100,19 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // ============ ROUTES ============
 const { requireFeature } = require('./middlewares/featureGate');
+
+// Root and health endpoints for Vercel and monitoring
+app.get(['/', '/api', '/api/health'], (req, res) => {
+  res.json({
+    status: 'online',
+    service: 'Renic Automation WhatsApp API',
+    version: '1.0.0',
+    endpoints: {
+      webhooks: '/api/webhooks/whatsapp',
+      health: '/api/webhooks/health'
+    }
+  });
+});
 
 app.use('/api/v1/license', require('./routes/licenseSync'));
 app.use('/api/v1/oauth', require('./routes/oauth'));

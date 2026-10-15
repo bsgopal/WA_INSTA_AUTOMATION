@@ -15,9 +15,16 @@ const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 }
 });
 
-const templateUploadsDir = path.join(__dirname, '..', 'uploads', 'templates');
-if (!fs.existsSync(templateUploadsDir)) {
-  fs.mkdirSync(templateUploadsDir, { recursive: true });
+let templateUploadsDir = path.join(__dirname, '..', 'uploads', 'templates');
+try {
+  if (!fs.existsSync(templateUploadsDir)) {
+    fs.mkdirSync(templateUploadsDir, { recursive: true });
+  }
+} catch (e) {
+  templateUploadsDir = path.join(process.env.TEMP || process.env.TMPDIR || '/tmp', 'uploads', 'templates');
+  try {
+    fs.mkdirSync(templateUploadsDir, { recursive: true });
+  } catch (err) {}
 }
 
 const templateMediaStorage = multer.diskStorage({

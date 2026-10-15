@@ -27,9 +27,16 @@ function appendWhatsAppOptInQuery(query) {
   });
 }
 
-const campaignUploadsDir = path.join(__dirname, '..', 'uploads', 'campaigns');
-if (!fs.existsSync(campaignUploadsDir)) {
-  fs.mkdirSync(campaignUploadsDir, { recursive: true });
+let campaignUploadsDir = path.join(__dirname, '..', 'uploads', 'campaigns');
+try {
+  if (!fs.existsSync(campaignUploadsDir)) {
+    fs.mkdirSync(campaignUploadsDir, { recursive: true });
+  }
+} catch (e) {
+  campaignUploadsDir = path.join(process.env.TEMP || process.env.TMPDIR || '/tmp', 'uploads', 'campaigns');
+  try {
+    fs.mkdirSync(campaignUploadsDir, { recursive: true });
+  } catch (err) {}
 }
 
 const campaignMediaStorage = multer.diskStorage({
