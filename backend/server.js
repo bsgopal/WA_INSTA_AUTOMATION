@@ -19,14 +19,32 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 // Make sure the uploads directory tree exists (multer writes here)
-const uploadsRoot = path.join(__dirname, 'uploads');
+let uploadsRoot = path.join(__dirname, 'uploads');
 try {
   fs.mkdirSync(path.join(uploadsRoot, 'templates'), { recursive: true });
   fs.mkdirSync(path.join(uploadsRoot, 'campaigns'), { recursive: true });
   fs.mkdirSync(path.join(uploadsRoot, 'catalog'), { recursive: true });
   fs.mkdirSync(path.join(uploadsRoot, 'invoices'), { recursive: true });
 } catch (e) {
-  console.warn('⚠️ Could not pre-create uploads directories:', e.message);
+  // Fallback to /tmp if filesystem is read-only or serverless
+  uploadsRoot = path.join(process.env.TEMP || process.env.TMPDIR || '/tmp', 'uploads');
+  try {
+    fs.mkdirSync(path.join(uploadsRoot, 'templates'), { recursive: true });
+    fs.mkdirSync(path.join(uploadsRoot, 'campaigns'), { recursive: true });
+    fs.mkdirSync(path.join(uploadsRoot, 'catalog'), { recursive: true });
+    fs.mkdirSync(path.join(uploadsRoot, 'invoices'), { recursive: true });
+  } catch (tmpErr) {
+    console.warn('⚠️ Could not pre-create uploads directories in /tmp:', tmpErr.message);
+  }
+}
+
+// Auto-connect Mongoose if connection is not yet established
+if (mongoose.connection.readyState === 0 && (process.env.MONGODB_URI || process.env.MONGO_URI)) {
+  const uri = process.env.MONGODB_URI || process.env.MONGO_URI;
+  mongoose.connect(uri, {
+    serverSelectionTimeoutMS: 5000,
+  }).then(() => console.log('🍃 MongoDB connected seamlessly'))
+    .catch(err => console.error('⚠️ MongoDB auto-connect error:', err.message));
 }
 
 const app = express();
