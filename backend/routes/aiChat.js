@@ -892,4 +892,30 @@ router.post('/whatsapp/waha-test', async (req, res) => {
   }
 });
 
+/**
+ * POST /api/ai-chat/whatsapp/start-waha
+ * Execute docker start waha in the background to start local container
+ */
+router.post('/whatsapp/start-waha', async (req, res) => {
+  try {
+    const { exec } = require('child_process');
+    console.log(`🐳 [docker start waha] Starting local WAHA container...`);
+    exec('docker start waha', (err, stdout, stderr) => {
+      if (err) {
+        return res.status(500).json({
+          success: false,
+          error: `Failed to execute 'docker start waha': ${err.message}`
+        });
+      }
+      res.json({
+        success: true,
+        message: 'WAHA container started successfully via Docker.',
+        output: (stdout || stderr || '').trim()
+      });
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 module.exports = router;

@@ -26,9 +26,9 @@ export const TenantProvider = ({ children }) => {
   const [oauthStatus, setOauthStatus] = useState(() => {
     try {
       const cached = localStorage.getItem('wa_oauth_status');
-      return cached ? JSON.parse(cached) : { configured: false, verified: false, clientId: '' };
+      return cached ? JSON.parse(cached) : { configured: false, verified: false, clientId: '', clientSecret: '' };
     } catch (e) {
-      return { configured: false, verified: false, clientId: '' };
+      return { configured: false, verified: false, clientId: '', clientSecret: '' };
     }
   });
 

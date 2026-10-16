@@ -21,12 +21,23 @@ export default function ScreenLocked({ isOauthLock = false, isLicenseLock = fals
   const navigate = useNavigate();
   const { refreshScreens, loading, oauthStatus, customerCode } = useTenant();
 
-  const [inputClientId, setInputClientId] = useState(oauthStatus?.clientId || '');
-  const [inputClientSecret, setInputClientSecret] = useState('');
+  const [inputClientId, setInputClientId] = useState(() => localStorage.getItem('wa_oauth_client_id') || oauthStatus?.clientId || '');
+  const [inputClientSecret, setInputClientSecret] = useState(() => localStorage.getItem('wa_oauth_client_secret') || oauthStatus?.clientSecret || '');
   const [showSecret, setShowSecret] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+
+  React.useEffect(() => {
+    if (oauthStatus?.clientId && !inputClientId) {
+      setInputClientId(oauthStatus.clientId);
+      localStorage.setItem('wa_oauth_client_id', oauthStatus.clientId);
+    }
+    if (oauthStatus?.clientSecret && !inputClientSecret) {
+      setInputClientSecret(oauthStatus.clientSecret);
+      localStorage.setItem('wa_oauth_client_secret', oauthStatus.clientSecret);
+    }
+  }, [oauthStatus?.clientId, oauthStatus?.clientSecret]);
 
   const handleQuickUnlock = async (e) => {
     if (e) e.preventDefault();
@@ -39,6 +50,9 @@ export default function ScreenLocked({ isOauthLock = false, isLicenseLock = fals
       setVerifying(true);
       setErrorMsg('');
       setSuccessMsg('');
+
+      localStorage.setItem('wa_oauth_client_id', inputClientId.trim());
+      localStorage.setItem('wa_oauth_client_secret', inputClientSecret.trim());
 
       const res = await apiClient.post('/settings/verify-oauth', {
         clientId: inputClientId.trim(),

@@ -200,10 +200,11 @@ const getOauthStatus = async (customerCode) => {
       configured,
       verified,
       clientId: config?.oauthConfig?.clientId || '',
+      clientSecret: config?.oauthConfig?.clientSecret || '',
       lastVerifiedAt: config?.oauthConfig?.lastVerifiedAt || null
     };
   } catch (e) {
-    return { configured: false, verified: false, clientId: '', lastVerifiedAt: null };
+    return { configured: false, verified: false, clientId: '', clientSecret: '', lastVerifiedAt: null };
   }
 };
 
@@ -565,6 +566,56 @@ app.post('/api/settings/oauth-credentials', async (req, res) => {
     });
 
     res.json({ success: true, oauthStatus });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get('/api/settings/oauth-credentials', async (req, res) => {
+  try {
+    let config = null;
+    try {
+      const { getModel } = require('./middlewares/tenantContext');
+      const TenantShopConfig = getModel('ShopConfig');
+      config = await TenantShopConfig.findOne({});
+    } catch (e) {}
+
+    if (!config) {
+      const ShopConfig = require('./models/ShopConfig');
+      config = await ShopConfig.findOne({});
+    }
+
+    res.json({
+      success: true,
+      clientId: config?.oauthConfig?.clientId || '',
+      clientSecret: config?.oauthConfig?.clientSecret || '',
+      verified: Boolean(config?.oauthConfig?.verified),
+      lastVerifiedAt: config?.oauthConfig?.lastVerifiedAt || null
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/settings/start-waha', async (req, res) => {
+  try {
+    const { exec } = require('child_process');
+    console.log(`🐳 [docker start waha] Triggered via API endpoint...`);
+    exec('docker start waha', (err, stdout, stderr) => {
+      if (err) {
+        console.warn(`⚠️ [docker start waha] Error:`, err.message);
+        return res.status(500).json({
+          success: false,
+          error: `Failed to execute 'docker start waha': ${err.message}`
+        });
+      }
+      console.log(`✅ [docker start waha] Output:`, stdout || stderr);
+      res.json({
+        success: true,
+        message: 'WAHA container started successfully via Docker.',
+        output: (stdout || stderr || '').trim()
+      });
+    });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

@@ -1268,6 +1268,14 @@ const testConnection = async (customUrl, customKey) => {
         error: `Authentication Rejected (HTTP 401 Unauthorized): The WAHA server at ${apiUrl} rejected the provided API Key. Please verify WAHA_API_KEY in your Railway service variables or update the key here.`
       };
     }
+
+    if (apiUrl.includes('localhost') || apiUrl.includes('127.0.0.1')) {
+      try {
+        const { exec } = require('child_process');
+        exec('docker start waha', () => {});
+      } catch (e) {}
+    }
+
     return {
       success: false,
       statusCode: status || 500,

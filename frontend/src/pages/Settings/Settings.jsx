@@ -21,6 +21,7 @@ import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import DnsIcon from '@mui/icons-material/Dns';
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 
 import apiClient from '../../api/client';
 import CustomSnackbar from '../../components/Snackbar';
@@ -122,11 +123,14 @@ export default function Settings() {
 
   // Tab 2: OAuth 2.0 State
   const { oauthEnforced, oauthStatus, isOauthLocked, isLicenseLocked, refreshScreens, whatsappSenderMode, clientName } = useTenant();
-  const [tenantClientId, setTenantClientId] = useState('');
-  const [tenantClientSecret, setTenantClientSecret] = useState('');
+  const isSettingsLocked = Boolean(isOauthLocked || isLicenseLocked || (!oauthStatus?.verified && oauthEnforced));
+
+  const [tenantClientId, setTenantClientId] = useState(() => localStorage.getItem('wa_oauth_client_id') || oauthStatus?.clientId || '');
+  const [tenantClientSecret, setTenantClientSecret] = useState(() => localStorage.getItem('wa_oauth_client_secret') || oauthStatus?.clientSecret || '');
   const [showClientSecret, setShowClientSecret] = useState(false);
   const [verifyingOauth, setVerifyingOauth] = useState(false);
   const [savingOauth, setSavingOauth] = useState(false);
+  const [startingWaha, setStartingWaha] = useState(false);
   const [oauthAlertBox, setOauthAlertBox] = useState({
     open: false,
     title: '',
@@ -135,10 +139,10 @@ export default function Settings() {
   });
 
   useEffect(() => {
-    if (isOauthLocked || isLicenseLocked || (!oauthStatus?.verified && oauthEnforced)) {
+    if (isSettingsLocked) {
       setActiveTab(2);
     }
-  }, [isOauthLocked, isLicenseLocked, oauthStatus?.verified, oauthEnforced]);
+  }, [isSettingsLocked]);
 
   useEffect(() => {
     if (whatsappSenderMode) {
@@ -147,10 +151,15 @@ export default function Settings() {
   }, [whatsappSenderMode]);
 
   useEffect(() => {
-    if (oauthStatus?.clientId) {
+    if (oauthStatus?.clientId && !tenantClientId) {
       setTenantClientId(oauthStatus.clientId);
+      localStorage.setItem('wa_oauth_client_id', oauthStatus.clientId);
     }
-  }, [oauthStatus?.clientId]);
+    if (oauthStatus?.clientSecret && !tenantClientSecret) {
+      setTenantClientSecret(oauthStatus.clientSecret);
+      localStorage.setItem('wa_oauth_client_secret', oauthStatus.clientSecret);
+    }
+  }, [oauthStatus?.clientId, oauthStatus?.clientSecret]);
 
   // Load backend data on mount
   useEffect(() => {
@@ -160,6 +169,7 @@ export default function Settings() {
     fetchMetaConfig();
     fetchSystemStatus();
     fetchWahaConfig();
+    fetchOauthCredentials();
 
     // Poll status periodically
     const interval = setInterval(fetchWhatsappStatus, 12000);
@@ -353,6 +363,45 @@ export default function Settings() {
     }
   };
 
+  const fetchOauthCredentials = async () => {
+    try {
+      const response = await apiClient.get('/settings/oauth-credentials');
+      if (response.data?.success) {
+        if (response.data.clientId) {
+          setTenantClientId(response.data.clientId);
+          localStorage.setItem('wa_oauth_client_id', response.data.clientId);
+        }
+        if (response.data.clientSecret) {
+          setTenantClientSecret(response.data.clientSecret);
+          localStorage.setItem('wa_oauth_client_secret', response.data.clientSecret);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load saved OAuth credentials:', e.message);
+    }
+  };
+
+  const handleStartWaha = async () => {
+    try {
+      setStartingWaha(true);
+      const response = await apiClient.post('/ai-chat/whatsapp/start-waha');
+      if (response.data?.success) {
+        setSnackbar({ open: true, message: '🐳 ' + (response.data.message || 'WAHA Docker container started!'), severity: 'success' });
+        setTimeout(() => {
+          fetchWhatsappStatus();
+          fetchWhatsappQr();
+          fetchSystemStatus();
+        }, 2000);
+      } else {
+        setSnackbar({ open: true, message: '❌ ' + (response.data?.error || 'Failed to start WAHA container.'), severity: 'error' });
+      }
+    } catch (error) {
+      setSnackbar({ open: true, message: '❌ ' + (error.response?.data?.error || error.message), severity: 'error' });
+    } finally {
+      setStartingWaha(false);
+    }
+  };
+
   const handleVerifyOauth = async () => {
     if (!tenantClientId.trim() || !tenantClientSecret.trim()) {
       setOauthAlertBox({
@@ -371,6 +420,9 @@ export default function Settings() {
     }
     try {
       setVerifyingOauth(true);
+      localStorage.setItem('wa_oauth_client_id', tenantClientId.trim());
+      localStorage.setItem('wa_oauth_client_secret', tenantClientSecret.trim());
+
       const response = await apiClient.post('/settings/verify-oauth', {
         clientId: tenantClientId.trim(),
         clientSecret: tenantClientSecret.trim()
@@ -408,6 +460,9 @@ export default function Settings() {
   const handleSaveOauthCredentials = async () => {
     try {
       setSavingOauth(true);
+      localStorage.setItem('wa_oauth_client_id', tenantClientId.trim());
+      localStorage.setItem('wa_oauth_client_secret', tenantClientSecret.trim());
+
       const response = await apiClient.post('/settings/oauth-credentials', {
         clientId: tenantClientId.trim(),
         clientSecret: tenantClientSecret.trim()
@@ -611,8 +666,18 @@ export default function Settings() {
         }}
       >
         <Tabs
-          value={activeTab}
-          onChange={(_, val) => setActiveTab(val)}
+          value={isSettingsLocked ? 2 : activeTab}
+          onChange={(_, val) => {
+            if (isSettingsLocked && val !== 2) {
+              setSnackbar({
+                open: true,
+                message: '🔒 Workspace locked. Please enter and verify your OAuth 2.0 Client Credentials first to unlock the other tabs.',
+                severity: 'warning'
+              });
+              return;
+            }
+            setActiveTab(val);
+          }}
           variant="fullWidth"
           sx={{
             minHeight: 36,
@@ -642,9 +707,26 @@ export default function Settings() {
             }
           }}
         >
-          <Tab icon={<StorefrontIcon sx={{ fontSize: 16 }} />} iconPosition="start" label="Store Details & Branding" />
-          <Tab icon={<ChatIcon sx={{ fontSize: 16 }} />} iconPosition="start" label="WhatsApp Engine & Connection" />
-          <Tab icon={<KeyIcon sx={{ fontSize: 16 }} />} iconPosition="start" label="API & OAuth 2.0" />
+          <Tab 
+            disabled={isSettingsLocked}
+            icon={isSettingsLocked ? <LockOutlinedIcon sx={{ fontSize: 16, color: '#94a3b8' }} /> : <StorefrontIcon sx={{ fontSize: 16 }} />} 
+            iconPosition="start" 
+            label={isSettingsLocked ? "Store Details 🔒 (Locked)" : "Store Details & Branding"} 
+            sx={{ opacity: isSettingsLocked ? 0.45 : 1, cursor: isSettingsLocked ? 'not-allowed !important' : 'pointer' }}
+          />
+          <Tab 
+            disabled={isSettingsLocked}
+            icon={isSettingsLocked ? <LockOutlinedIcon sx={{ fontSize: 16, color: '#94a3b8' }} /> : <ChatIcon sx={{ fontSize: 16 }} />} 
+            iconPosition="start" 
+            label={isSettingsLocked ? "WhatsApp Engine 🔒 (Locked)" : "WhatsApp Engine & Connection"} 
+            sx={{ opacity: isSettingsLocked ? 0.45 : 1, cursor: isSettingsLocked ? 'not-allowed !important' : 'pointer' }}
+          />
+          <Tab 
+            icon={<KeyIcon sx={{ fontSize: 16 }} />} 
+            iconPosition="start" 
+            label={isSettingsLocked ? "🔑 API & OAuth 2.0 (Required)" : "API & OAuth 2.0"} 
+            sx={{ ...(isSettingsLocked && { bgcolor: 'rgba(217, 119, 6, 0.12)', color: '#b45309 !important', fontWeight: 900 }) }}
+          />
         </Tabs>
       </Paper>
 
@@ -656,7 +738,7 @@ export default function Settings() {
       ) : (
         <Box sx={{ width: '100%', flexGrow: 1 }}>
           {/* Tab 0: Store Details & Branding */}
-          {activeTab === 0 && (
+          {activeTab === 0 && !isSettingsLocked && (
             <Grid container spacing={1.5} sx={{
               '@keyframes tabFadeIn': {
                 from: { opacity: 0, transform: 'translateY(4px)' },
@@ -964,7 +1046,7 @@ export default function Settings() {
           )}
 
           {/* Tab 1: WhatsApp Engine & Connection */}
-          {activeTab === 1 && (
+          {activeTab === 1 && !isSettingsLocked && (
             <Box sx={{
               '@keyframes tabFadeIn': {
                 from: { opacity: 0, transform: 'translateY(4px)' },
@@ -1229,7 +1311,25 @@ export default function Settings() {
                           </Grid>
                         </Grid>
 
-                        <Box sx={{ display: 'flex', gap: 1, mt: 1.5, justifyContent: 'flex-end' }}>
+                        <Box sx={{ display: 'flex', gap: 1, mt: 1.5, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            disabled={startingWaha}
+                            onClick={handleStartWaha}
+                            sx={{
+                              borderColor: '#38bdf8',
+                              color: '#0284c7',
+                              fontWeight: 700,
+                              fontSize: '0.75rem',
+                              textTransform: 'none',
+                              borderRadius: '6px',
+                              bgcolor: 'rgba(56, 189, 248, 0.06)',
+                              '&:hover': { bgcolor: 'rgba(56, 189, 248, 0.15)', borderColor: '#0284c7' }
+                            }}
+                          >
+                            {startingWaha ? 'Starting WAHA...' : '🐳 Start Local WAHA (docker start waha)'}
+                          </Button>
                           <Button
                             variant="outlined"
                             size="small"
@@ -1323,7 +1423,7 @@ export default function Settings() {
                                 )}
                               </Box>
 
-                            <Stack direction="row" spacing={1}>
+                            <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', justifyContent: 'center' }}>
                               <Button
                                 variant="outlined"
                                 size="small"
@@ -1343,6 +1443,15 @@ export default function Settings() {
                                 sx={{ borderRadius: '6px', fontWeight: 800, fontSize: '0.72rem', textTransform: 'none', px: 1.5, bgcolor: '#0f172a', color: '#ffffff', '&:hover': { bgcolor: '#1e293b' } }}
                               >
                                 {restartingSession ? 'Restarting...' : 'Restart'}
+                              </Button>
+                              <Button
+                                variant="outlined"
+                                size="small"
+                                disabled={startingWaha}
+                                onClick={handleStartWaha}
+                                sx={{ borderRadius: '6px', fontWeight: 700, fontSize: '0.72rem', textTransform: 'none', px: 1.5, borderColor: '#38bdf8', color: '#0284c7', bgcolor: 'rgba(56, 189, 248, 0.05)' }}
+                              >
+                                {startingWaha ? 'Starting...' : '🐳 Start Docker WAHA'}
                               </Button>
                             </Stack>
                           </CardContent>
@@ -1604,7 +1713,7 @@ export default function Settings() {
           )}
 
           {/* Tab 2: API & OAuth 2.0 Credentials */}
-          {activeTab === 2 && (
+          {(activeTab === 2 || isSettingsLocked) && (
             <Box sx={{ width: '100%', maxWidth: 640, mx: 'auto' }}>
               <Card sx={{ 
                 borderRadius: '8px', 
