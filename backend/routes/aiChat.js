@@ -23,9 +23,14 @@ const fs = require('fs');
 // Configure Multer storage for catalog images
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const uploadDir = path.join(__dirname, '..', 'uploads', 'catalog');
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
+    let uploadDir = path.join(__dirname, '..', 'uploads', 'catalog');
+    try {
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+      }
+    } catch (e) {
+      uploadDir = path.join(process.env.TEMP || process.env.TMPDIR || '/tmp', 'uploads', 'catalog');
+      try { fs.mkdirSync(uploadDir, { recursive: true }); } catch (err) {}
     }
     cb(null, uploadDir);
   },

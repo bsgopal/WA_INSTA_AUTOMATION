@@ -9,8 +9,10 @@ const fs = require('fs');
 const path = require('path');
 const xlsx = require('xlsx');
 
-// Configure multer for CSV uploads
-const upload = multer({ dest: 'uploads/' });
+// Configure multer for CSV uploads with safe serverless fallback
+const safeUploadsDir = path.join(process.env.TEMP || process.env.TMPDIR || '/tmp', 'uploads');
+try { fs.mkdirSync(safeUploadsDir, { recursive: true }); } catch (e) {}
+const upload = multer({ dest: safeUploadsDir });
 
 // ============ GET ALL CUSTOMERS ============
 router.get('/', [

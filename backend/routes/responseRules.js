@@ -10,8 +10,11 @@ const path = require('path');
 const csv = require('csv-parser');
 const parsePdfText = require('../utils/parsePdfText');
 
+const safeUploadsDir = path.join(process.env.TEMP || process.env.TMPDIR || '/tmp', 'uploads');
+try { fs.mkdirSync(safeUploadsDir, { recursive: true }); } catch (e) {}
+
 const upload = multer({ 
-  dest: 'uploads/',
+  dest: safeUploadsDir,
   limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
 });
 

@@ -11,9 +11,14 @@ const PDFDocument = require('pdfkit');
 function generateInvoicePDF(invoiceData = {}) {
   return new Promise((resolve, reject) => {
     try {
-      const invoicesDir = path.join(__dirname, '..', 'uploads', 'invoices');
-      if (!fs.existsSync(invoicesDir)) {
-        fs.mkdirSync(invoicesDir, { recursive: true });
+      let invoicesDir = path.join(__dirname, '..', 'uploads', 'invoices');
+      try {
+        if (!fs.existsSync(invoicesDir)) {
+          fs.mkdirSync(invoicesDir, { recursive: true });
+        }
+      } catch (e) {
+        invoicesDir = path.join(process.env.TEMP || process.env.TMPDIR || '/tmp', 'uploads', 'invoices');
+        try { fs.mkdirSync(invoicesDir, { recursive: true }); } catch (err) {}
       }
 
       const {
