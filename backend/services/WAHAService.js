@@ -281,7 +281,7 @@ const getQRCode = async () => {
   try {
     const sessionStatus = await getSessionStatus();
     if (!sessionStatus.success) {
-      return { success: false, error: `Cannot reach WAHA (${sessionStatus.error}). Is the Docker container running?` };
+      return { success: false, error: 'Unable to reach WhatsApp gateway service. Please retry in a moment.' };
     }
 
     if (sessionStatus.authenticated) {

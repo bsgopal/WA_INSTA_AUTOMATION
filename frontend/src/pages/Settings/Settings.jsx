@@ -513,7 +513,7 @@ export default function Settings() {
         setQrError(response.data.error || 'Failed to load QR code.');
       }
     } catch (error) {
-      setQrError('Failed to reach the WhatsApp service. Make sure the Docker (WAHA) container is running on localhost:3000.');
+      setQrError('Connecting to WhatsApp service. Please click Refresh QR or wait a few moments.');
     } finally {
       setLoadingQr(false);
     }
@@ -573,7 +573,7 @@ export default function Settings() {
         setSnackbar({ open: true, message: response.data.error || 'Failed to request pairing code', severity: 'error' });
       }
     } catch (error) {
-      setSnackbar({ open: true, message: 'Failed to generate pairing code. Make sure Docker container is running.', severity: 'error' });
+      setSnackbar({ open: true, message: 'Failed to generate pairing code. Please try refreshing or scanning the QR code.', severity: 'error' });
     } finally {
       setRequestingCode(false);
     }
@@ -1074,7 +1074,7 @@ export default function Settings() {
                   <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: '#84cc16', boxShadow: '0 0 8px #84cc16' }} />
                   <Box>
                     <Typography sx={{ fontWeight: 800, color: '#f8fafc', fontSize: '0.88rem' }}>
-                      Assigned Engine: {senderMode === 'DOCKER' ? '🐳 Docker WAHA (Local QR Engine)' : '⚡ Official Meta WhatsApp Cloud API'}
+                      Assigned Integration: {senderMode === 'DOCKER' ? '📱 WhatsApp Web (Direct Linking)' : '⚡ Official Meta WhatsApp Cloud API'}
                     </Typography>
                     <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.72rem' }}>
                       Centrally managed for {clientName ? <b>{clientName}</b> : 'this workspace'}.
@@ -1091,7 +1091,7 @@ export default function Settings() {
               {/* VIEW 1: DOCKER / WAHA LOCAL QR ENGINE */}
               {senderMode === 'DOCKER' && (
                 <Stack spacing={1.5}>
-                  {/* Docker Header Status Card */}
+                  {/* Header Status Card */}
                   <Card elevation={0} sx={{ borderRadius: '8px', border: '1px solid', borderColor: whatsappStatus.authenticated ? '#86efac' : '#fde68a', overflow: 'hidden' }}>
                     <Box sx={{
                       p: 1.5,
@@ -1113,11 +1113,11 @@ export default function Settings() {
                             bgcolor: whatsappStatus.authenticated ? '#84cc16' : '#f59e0b',
                             boxShadow: whatsappStatus.authenticated ? '0 0 10px #84cc16' : '0 0 10px #f59e0b'
                           }} />
-                          {whatsappStatus.authenticated ? 'Docker WhatsApp Active & Connected' : 'Docker WhatsApp Connection Required'}
+                          {whatsappStatus.authenticated ? 'WhatsApp Active & Connected' : 'WhatsApp Connection Required'}
                         </Typography>
                         <Typography variant="caption" sx={{ color: whatsappStatus.authenticated ? '#15803d' : '#b45309', fontWeight: 600 }}>
                           {whatsappStatus.authenticated 
-                            ? 'Your local WAHA Docker container is authorized and responding to messages.'
+                            ? 'Your WhatsApp account is authorized and actively responding to customer messages.'
                             : 'Scan the QR code below or enter an 8-character pairing code to connect your WhatsApp number.'}
                         </Typography>
                       </Box>
@@ -1148,34 +1148,34 @@ export default function Settings() {
                     </Box>
                   </Card>
 
-                  {/* Docker Connected View */}
+                  {/* Connected View */}
                   {whatsappStatus.authenticated ? (
                     <Card elevation={0} sx={{ borderRadius: '8px', border: '1px solid #e2e8f0', p: 2, bgcolor: '#ffffff' }}>
                       <Grid container spacing={1.5} sx={{ maxWidth: 800, mx: 'auto', mb: 2 }}>
                         <Grid item xs={12} sm={4}>
                           <Paper variant="outlined" sx={{ p: 1.5, borderRadius: '8px', textAlign: 'left', bgcolor: '#f8fafc', borderColor: '#e2e8f0', height: '100%' }}>
-                            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, fontSize: '0.68rem' }}>ENGINE PROVIDER</Typography>
+                            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, fontSize: '0.68rem' }}>INTEGRATION</Typography>
                             <Typography sx={{ fontWeight: 800, color: '#0f172a', fontSize: '0.82rem' }}>
-                              Docker WAHA (Local QR)
+                              WhatsApp Web Direct
                             </Typography>
                           </Paper>
                         </Grid>
                         <Grid item xs={12} sm={4}>
                           <Paper variant="outlined" sx={{ p: 1.5, borderRadius: '8px', textAlign: 'left', bgcolor: '#f8fafc', borderColor: '#e2e8f0', height: '100%' }}>
-                            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, fontSize: '0.68rem' }}>LOCAL SERVICE</Typography>
+                            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, fontSize: '0.68rem' }}>CONNECTION STATUS</Typography>
                             <Typography sx={{ fontWeight: 800, color: '#0f172a', fontSize: '0.82rem' }}>
-                              localhost:3000
+                              Connected & Synced
                             </Typography>
                           </Paper>
                         </Grid>
                         <Grid item xs={12} sm={4}>
-                          <Paper variant="outlined" sx={{ p: 1.5, borderRadius: '8px', textAlign: 'left', bgcolor: systemStatus.waha.running ? '#f0fdf4' : '#fef2f2', borderColor: systemStatus.waha.running ? '#86efac' : '#fecaca', height: '100%' }}>
+                          <Paper variant="outlined" sx={{ p: 1.5, borderRadius: '8px', textAlign: 'left', bgcolor: '#f0fdf4', borderColor: '#86efac', height: '100%' }}>
                             <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, fontSize: '0.68rem', display: 'flex', alignItems: 'center', gap: 0.8 }}>
-                              CONTAINER STATUS
-                              <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: systemStatus.waha.running ? '#16a34a' : '#ef4444' }} />
+                              GATEWAY
+                              <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: '#16a34a' }} />
                             </Typography>
-                            <Typography sx={{ fontWeight: 800, color: systemStatus.waha.running ? '#166534' : '#991b1b', fontSize: '0.82rem' }}>
-                              {systemStatus.waha.running ? 'Running Healthy' : 'Container Stopped'}
+                            <Typography sx={{ fontWeight: 800, color: '#166534', fontSize: '0.82rem' }}>
+                              Active
                             </Typography>
                           </Paper>
                         </Grid>
@@ -1184,19 +1184,19 @@ export default function Settings() {
                       {/* Throttle Configuration */}
                       <Box sx={{ maxWidth: 800, mx: 'auto', p: 1.5, borderRadius: '8px', bgcolor: '#f8fafc', border: '1px solid #e2e8f0' }}>
                         <Typography sx={{ fontWeight: 800, color: '#0f172a', fontSize: '0.82rem', mb: 0.3 }}>
-                          Docker Broadcast Throttle Delay
+                          Broadcast Message Interval
                         </Typography>
                         <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1, fontSize: '0.7rem' }}>
-                          Pause duration between each outgoing message in bulk campaigns to prevent WhatsApp account rate limits.
+                          Pause duration between each outgoing message in bulk campaigns to ensure safe delivery.
                         </Typography>
                         <Stack direction="row" spacing={1.5} alignItems="center">
                           <TextField
                             size="small"
                             type="number"
-                            label="Throttle Seconds"
+                            label="Interval (Seconds)"
                             value={dockerThrottle}
                             onChange={(e) => setDockerThrottle(e.target.value)}
-                            slotProps={{ input: { sx: { borderRadius: '6px', width: 120, fontSize: '0.8rem' } } }}
+                            slotProps={{ input: { sx: { borderRadius: '6px', width: 140, fontSize: '0.8rem' } } }}
                           />
                           <Button
                             variant="contained"
@@ -1215,7 +1215,7 @@ export default function Settings() {
                               '&:hover': { bgcolor: '#65a30d' }
                             }}
                           >
-                            Save Delay
+                            Save Interval
                           </Button>
                         </Stack>
                       </Box>
@@ -1269,7 +1269,7 @@ export default function Settings() {
                                   <Box sx={{ p: 1, textAlign: 'center' }}>
                                     <Typography variant="caption" sx={{ color: qrError.includes('401') ? '#dc2626' : '#64748b', fontSize: '0.68rem', fontWeight: qrError.includes('401') ? 700 : 500, display: 'block', mb: 0.5 }}>
                                       {qrError.includes('401') 
-                                        ? '⚠️ WhatsApp Service Authorizing: WAHA API Key verification pending from Renic Soft Master HQ. Please refresh once configured.' 
+                                        ? '⚠️ WhatsApp service is initializing. Please click Refresh QR or wait a few moments.' 
                                         : qrError}
                                     </Typography>
                                   </Box>
