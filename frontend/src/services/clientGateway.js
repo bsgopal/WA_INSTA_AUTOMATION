@@ -76,11 +76,11 @@ class TenantAPIGateway {
 
     // 4. Default fallback
     const stored = (typeof localStorage !== 'undefined' && localStorage.getItem('customerCode')) || '';
-    if (stored && !stored.includes('automation') && !stored.includes('vercel')) {
+    if (stored && !stored.includes('automation') && !stored.includes('vercel') && stored !== 'default') {
       return stored.toLowerCase().replace(/[^a-z0-9_-]/g, '');
     }
 
-    return '';
+    return 'apx-wa01';
   }
 
   /**

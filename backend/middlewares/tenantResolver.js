@@ -103,17 +103,31 @@ async function tenantResolver(req, res, next) {
   // 6. Check subdomain if no explicit identifier
   if (!customerCode && req.headers.host) {
     const rawHost = req.headers.host.split(':')[0].toLowerCase();
-    const parts = rawHost.split('.');
-    const knownAppSlugs = ['wa', 'pos', 'challan', 'crm', 'app', 'www', 'api', 'admin', 'hq', 'mail', 'ftp'];
-    let sub = '';
-    if (parts.length >= 3 && knownAppSlugs.includes(parts[0])) {
-      sub = parts[1];
-    } else if (parts.length >= 2 && !knownAppSlugs.includes(parts[0])) {
-      sub = parts[0];
-    }
-    const reserved = ['localhost', 'lvh', 'renictech', 'com', 'me', 'io', 'dev', '127', '0'];
-    if (sub && !reserved.includes(sub) && !knownAppSlugs.includes(sub)) {
-      customerCode = sub.toLowerCase();
+    const isCloudHost = rawHost.endsWith('.vercel.app') || 
+                        rawHost.endsWith('.railway.app') || 
+                        rawHost.endsWith('.onrender.com') || 
+                        rawHost.endsWith('.render.com') || 
+                        rawHost.endsWith('.netlify.app') || 
+                        rawHost.endsWith('.pages.dev') ||
+                        rawHost.endsWith('.ngrok.io') ||
+                        rawHost.endsWith('.ngrok-free.app') ||
+                        rawHost.endsWith('.ngrok-free.dev') ||
+                        rawHost.includes('localhost') || 
+                        rawHost.includes('127.0.0.1');
+
+    if (!isCloudHost) {
+      const parts = rawHost.split('.');
+      const knownAppSlugs = ['wa', 'pos', 'challan', 'crm', 'app', 'www', 'api', 'admin', 'hq', 'mail', 'ftp'];
+      let sub = '';
+      if (parts.length >= 3 && knownAppSlugs.includes(parts[0])) {
+        sub = parts[1];
+      } else if (parts.length >= 2 && !knownAppSlugs.includes(parts[0])) {
+        sub = parts[0];
+      }
+      const reserved = ['localhost', 'lvh', 'renictech', 'com', 'me', 'io', 'dev', '127', '0', 'vercel', 'railway', 'app'];
+      if (sub && !reserved.includes(sub) && !knownAppSlugs.includes(sub)) {
+        customerCode = sub.toLowerCase();
+      }
     }
   }
 
@@ -123,9 +137,9 @@ async function tenantResolver(req, res, next) {
     if (resolved) customerCode = resolved;
   }
 
-  // 7. Fallback default
-  if (!customerCode) {
-    customerCode = (process.env.DEFAULT_CUSTOMER_CODE || 'default').toLowerCase();
+  // 7. Fallback default: prioritize apx-wa01 over unverified default
+  if (!customerCode || customerCode === 'default' || customerCode === 'wa-insta-automation') {
+    customerCode = (process.env.DEFAULT_CUSTOMER_CODE || process.env.CUSTOMER_CODE || 'apx-wa01').toLowerCase();
   }
 
   const cleanCode = customerCode.toLowerCase().replace(/[^a-z0-9_-]/g, '');

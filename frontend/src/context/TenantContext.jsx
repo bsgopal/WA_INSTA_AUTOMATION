@@ -78,7 +78,10 @@ export const TenantProvider = ({ children }) => {
     fetchingRef.current = true;
     try {
       setLoading(true);
-      const res = await apiClient.get('/tenant/screens');
+      const activeCode = resolveCustomerCode() || localStorage.getItem('customerCode') || 'apx-wa01';
+      const res = await apiClient.get('/tenant/screens', {
+        params: activeCode ? { customerCode: activeCode } : {}
+      });
       if (res.data?.success) {
         if (res.data.screenPermissions) {
           setScreenPermissions(res.data.screenPermissions);
@@ -92,8 +95,9 @@ export const TenantProvider = ({ children }) => {
           setOauthStatus(res.data.oauthStatus);
           setItemIfChanged('wa_oauth_status', JSON.stringify(res.data.oauthStatus));
         }
-        if (res.data.customerCode) {
+        if (res.data.customerCode && res.data.customerCode !== 'wa-insta-automation' && res.data.customerCode !== 'default') {
           setCustomerCode(res.data.customerCode);
+          setItemIfChanged('customerCode', res.data.customerCode);
         }
         if (res.data.clientName) {
           setClientName(res.data.clientName);
