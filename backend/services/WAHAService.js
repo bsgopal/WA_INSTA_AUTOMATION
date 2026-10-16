@@ -1219,6 +1219,8 @@ const startSessionHealthWorker = () => {
       // WAHA container may be temporarily restarting, ignore error
     }
   }, 30000);
+};
+
 const testConnection = async (customUrl, customKey) => {
   let apiUrl = customUrl;
   let apiKey = customKey;
