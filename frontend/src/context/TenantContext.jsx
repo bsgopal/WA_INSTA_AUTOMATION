@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import apiClient from '../api/client';
 import { resolveCustomerCode } from '../services/clientGateway';
 
@@ -63,161 +63,169 @@ export const TenantProvider = ({ children }) => {
   const [isLocked, setIsLocked] = useState(() => localStorage.getItem('wa_is_locked') === 'true');
   const [loading, setLoading] = useState(false);
 
+  const fetchingRef = useRef(false);
+
+  const setItemIfChanged = (key, val) => {
+    try {
+      if (localStorage.getItem(key) !== val) {
+        localStorage.setItem(key, val);
+      }
+    } catch (e) {}
+  };
+
   const fetchScreens = useCallback(async () => {
+    if (fetchingRef.current) return;
+    fetchingRef.current = true;
     try {
       setLoading(true);
       const res = await apiClient.get('/tenant/screens');
       if (res.data?.success) {
         if (res.data.screenPermissions) {
           setScreenPermissions(res.data.screenPermissions);
-          localStorage.setItem('wa_screen_permissions', JSON.stringify(res.data.screenPermissions));
+          setItemIfChanged('wa_screen_permissions', JSON.stringify(res.data.screenPermissions));
         }
         if (res.data.oauthEnforced !== undefined) {
           setOauthEnforced(Boolean(res.data.oauthEnforced));
-          localStorage.setItem('wa_oauth_enforced', JSON.stringify(res.data.oauthEnforced));
+          setItemIfChanged('wa_oauth_enforced', JSON.stringify(res.data.oauthEnforced));
         }
         if (res.data.oauthStatus) {
           setOauthStatus(res.data.oauthStatus);
-          localStorage.setItem('wa_oauth_status', JSON.stringify(res.data.oauthStatus));
+          setItemIfChanged('wa_oauth_status', JSON.stringify(res.data.oauthStatus));
         }
         if (res.data.customerCode) {
           setCustomerCode(res.data.customerCode);
         }
         if (res.data.clientName) {
           setClientName(res.data.clientName);
-          localStorage.setItem('wa_client_name', res.data.clientName);
+          setItemIfChanged('wa_client_name', res.data.clientName);
         }
         if (res.data.whatsappSenderMode) {
           setWhatsappSenderMode(res.data.whatsappSenderMode);
-          localStorage.setItem('wa_sender_mode', res.data.whatsappSenderMode);
+          setItemIfChanged('wa_sender_mode', res.data.whatsappSenderMode);
         }
         if (res.data.dockerThrottleSeconds !== undefined) {
           setDockerThrottleSeconds(Number(res.data.dockerThrottleSeconds));
-          localStorage.setItem('wa_docker_throttle', String(res.data.dockerThrottleSeconds));
+          setItemIfChanged('wa_docker_throttle', String(res.data.dockerThrottleSeconds));
         }
         if (res.data.businessType) {
           setBusinessType(res.data.businessType);
-          localStorage.setItem('wa_business_type', res.data.businessType);
+          setItemIfChanged('wa_business_type', res.data.businessType);
         }
         if (res.data.solutionMode) {
           setSolutionMode(res.data.solutionMode);
-          localStorage.setItem('wa_solution_mode', res.data.solutionMode);
+          setItemIfChanged('wa_solution_mode', res.data.solutionMode);
         }
         if (res.data.solutionModes) {
           setSolutionModes(res.data.solutionModes);
-          localStorage.setItem('wa_solution_modes', JSON.stringify(res.data.solutionModes));
+          setItemIfChanged('wa_solution_modes', JSON.stringify(res.data.solutionModes));
         }
         if (res.data.customTerminology) {
           setCustomTerminology(res.data.customTerminology);
-          localStorage.setItem('wa_custom_terminology', JSON.stringify(res.data.customTerminology));
+          setItemIfChanged('wa_custom_terminology', JSON.stringify(res.data.customTerminology));
         }
         if (res.data.active !== undefined) {
           setLicenseActive(Boolean(res.data.active));
-          localStorage.setItem('wa_license_active', String(res.data.active));
+          setItemIfChanged('wa_license_active', String(res.data.active));
         }
         if (res.data.licenseRequired !== undefined) {
           setLicenseRequired(Boolean(res.data.licenseRequired));
-          localStorage.setItem('wa_license_required', String(res.data.licenseRequired));
+          setItemIfChanged('wa_license_required', String(res.data.licenseRequired));
         }
         if (res.data.isLocked !== undefined) {
           setIsLocked(Boolean(res.data.isLocked));
-          localStorage.setItem('wa_is_locked', String(res.data.isLocked));
+          setItemIfChanged('wa_is_locked', String(res.data.isLocked));
         }
       }
     } catch (err) {
       console.warn('[TenantContext] Error fetching tenant screens:', err?.message);
     } finally {
       setLoading(false);
+      fetchingRef.current = false;
     }
   }, []);
 
   useEffect(() => {
     fetchScreens();
 
-    const host = typeof window !== 'undefined' ? (window.location.hostname || 'localhost') : 'localhost';
-    const sseUrl = `http://${host}:5000/api/tenant/stream`;
-    let eventSource = null;
+    const isLocalhost = typeof window !== 'undefined' && 
+      (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
-    try {
-      eventSource = new EventSource(sseUrl);
-      eventSource.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          if (data && data.screenPermissions) {
-            setScreenPermissions(data.screenPermissions);
-            localStorage.setItem('wa_screen_permissions', JSON.stringify(data.screenPermissions));
-          }
-          if (data && data.oauthEnforced !== undefined) {
-            setOauthEnforced(Boolean(data.oauthEnforced));
-            localStorage.setItem('wa_oauth_enforced', JSON.stringify(data.oauthEnforced));
-          }
-          if (data && data.oauthStatus) {
-            setOauthStatus(data.oauthStatus);
-            localStorage.setItem('wa_oauth_status', JSON.stringify(data.oauthStatus));
-          }
-          if (data && data.clientName) {
-            setClientName(data.clientName);
-            localStorage.setItem('wa_client_name', data.clientName);
-          }
-          if (data && data.customerCode) {
-            setCustomerCode(data.customerCode);
-          }
-          if (data && data.whatsappSenderMode) {
-            setWhatsappSenderMode(data.whatsappSenderMode);
-            localStorage.setItem('wa_sender_mode', data.whatsappSenderMode);
-          }
-          if (data && data.dockerThrottleSeconds !== undefined) {
-            setDockerThrottleSeconds(Number(data.dockerThrottleSeconds));
-            localStorage.setItem('wa_docker_throttle', String(data.dockerThrottleSeconds));
-          }
-          if (data && data.businessType) {
-            setBusinessType(data.businessType);
-            localStorage.setItem('wa_business_type', data.businessType);
-          }
-          if (data && data.solutionMode) {
-            setSolutionMode(data.solutionMode);
-            localStorage.setItem('wa_solution_mode', data.solutionMode);
-          }
-          if (data && data.solutionModes) {
-            setSolutionModes(data.solutionModes);
-            localStorage.setItem('wa_solution_modes', JSON.stringify(data.solutionModes));
-          }
-          if (data && data.customTerminology) {
-            setCustomTerminology(data.customTerminology);
-            localStorage.setItem('wa_custom_terminology', JSON.stringify(data.customTerminology));
-          }
-          if (data && data.active !== undefined) {
-            setLicenseActive(Boolean(data.active));
-            localStorage.setItem('wa_license_active', String(data.active));
-          }
-          if (data && data.licenseRequired !== undefined) {
-            setLicenseRequired(Boolean(data.licenseRequired));
-            localStorage.setItem('wa_license_required', String(data.licenseRequired));
-          }
-          if (data && data.isLocked !== undefined) {
-            setIsLocked(Boolean(data.isLocked));
-            localStorage.setItem('wa_is_locked', String(data.isLocked));
-          }
-        } catch (e) {}
-      };
-    } catch (e) {
-      console.warn('[TenantContext] SSE setup error:', e);
+    let eventSource = null;
+    if (isLocalhost) {
+      try {
+        const sseUrl = `http://localhost:5000/api/tenant/stream`;
+        eventSource = new EventSource(sseUrl);
+        eventSource.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (data && data.screenPermissions) {
+              setScreenPermissions(data.screenPermissions);
+              setItemIfChanged('wa_screen_permissions', JSON.stringify(data.screenPermissions));
+            }
+            if (data && data.oauthEnforced !== undefined) {
+              setOauthEnforced(Boolean(data.oauthEnforced));
+              setItemIfChanged('wa_oauth_enforced', JSON.stringify(data.oauthEnforced));
+            }
+            if (data && data.oauthStatus) {
+              setOauthStatus(data.oauthStatus);
+              setItemIfChanged('wa_oauth_status', JSON.stringify(data.oauthStatus));
+            }
+            if (data && data.clientName) {
+              setClientName(data.clientName);
+              setItemIfChanged('wa_client_name', data.clientName);
+            }
+            if (data && data.customerCode) {
+              setCustomerCode(data.customerCode);
+            }
+            if (data && data.whatsappSenderMode) {
+              setWhatsappSenderMode(data.whatsappSenderMode);
+              setItemIfChanged('wa_sender_mode', data.whatsappSenderMode);
+            }
+            if (data && data.dockerThrottleSeconds !== undefined) {
+              setDockerThrottleSeconds(Number(data.dockerThrottleSeconds));
+              setItemIfChanged('wa_docker_throttle', String(data.dockerThrottleSeconds));
+            }
+            if (data && data.businessType) {
+              setBusinessType(data.businessType);
+              setItemIfChanged('wa_business_type', data.businessType);
+            }
+            if (data && data.solutionMode) {
+              setSolutionMode(data.solutionMode);
+              setItemIfChanged('wa_solution_mode', data.solutionMode);
+            }
+            if (data && data.solutionModes) {
+              setSolutionModes(data.solutionModes);
+              setItemIfChanged('wa_solution_modes', JSON.stringify(data.solutionModes));
+            }
+            if (data && data.customTerminology) {
+              setCustomTerminology(data.customTerminology);
+              setItemIfChanged('wa_custom_terminology', JSON.stringify(data.customTerminology));
+            }
+            if (data && data.active !== undefined) {
+              setLicenseActive(Boolean(data.active));
+              setItemIfChanged('wa_license_active', String(data.active));
+            }
+            if (data && data.licenseRequired !== undefined) {
+              setLicenseRequired(Boolean(data.licenseRequired));
+              setItemIfChanged('wa_license_required', String(data.licenseRequired));
+            }
+            if (data && data.isLocked !== undefined) {
+              setIsLocked(Boolean(data.isLocked));
+              setItemIfChanged('wa_is_locked', String(data.isLocked));
+            }
+          } catch (e) {}
+        };
+      } catch (e) {
+        console.warn('[TenantContext] SSE setup error:', e);
+      }
     }
 
-    const handleVisibility = () => {
-      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
-        fetchScreens();
-      }
-    };
-    window.addEventListener('focus', fetchScreens);
-    window.addEventListener('storage', fetchScreens);
-    document.addEventListener('visibilitychange', handleVisibility);
+    // Safe periodic polling every 45s (NO aggressive storage listener loop)
+    const pollInterval = setInterval(fetchScreens, 45000);
 
     return () => {
       if (eventSource) eventSource.close();
-      window.removeEventListener('focus', fetchScreens);
-      window.removeEventListener('storage', fetchScreens);
-      document.removeEventListener('visibilitychange', handleVisibility);
+      clearInterval(pollInterval);
     };
   }, [fetchScreens]);
 

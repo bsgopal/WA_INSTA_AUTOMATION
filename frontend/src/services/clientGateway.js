@@ -16,37 +16,67 @@ class TenantAPIGateway {
    */
   resolveCustomerCode() {
     if (typeof window !== 'undefined' && window.location) {
-      // 1. Query param ?tenant=apx-wa01 or ?customerCode=apx-wa01
+      // 1. Query param in window.location.search OR window.location.hash
       const urlParams = new URLSearchParams(window.location.search);
-      const qCode = urlParams.get('tenant') || urlParams.get('customerCode') || urlParams.get('clientId');
-      if (qCode) {
-        const clean = qCode.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
-        localStorage.setItem('customerCode', clean);
-        return clean;
+      let qCode = urlParams.get('tenant') || urlParams.get('customerCode') || urlParams.get('clientId');
+
+      if (!qCode && window.location.hash && window.location.hash.includes('?')) {
+        const hashQuery = window.location.hash.split('?')[1];
+        const hashParams = new URLSearchParams(hashQuery);
+        qCode = hashParams.get('tenant') || hashParams.get('customerCode') || hashParams.get('clientId');
       }
 
-      // 2. Subdomain extraction (e.g. wa.apx-wa01.lvh.me, wa.apx-wa01.renictech.com, apx-wa01.renictech.com)
-      const host = window.location.hostname.toLowerCase();
-      const parts = host.split('.');
-      const knownAppSlugs = ['wa', 'pos', 'challan', 'crm', 'app', 'www', 'api', 'admin', 'hq', 'mail', 'ftp'];
-      let sub = '';
-      if (parts.length >= 3 && knownAppSlugs.includes(parts[0])) {
-        sub = parts[1];
-      } else if (parts.length >= 2 && !knownAppSlugs.includes(parts[0])) {
-        sub = parts[0];
+      if (qCode) {
+        const clean = qCode.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+        if (clean && clean !== 'default') {
+          if (localStorage.getItem('customerCode') !== clean) {
+            localStorage.setItem('customerCode', clean);
+          }
+          return clean;
+        }
       }
-      
-      const reserved = ['localhost', 'lvh', 'renictech', 'com', 'me', 'io', 'dev', '127', '0'];
-      if (sub && !reserved.includes(sub) && !knownAppSlugs.includes(sub)) {
-        const clean = sub.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
-        localStorage.setItem('customerCode', clean);
-        return clean;
+
+      // 2. Stored session fallback (prioritize stored session over host parsing)
+      const stored = localStorage.getItem('customerCode');
+      const invalidCodes = ['wa', 'default', 'undefined', 'null', 'vercel', 'wa-insta-automation'];
+      if (stored && !invalidCodes.includes(stored) && !stored.includes('vercel') && !stored.includes('automation')) {
+        return stored.toLowerCase().replace(/[^a-z0-9_-]/g, '');
+      }
+
+      // 3. Subdomain extraction (ONLY for custom tenant domains, NEVER for *.vercel.app, *.railway.app, etc.)
+      const host = window.location.hostname.toLowerCase();
+      const isCloudPlatform = host.endsWith('.vercel.app') || 
+                              host.endsWith('.railway.app') || 
+                              host.endsWith('.onrender.com') || 
+                              host.endsWith('.netlify.app') || 
+                              host.endsWith('.pages.dev') ||
+                              host.includes('localhost') || 
+                              host.includes('127.0.0.1');
+
+      if (!isCloudPlatform) {
+        const parts = host.split('.');
+        const knownAppSlugs = ['wa', 'pos', 'challan', 'crm', 'app', 'www', 'api', 'admin', 'hq', 'mail', 'ftp'];
+        let sub = '';
+        if (parts.length >= 3 && knownAppSlugs.includes(parts[0])) {
+          sub = parts[1];
+        } else if (parts.length >= 2 && !knownAppSlugs.includes(parts[0])) {
+          sub = parts[0];
+        }
+
+        const reserved = ['localhost', 'lvh', 'renictech', 'com', 'me', 'io', 'dev', '127', '0'];
+        if (sub && !reserved.includes(sub) && !knownAppSlugs.includes(sub)) {
+          const clean = sub.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+          if (localStorage.getItem('customerCode') !== clean) {
+            localStorage.setItem('customerCode', clean);
+          }
+          return clean;
+        }
       }
     }
 
-    // 3. Stored session fallback
-    const stored = localStorage.getItem('customerCode');
-    if (stored && stored !== 'wa' && stored !== 'default') {
+    // 4. Default fallback
+    const stored = (typeof localStorage !== 'undefined' && localStorage.getItem('customerCode')) || '';
+    if (stored && !stored.includes('automation') && !stored.includes('vercel')) {
       return stored.toLowerCase().replace(/[^a-z0-9_-]/g, '');
     }
 
