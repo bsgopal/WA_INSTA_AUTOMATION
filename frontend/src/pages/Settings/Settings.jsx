@@ -1223,149 +1223,6 @@ export default function Settings() {
                   ) : (
                     /* Docker Pairing View (Disconnected) */
                     <Stack spacing={1.5} sx={{ width: '100%' }}>
-                      {/* WAHA Server Connection & API Key Configuration */}
-                      <Card elevation={0} sx={{ borderRadius: '8px', border: '1px solid #e2e8f0', bgcolor: '#ffffff', p: 2 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5, flexWrap: 'wrap', gap: 1 }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
-                            <Box sx={{ width: 34, height: 34, borderRadius: '8px', bgcolor: 'rgba(132, 204, 22, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                              <DnsIcon sx={{ color: '#65a30d', fontSize: 18 }} />
-                            </Box>
-                            <Box>
-                              <Typography sx={{ fontWeight: 800, color: '#0f172a', fontSize: '0.9rem' }}>
-                                WAHA Server &amp; API Key Configuration
-                              </Typography>
-                              <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.7rem' }}>
-                                Connect to your Railway cloud container or local Docker instance
-                              </Typography>
-                            </Box>
-                          </Box>
-                          <Stack direction="row" spacing={0.8}>
-                            <Chip
-                              label="Railway Cloud"
-                              size="small"
-                              onClick={() => setWahaConfig(prev => ({ ...prev, wahaApiUrl: 'https://devlikeaprowaha-production-661c.up.railway.app' }))}
-                              clickable
-                              sx={{ fontSize: '0.68rem', height: 22, fontWeight: 700, bgcolor: '#f1f5f9' }}
-                            />
-                            <Chip
-                              label="Localhost:3000"
-                              size="small"
-                              onClick={() => setWahaConfig(prev => ({ ...prev, wahaApiUrl: 'http://localhost:3000' }))}
-                              clickable
-                              sx={{ fontSize: '0.68rem', height: 22, fontWeight: 700, bgcolor: '#f1f5f9' }}
-                            />
-                          </Stack>
-                        </Box>
-
-                        {wahaTestResult && (
-                          <Alert
-                            severity={wahaTestResult.success ? 'success' : 'error'}
-                            sx={{ mb: 1.5, py: 0.4, borderRadius: '6px', '& .MuiAlert-message': { fontSize: '0.75rem' } }}
-                          >
-                            {wahaTestResult.message}
-                          </Alert>
-                        )}
-
-                        <Grid container spacing={1.5}>
-                          <Grid item xs={12} sm={6}>
-                            <Typography variant="caption" sx={{ fontWeight: 700, color: '#475569', mb: 0.4, display: 'block', fontSize: '0.72rem' }}>
-                              WAHA Server URL
-                            </Typography>
-                            <TextField
-                              fullWidth
-                              size="small"
-                              placeholder="e.g. https://devlikeaprowaha-...up.railway.app"
-                              value={wahaConfig.wahaApiUrl}
-                              onChange={(e) => setWahaConfig(prev => ({ ...prev, wahaApiUrl: e.target.value }))}
-                              slotProps={{
-                                input: {
-                                  sx: { fontFamily: 'monospace', fontSize: '0.78rem', bgcolor: '#f8fafc', borderRadius: '6px' }
-                                }
-                              }}
-                            />
-                          </Grid>
-                          <Grid item xs={12} sm={6}>
-                            <Typography variant="caption" sx={{ fontWeight: 700, color: '#475569', mb: 0.4, display: 'block', fontSize: '0.72rem' }}>
-                              WAHA API Key (X-Api-Key)
-                            </Typography>
-                            <TextField
-                              fullWidth
-                              size="small"
-                              type={showWahaKey ? 'text' : 'password'}
-                              placeholder="Enter WAHA_API_KEY"
-                              value={wahaConfig.wahaApiKey}
-                              onChange={(e) => setWahaConfig(prev => ({ ...prev, wahaApiKey: e.target.value }))}
-                              slotProps={{
-                                input: {
-                                  sx: { fontFamily: 'monospace', fontSize: '0.78rem', bgcolor: '#f8fafc', borderRadius: '6px' },
-                                  endAdornment: (
-                                    <InputAdornment position="end">
-                                      <IconButton size="small" onClick={() => setShowWahaKey(!showWahaKey)} edge="end">
-                                        {showWahaKey ? <VisibilityOff sx={{ fontSize: 16 }} /> : <Visibility sx={{ fontSize: 16 }} />}
-                                      </IconButton>
-                                    </InputAdornment>
-                                  )
-                                }
-                              }}
-                            />
-                          </Grid>
-                        </Grid>
-
-                        <Box sx={{ display: 'flex', gap: 1, mt: 1.5, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                          <Button
-                            variant="outlined"
-                            size="small"
-                            disabled={startingWaha}
-                            onClick={handleStartWaha}
-                            sx={{
-                              borderColor: '#38bdf8',
-                              color: '#0284c7',
-                              fontWeight: 700,
-                              fontSize: '0.75rem',
-                              textTransform: 'none',
-                              borderRadius: '6px',
-                              bgcolor: 'rgba(56, 189, 248, 0.06)',
-                              '&:hover': { bgcolor: 'rgba(56, 189, 248, 0.15)', borderColor: '#0284c7' }
-                            }}
-                          >
-                            {startingWaha ? 'Starting WAHA...' : '🐳 Start Local WAHA (docker start waha)'}
-                          </Button>
-                          <Button
-                            variant="outlined"
-                            size="small"
-                            disabled={testingWaha}
-                            onClick={handleTestWaha}
-                            sx={{
-                              borderColor: '#cbd5e1',
-                              color: '#334155',
-                              fontWeight: 700,
-                              fontSize: '0.75rem',
-                              textTransform: 'none',
-                              borderRadius: '6px'
-                            }}
-                          >
-                            {testingWaha ? 'Testing...' : 'Test Connection'}
-                          </Button>
-                          <Button
-                            variant="contained"
-                            size="small"
-                            disabled={savingWahaConfig}
-                            onClick={handleSaveWahaConfig}
-                            sx={{
-                              bgcolor: '#84cc16',
-                              color: '#0f172a',
-                              fontWeight: 800,
-                              fontSize: '0.75rem',
-                              textTransform: 'none',
-                              borderRadius: '6px',
-                              '&:hover': { bgcolor: '#65a30d' }
-                            }}
-                          >
-                            {savingWahaConfig ? 'Saving...' : 'Save WAHA Settings'}
-                          </Button>
-                        </Box>
-                      </Card>
-
                       {/* Pairing Options */}
                       <Grid container spacing={1.5}>
                         {/* Option 1: QR Code Card */}
@@ -1412,7 +1269,7 @@ export default function Settings() {
                                   <Box sx={{ p: 1, textAlign: 'center' }}>
                                     <Typography variant="caption" sx={{ color: qrError.includes('401') ? '#dc2626' : '#64748b', fontSize: '0.68rem', fontWeight: qrError.includes('401') ? 700 : 500, display: 'block', mb: 0.5 }}>
                                       {qrError.includes('401') 
-                                        ? '⚠️ 401 Unauthorized: WAHA rejected the API Key. Check the WAHA Server Settings above to enter the matching key.' 
+                                        ? '⚠️ WhatsApp Service Authorizing: WAHA API Key verification pending from Renic Soft Master HQ. Please refresh once configured.' 
                                         : qrError}
                                     </Typography>
                                   </Box>
@@ -1443,15 +1300,6 @@ export default function Settings() {
                                 sx={{ borderRadius: '6px', fontWeight: 800, fontSize: '0.72rem', textTransform: 'none', px: 1.5, bgcolor: '#0f172a', color: '#ffffff', '&:hover': { bgcolor: '#1e293b' } }}
                               >
                                 {restartingSession ? 'Restarting...' : 'Restart'}
-                              </Button>
-                              <Button
-                                variant="outlined"
-                                size="small"
-                                disabled={startingWaha}
-                                onClick={handleStartWaha}
-                                sx={{ borderRadius: '6px', fontWeight: 700, fontSize: '0.72rem', textTransform: 'none', px: 1.5, borderColor: '#38bdf8', color: '#0284c7', bgcolor: 'rgba(56, 189, 248, 0.05)' }}
-                              >
-                                {startingWaha ? 'Starting...' : '🐳 Start Docker WAHA'}
                               </Button>
                             </Stack>
                           </CardContent>

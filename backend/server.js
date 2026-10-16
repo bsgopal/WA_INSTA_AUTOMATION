@@ -315,8 +315,27 @@ app.get('/api/tenant/screens', async (req, res) => {
               featurePermissions: client.screenPermissions || {},
               isUsed: true
             });
-            if (config && (!config.screenPermissions || Object.keys(config.screenPermissions).length === 0)) {
-              config.screenPermissions = client.screenPermissions || {};
+          }
+
+          if (client && config) {
+            let configChanged = false;
+            if (client.screenPermissions && (!config.screenPermissions || Object.keys(config.screenPermissions).length === 0)) {
+              config.screenPermissions = client.screenPermissions;
+              configChanged = true;
+            }
+            if (client.wahaApiUrl !== undefined && config.wahaApiUrl !== client.wahaApiUrl) {
+              config.wahaApiUrl = (client.wahaApiUrl || '').trim();
+              configChanged = true;
+            }
+            if (client.wahaApiKey !== undefined && config.wahaApiKey !== client.wahaApiKey) {
+              config.wahaApiKey = (client.wahaApiKey || '').trim();
+              configChanged = true;
+            }
+            if (client.wahaSessionName && config.wahaSessionName !== client.wahaSessionName) {
+              config.wahaSessionName = (client.wahaSessionName || 'default').trim();
+              configChanged = true;
+            }
+            if (configChanged) {
               await config.save();
             }
           }
@@ -629,6 +648,9 @@ app.post('/api/tenant/sync-push', async (req, res) => {
     revoked, 
     whatsappSenderMode, 
     dockerThrottleSeconds,
+    wahaApiUrl,
+    wahaApiKey,
+    wahaSessionName,
     businessType,
     solutionMode,
     solutionModes,
@@ -664,6 +686,9 @@ app.post('/api/tenant/sync-push', async (req, res) => {
       config.metaApiEnabled = config.whatsappSenderMode === 'META';
     }
     if (dockerThrottleSeconds !== undefined) config.dockerThrottleSeconds = Number(dockerThrottleSeconds) || 6;
+    if (wahaApiUrl !== undefined) config.wahaApiUrl = (wahaApiUrl || '').trim();
+    if (wahaApiKey !== undefined) config.wahaApiKey = (wahaApiKey || '').trim();
+    if (wahaSessionName !== undefined) config.wahaSessionName = (wahaSessionName || 'default').trim();
     if (businessType) config.businessType = businessType;
     if (solutionMode) config.solutionMode = solutionMode;
     if (solutionModes) config.solutionModes = solutionModes;
