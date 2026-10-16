@@ -79,11 +79,43 @@ const buildReadableListFallback = (message, listConfig = {}) => {
 
 const wahaClient = axios.create({
   baseURL: `${WAHA_API_URL}/api`,
-  timeout: 10000,
+  timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
     ...(process.env.WAHA_API_KEY && { 'X-Api-Key': process.env.WAHA_API_KEY })
   }
+});
+
+// Dynamic configuration interceptor: loads tenant-configured wahaApiUrl & wahaApiKey on every outgoing request
+wahaClient.interceptors.request.use(async (config) => {
+  try {
+    let shopConfig = null;
+    try {
+      const { getModel } = require('../middlewares/tenantContext');
+      const TenantShopConfig = getModel('ShopConfig');
+      shopConfig = await TenantShopConfig.findOne({});
+    } catch (e) {}
+
+    if (!shopConfig) {
+      const ShopConfig = require('../models/ShopConfig');
+      shopConfig = await ShopConfig.findOne({});
+    }
+
+    if (shopConfig?.wahaApiUrl && shopConfig.wahaApiUrl.trim()) {
+      const cleanUrl = shopConfig.wahaApiUrl.trim().replace(/\/+$/, '');
+      config.baseURL = `${cleanUrl}/api`;
+    }
+    const activeKey = (shopConfig?.wahaApiKey !== undefined && shopConfig?.wahaApiKey !== '')
+      ? shopConfig.wahaApiKey.trim()
+      : (process.env.WAHA_API_KEY || '');
+
+    if (activeKey) {
+      config.headers['X-Api-Key'] = activeKey;
+    } else {
+      delete config.headers['X-Api-Key'];
+    }
+  } catch (err) {}
+  return config;
 });
 
 /**
@@ -1187,6 +1219,60 @@ const startSessionHealthWorker = () => {
       // WAHA container may be temporarily restarting, ignore error
     }
   }, 30000);
+const testConnection = async (customUrl, customKey) => {
+  let apiUrl = customUrl;
+  let apiKey = customKey;
+
+  if (!apiUrl) {
+    try {
+      const { getModel } = require('../middlewares/tenantContext');
+      const TenantShopConfig = getModel('ShopConfig');
+      const sc = await TenantShopConfig.findOne({});
+      apiUrl = sc?.wahaApiUrl;
+      if (apiKey === undefined) apiKey = sc?.wahaApiKey;
+    } catch (e) {}
+  }
+
+  apiUrl = (apiUrl || process.env.WAHA_API_URL || 'http://localhost:3000').trim().replace(/\/+$/, '');
+  if (apiKey === undefined) {
+    apiKey = process.env.WAHA_API_KEY || '';
+  }
+
+  try {
+    const testAxios = axios.create({
+      baseURL: `${apiUrl}/api`,
+      timeout: 10000,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(apiKey ? { 'X-Api-Key': apiKey.trim() } : {})
+      }
+    });
+
+    const res = await testAxios.get('/sessions');
+    return {
+      success: true,
+      message: `Connected successfully to WAHA server at ${apiUrl}!`,
+      apiUrl,
+      sessionsCount: Array.isArray(res.data) ? res.data.length : 0,
+      sessions: res.data
+    };
+  } catch (err) {
+    const status = err.response?.status;
+    if (status === 401) {
+      return {
+        success: false,
+        statusCode: 401,
+        apiUrl,
+        error: `Authentication Rejected (HTTP 401 Unauthorized): The WAHA server at ${apiUrl} rejected the provided API Key. Please verify WAHA_API_KEY in your Railway service variables or update the key here.`
+      };
+    }
+    return {
+      success: false,
+      statusCode: status || 500,
+      apiUrl,
+      error: `Connection Failed: Cannot reach WAHA at ${apiUrl} (${err.message}). Make sure the server or container is running.`
+    };
+  }
 };
 
 module.exports = {
@@ -1209,6 +1295,7 @@ module.exports = {
   updateCampaignStatusCounters,
   getContact,
   startSessionHealthWorker,
+  testConnection,
   WAHA_API_URL,
   SESSION_NAME
 };

@@ -80,6 +80,9 @@ const shopConfigSchema = new mongoose.Schema({
     type: Number,
     default: 6
   },
+  wahaApiUrl: { type: String, default: '' },
+  wahaApiKey: { type: String, default: '' },
+  wahaSessionName: { type: String, default: 'default' },
   faqs: [faqSchema]
 }, { timestamps: true });
 

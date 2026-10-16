@@ -219,5 +219,6 @@ module.exports = {
   getQRCode,
   logout,
   restartSession,
-  requestPairingCode
+  requestPairingCode,
+  testConnection: WAHAService.testConnection
 };

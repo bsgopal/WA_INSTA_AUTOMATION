@@ -20,6 +20,7 @@ import DescriptionIcon from '@mui/icons-material/Description';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import DnsIcon from '@mui/icons-material/Dns';
 
 import apiClient from '../../api/client';
 import CustomSnackbar from '../../components/Snackbar';
@@ -80,6 +81,17 @@ export default function Settings() {
   const [qrError, setQrError] = useState('');
   const [restartingSession, setRestartingSession] = useState(false);
   const whatsappQrRef = useRef('');
+
+  // Tab 1: WAHA Server Connection State
+  const [wahaConfig, setWahaConfig] = useState({
+    wahaApiUrl: 'https://devlikeaprowaha-production-661c.up.railway.app',
+    wahaApiKey: '6968d9f6a8c0471587939565fea81e5e',
+    wahaSessionName: 'default'
+  });
+  const [showWahaKey, setShowWahaKey] = useState(false);
+  const [testingWaha, setTestingWaha] = useState(false);
+  const [wahaTestResult, setWahaTestResult] = useState(null);
+  const [savingWahaConfig, setSavingWahaConfig] = useState(false);
 
   // WhatsApp Pairing Code Flow State
   const [pairingPhone, setPairingPhone] = useState('');
@@ -147,6 +159,7 @@ export default function Settings() {
     fetchWhatsappStatus();
     fetchMetaConfig();
     fetchSystemStatus();
+    fetchWahaConfig();
 
     // Poll status periodically
     const interval = setInterval(fetchWhatsappStatus, 12000);
@@ -275,6 +288,68 @@ export default function Settings() {
       setSnackbar({ open: true, message: 'Failed to test Meta API connection.', severity: 'error' });
     } finally {
       setMetaTesting(false);
+    }
+  };
+
+  const fetchWahaConfig = async () => {
+    try {
+      const response = await apiClient.get('/ai-chat/whatsapp/waha-config');
+      if (response.data.success) {
+        setWahaConfig(prev => ({
+          ...prev,
+          wahaApiUrl: response.data.wahaApiUrl || prev.wahaApiUrl,
+          wahaApiKey: response.data.wahaApiKey !== undefined ? response.data.wahaApiKey : prev.wahaApiKey,
+          wahaSessionName: response.data.wahaSessionName || prev.wahaSessionName
+        }));
+      }
+    } catch (err) {
+      console.warn('Failed to load WAHA config:', err.message);
+    }
+  };
+
+  const handleTestWaha = async () => {
+    try {
+      setTestingWaha(true);
+      setWahaTestResult(null);
+      const response = await apiClient.post('/ai-chat/whatsapp/waha-test', {
+        wahaApiUrl: wahaConfig.wahaApiUrl.trim(),
+        wahaApiKey: wahaConfig.wahaApiKey.trim()
+      });
+      if (response.data.success) {
+        setWahaTestResult({ success: true, message: response.data.message || 'Connected to WAHA successfully!' });
+        setSnackbar({ open: true, message: 'WAHA connection verified successfully!', severity: 'success' });
+        fetchWhatsappQr();
+      } else {
+        setWahaTestResult({ success: false, message: response.data.error || 'Connection failed' });
+        setSnackbar({ open: true, message: response.data.error || 'Connection failed', severity: 'error' });
+      }
+    } catch (error) {
+      const errMsg = error.response?.data?.error || error.message || 'Failed to reach WAHA server';
+      setWahaTestResult({ success: false, message: errMsg });
+      setSnackbar({ open: true, message: errMsg, severity: 'error' });
+    } finally {
+      setTestingWaha(false);
+    }
+  };
+
+  const handleSaveWahaConfig = async () => {
+    try {
+      setSavingWahaConfig(true);
+      const response = await apiClient.put('/ai-chat/whatsapp/waha-config', {
+        wahaApiUrl: wahaConfig.wahaApiUrl.trim(),
+        wahaApiKey: wahaConfig.wahaApiKey.trim(),
+        wahaSessionName: wahaConfig.wahaSessionName.trim()
+      });
+      if (response.data.success) {
+        setSnackbar({ open: true, message: 'WAHA Server Settings saved successfully!', severity: 'success' });
+        setWahaTestResult({ success: true, message: 'Settings saved! Loading session QR code...' });
+        fetchWhatsappStatus();
+        fetchWhatsappQr();
+      }
+    } catch (err) {
+      setSnackbar({ open: true, message: 'Failed to save WAHA settings', severity: 'error' });
+    } finally {
+      setSavingWahaConfig(false);
     }
   };
 
@@ -1065,57 +1140,188 @@ export default function Settings() {
                     </Card>
                   ) : (
                     /* Docker Pairing View (Disconnected) */
-                    <Grid container spacing={1.5}>
-                      {/* Option 1: QR Code Card */}
-                      <Grid item xs={12} md={6}>
-                        <Card elevation={0} sx={{ borderRadius: '8px', border: '1px solid #e2e8f0', bgcolor: '#ffffff', height: '100%' }}>
-                          <CardContent sx={{ p: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-                            <Box sx={{ 
-                              width: 38, 
-                              height: 38, 
-                              borderRadius: '8px', 
-                              bgcolor: 'rgba(132, 204, 22, 0.15)', 
-                              display: 'flex', 
-                              justifyContent: 'center', 
-                              alignItems: 'center',
-                              mb: 1
-                            }}>
-                              <ChatIcon sx={{ fontSize: 20, color: '#4d7c0f' }} />
+                    <Stack spacing={1.5} sx={{ width: '100%' }}>
+                      {/* WAHA Server Connection & API Key Configuration */}
+                      <Card elevation={0} sx={{ borderRadius: '8px', border: '1px solid #e2e8f0', bgcolor: '#ffffff', p: 2 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5, flexWrap: 'wrap', gap: 1 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
+                            <Box sx={{ width: 34, height: 34, borderRadius: '8px', bgcolor: 'rgba(132, 204, 22, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <DnsIcon sx={{ color: '#65a30d', fontSize: 18 }} />
                             </Box>
-                            
-                            <Typography sx={{ fontWeight: 800, mb: 0.3, color: '#0f172a', fontSize: '0.88rem' }}>
-                              Option 1: Scan QR Code
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary" sx={{ maxWidth: 280, mb: 1.5, fontSize: '0.72rem' }}>
-                              WhatsApp &rarr; Linked Devices &rarr; Link a Device, scan QR code below.
-                            </Typography>
+                            <Box>
+                              <Typography sx={{ fontWeight: 800, color: '#0f172a', fontSize: '0.9rem' }}>
+                                WAHA Server &amp; API Key Configuration
+                              </Typography>
+                              <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.7rem' }}>
+                                Connect to your Railway cloud container or local Docker instance
+                              </Typography>
+                            </Box>
+                          </Box>
+                          <Stack direction="row" spacing={0.8}>
+                            <Chip
+                              label="Railway Cloud"
+                              size="small"
+                              onClick={() => setWahaConfig(prev => ({ ...prev, wahaApiUrl: 'https://devlikeaprowaha-production-661c.up.railway.app' }))}
+                              clickable
+                              sx={{ fontSize: '0.68rem', height: 22, fontWeight: 700, bgcolor: '#f1f5f9' }}
+                            />
+                            <Chip
+                              label="Localhost:3000"
+                              size="small"
+                              onClick={() => setWahaConfig(prev => ({ ...prev, wahaApiUrl: 'http://localhost:3000' }))}
+                              clickable
+                              sx={{ fontSize: '0.68rem', height: 22, fontWeight: 700, bgcolor: '#f1f5f9' }}
+                            />
+                          </Stack>
+                        </Box>
 
-                            <Box sx={{ 
-                              width: 170, 
-                              height: 170, 
-                              borderRadius: '8px', 
-                              border: '1px solid #e2e8f0', 
-                              bgcolor: '#ffffff',
-                              display: 'flex', 
-                              justifyContent: 'center', 
-                              alignItems: 'center',
-                              p: 1, 
-                              mb: 1.5
-                            }}>
-                              {loadingQr ? (
-                                <CircularProgress size={28} sx={{ color: '#84cc16' }} />
-                              ) : whatsappQr ? (
-                                <img src={whatsappQr} alt="WhatsApp QR Code" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-                              ) : qrError ? (
-                                <Typography variant="caption" color="text.secondary" px={1} sx={{ textAlign: 'center', fontSize: '0.68rem' }}>
-                                  {qrError}
-                                </Typography>
-                              ) : (
-                                <Typography variant="caption" color="text.secondary" px={1} sx={{ fontSize: '0.68rem' }}>
-                                  Press refresh to load QR code.
-                                </Typography>
-                              )}
-                            </Box>
+                        {wahaTestResult && (
+                          <Alert
+                            severity={wahaTestResult.success ? 'success' : 'error'}
+                            sx={{ mb: 1.5, py: 0.4, borderRadius: '6px', '& .MuiAlert-message': { fontSize: '0.75rem' } }}
+                          >
+                            {wahaTestResult.message}
+                          </Alert>
+                        )}
+
+                        <Grid container spacing={1.5}>
+                          <Grid item xs={12} sm={6}>
+                            <Typography variant="caption" sx={{ fontWeight: 700, color: '#475569', mb: 0.4, display: 'block', fontSize: '0.72rem' }}>
+                              WAHA Server URL
+                            </Typography>
+                            <TextField
+                              fullWidth
+                              size="small"
+                              placeholder="e.g. https://devlikeaprowaha-...up.railway.app"
+                              value={wahaConfig.wahaApiUrl}
+                              onChange={(e) => setWahaConfig(prev => ({ ...prev, wahaApiUrl: e.target.value }))}
+                              slotProps={{
+                                input: {
+                                  sx: { fontFamily: 'monospace', fontSize: '0.78rem', bgcolor: '#f8fafc', borderRadius: '6px' }
+                                }
+                              }}
+                            />
+                          </Grid>
+                          <Grid item xs={12} sm={6}>
+                            <Typography variant="caption" sx={{ fontWeight: 700, color: '#475569', mb: 0.4, display: 'block', fontSize: '0.72rem' }}>
+                              WAHA API Key (X-Api-Key)
+                            </Typography>
+                            <TextField
+                              fullWidth
+                              size="small"
+                              type={showWahaKey ? 'text' : 'password'}
+                              placeholder="Enter WAHA_API_KEY"
+                              value={wahaConfig.wahaApiKey}
+                              onChange={(e) => setWahaConfig(prev => ({ ...prev, wahaApiKey: e.target.value }))}
+                              slotProps={{
+                                input: {
+                                  sx: { fontFamily: 'monospace', fontSize: '0.78rem', bgcolor: '#f8fafc', borderRadius: '6px' },
+                                  endAdornment: (
+                                    <InputAdornment position="end">
+                                      <IconButton size="small" onClick={() => setShowWahaKey(!showWahaKey)} edge="end">
+                                        {showWahaKey ? <VisibilityOff sx={{ fontSize: 16 }} /> : <Visibility sx={{ fontSize: 16 }} />}
+                                      </IconButton>
+                                    </InputAdornment>
+                                  )
+                                }
+                              }}
+                            />
+                          </Grid>
+                        </Grid>
+
+                        <Box sx={{ display: 'flex', gap: 1, mt: 1.5, justifyContent: 'flex-end' }}>
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            disabled={testingWaha}
+                            onClick={handleTestWaha}
+                            sx={{
+                              borderColor: '#cbd5e1',
+                              color: '#334155',
+                              fontWeight: 700,
+                              fontSize: '0.75rem',
+                              textTransform: 'none',
+                              borderRadius: '6px'
+                            }}
+                          >
+                            {testingWaha ? 'Testing...' : 'Test Connection'}
+                          </Button>
+                          <Button
+                            variant="contained"
+                            size="small"
+                            disabled={savingWahaConfig}
+                            onClick={handleSaveWahaConfig}
+                            sx={{
+                              bgcolor: '#84cc16',
+                              color: '#0f172a',
+                              fontWeight: 800,
+                              fontSize: '0.75rem',
+                              textTransform: 'none',
+                              borderRadius: '6px',
+                              '&:hover': { bgcolor: '#65a30d' }
+                            }}
+                          >
+                            {savingWahaConfig ? 'Saving...' : 'Save WAHA Settings'}
+                          </Button>
+                        </Box>
+                      </Card>
+
+                      {/* Pairing Options */}
+                      <Grid container spacing={1.5}>
+                        {/* Option 1: QR Code Card */}
+                        <Grid item xs={12} md={6}>
+                          <Card elevation={0} sx={{ borderRadius: '8px', border: '1px solid #e2e8f0', bgcolor: '#ffffff', height: '100%' }}>
+                            <CardContent sx={{ p: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                              <Box sx={{ 
+                                width: 38, 
+                                height: 38, 
+                                borderRadius: '8px', 
+                                bgcolor: 'rgba(132, 204, 22, 0.15)', 
+                                display: 'flex', 
+                                justifyContent: 'center', 
+                                alignItems: 'center',
+                                mb: 1
+                              }}>
+                                <ChatIcon sx={{ fontSize: 20, color: '#4d7c0f' }} />
+                              </Box>
+                              
+                              <Typography sx={{ fontWeight: 800, mb: 0.3, color: '#0f172a', fontSize: '0.88rem' }}>
+                                Option 1: Scan QR Code
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary" sx={{ maxWidth: 280, mb: 1.5, fontSize: '0.72rem' }}>
+                                WhatsApp &rarr; Linked Devices &rarr; Link a Device, scan QR code below.
+                              </Typography>
+
+                              <Box sx={{ 
+                                width: 170, 
+                                height: 170, 
+                                borderRadius: '8px', 
+                                border: '1px solid #e2e8f0', 
+                                bgcolor: '#ffffff',
+                                display: 'flex', 
+                                justifyContent: 'center', 
+                                alignItems: 'center',
+                                p: 1, 
+                                mb: 1.5
+                              }}>
+                                {loadingQr ? (
+                                  <CircularProgress size={28} sx={{ color: '#84cc16' }} />
+                                ) : whatsappQr ? (
+                                  <img src={whatsappQr} alt="WhatsApp QR Code" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                                ) : qrError ? (
+                                  <Box sx={{ p: 1, textAlign: 'center' }}>
+                                    <Typography variant="caption" sx={{ color: qrError.includes('401') ? '#dc2626' : '#64748b', fontSize: '0.68rem', fontWeight: qrError.includes('401') ? 700 : 500, display: 'block', mb: 0.5 }}>
+                                      {qrError.includes('401') 
+                                        ? '⚠️ 401 Unauthorized: WAHA rejected the API Key. Check the WAHA Server Settings above to enter the matching key.' 
+                                        : qrError}
+                                    </Typography>
+                                  </Box>
+                                ) : (
+                                  <Typography variant="caption" color="text.secondary" px={1} sx={{ fontSize: '0.68rem' }}>
+                                    Press refresh to load QR code.
+                                  </Typography>
+                                )}
+                              </Box>
 
                             <Stack direction="row" spacing={1}>
                               <Button
@@ -1219,9 +1425,10 @@ export default function Settings() {
                         </Card>
                       </Grid>
                     </Grid>
-                  )}
-                </Stack>
-              )}
+                  </Stack>
+                )}
+              </Stack>
+            )}
 
               {/* VIEW 2: META WHATSAPP CLOUD API */}
               {senderMode === 'META' && (

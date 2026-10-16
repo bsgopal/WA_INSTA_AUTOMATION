@@ -828,4 +828,68 @@ router.get('/instagram/status', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/ai-chat/whatsapp/waha-config
+ * Get active WAHA connection configuration
+ */
+router.get('/whatsapp/waha-config', async (req, res) => {
+  try {
+    const ShopConfigModel = getTargetShopConfig();
+    const config = await ShopConfigModel.findOne({}) || {};
+    res.json({
+      success: true,
+      wahaApiUrl: config.wahaApiUrl || process.env.WAHA_API_URL || 'http://localhost:3000',
+      wahaApiKey: config.wahaApiKey !== undefined && config.wahaApiKey !== '' ? config.wahaApiKey : (process.env.WAHA_API_KEY || ''),
+      wahaSessionName: config.wahaSessionName || process.env.WAHA_SESSION_NAME || 'default'
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * PUT /api/ai-chat/whatsapp/waha-config
+ * Update WAHA connection settings
+ */
+router.put('/whatsapp/waha-config', async (req, res) => {
+  try {
+    const { wahaApiUrl, wahaApiKey, wahaSessionName } = req.body;
+    const ShopConfigModel = getTargetShopConfig();
+    let config = await ShopConfigModel.findOne({});
+    if (!config) {
+      config = new ShopConfigModel({});
+    }
+    if (wahaApiUrl !== undefined) config.wahaApiUrl = wahaApiUrl.trim();
+    if (wahaApiKey !== undefined) config.wahaApiKey = wahaApiKey.trim();
+    if (wahaSessionName !== undefined) config.wahaSessionName = wahaSessionName.trim();
+    await config.save();
+
+    res.json({
+      success: true,
+      message: 'WAHA configuration saved successfully.',
+      config: {
+        wahaApiUrl: config.wahaApiUrl,
+        wahaApiKey: config.wahaApiKey,
+        wahaSessionName: config.wahaSessionName
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/ai-chat/whatsapp/waha-test
+ * Test connection to WAHA server
+ */
+router.post('/whatsapp/waha-test', async (req, res) => {
+  try {
+    const { wahaApiUrl, wahaApiKey } = req.body;
+    const result = await WhatsAppService.testConnection(wahaApiUrl, wahaApiKey);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 module.exports = router;
