@@ -106,7 +106,7 @@ const canAccess = (item, role, permissions = {}) => {
     if (item.path === '/quotations' && permissions.quotations === false) return false;
     if (item.path === '/conversations' && permissions.conversations === false && permissions.liveChat === false) return false;
     if (item.path === '/messages' && permissions.messages === false && permissions.liveChat === false) return false;
-    if (item.path === '/settings' && permissions.settings === false) return false;
+    if (item.path === '/settings') return true; // Settings is always accessible for workspace configuration & activation
   }
 
   return true;
@@ -1236,7 +1236,7 @@ export default function DashboardLayout() {
             const effectivePermissions = tenantScreenPermissions || licenseStatus?.screenPermissions || licenseStatus?.featurePermissions || {};
             const isCurrentScreenAllowed = currentItem ? canAccess(currentItem, user?.role, effectivePermissions) : true;
 
-            if (isLicenseLocked) {
+            if (isLicenseLocked && location.pathname !== '/settings') {
               return <ScreenLocked isLicenseLock={true} />;
             }
             if (isOauthLocked && location.pathname !== '/settings') {

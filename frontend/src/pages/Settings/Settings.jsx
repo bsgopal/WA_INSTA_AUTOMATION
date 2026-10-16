@@ -4,7 +4,7 @@ import {
   Typography, Box, Paper, Grid, TextField, Button, Switch,
   FormControlLabel, Stack, Card, CardContent, Alert,
   Tabs, Tab, IconButton, CircularProgress, Chip,
-  Dialog, DialogTitle, DialogContent, DialogActions
+  Dialog, DialogTitle, DialogContent, DialogActions, InputAdornment
 } from '@mui/material';
 import SaveIcon from '@mui/icons-material/Save';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -17,6 +17,9 @@ import CloudIcon from '@mui/icons-material/Cloud';
 import KeyIcon from '@mui/icons-material/Key';
 import ShieldIcon from '@mui/icons-material/Shield';
 import DescriptionIcon from '@mui/icons-material/Description';
+import Visibility from '@mui/icons-material/Visibility';
+import VisibilityOff from '@mui/icons-material/VisibilityOff';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 
 import apiClient from '../../api/client';
 import CustomSnackbar from '../../components/Snackbar';
@@ -106,9 +109,10 @@ export default function Settings() {
   });
 
   // Tab 2: OAuth 2.0 State
-  const { oauthEnforced, oauthStatus, isOauthLocked, refreshScreens, whatsappSenderMode, clientName } = useTenant();
+  const { oauthEnforced, oauthStatus, isOauthLocked, isLicenseLocked, refreshScreens, whatsappSenderMode, clientName } = useTenant();
   const [tenantClientId, setTenantClientId] = useState('');
   const [tenantClientSecret, setTenantClientSecret] = useState('');
+  const [showClientSecret, setShowClientSecret] = useState(false);
   const [verifyingOauth, setVerifyingOauth] = useState(false);
   const [savingOauth, setSavingOauth] = useState(false);
   const [oauthAlertBox, setOauthAlertBox] = useState({
@@ -119,10 +123,10 @@ export default function Settings() {
   });
 
   useEffect(() => {
-    if (isOauthLocked) {
+    if (isOauthLocked || isLicenseLocked || (!oauthStatus?.verified && oauthEnforced)) {
       setActiveTab(2);
     }
-  }, [isOauthLocked]);
+  }, [isOauthLocked, isLicenseLocked, oauthStatus?.verified, oauthEnforced]);
 
   useEffect(() => {
     if (whatsappSenderMode) {
@@ -1394,87 +1398,100 @@ export default function Settings() {
 
           {/* Tab 2: API & OAuth 2.0 Credentials */}
           {activeTab === 2 && (
-            <Box sx={{ width: '100%', maxWidth: 600, mx: 'auto' }}>
+            <Box sx={{ width: '100%', maxWidth: 640, mx: 'auto' }}>
               <Card sx={{ 
                 borderRadius: '8px', 
                 border: '1px solid #e2e8f0', 
                 bgcolor: '#ffffff',
-                p: 2
+                p: 2.5
               }}>
                 <CardContent sx={{ p: 0 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Box sx={{ width: 32, height: 32, borderRadius: '6px', bgcolor: 'rgba(132, 204, 22, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <KeyIcon sx={{ color: '#65a30d', fontSize: 18 }} />
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
+                      <Box sx={{ width: 36, height: 36, borderRadius: '8px', bgcolor: 'rgba(132, 204, 22, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <KeyIcon sx={{ color: '#65a30d', fontSize: 20 }} />
                       </Box>
                       <Box>
-                        <Typography sx={{ fontWeight: 800, color: '#0f172a', fontSize: '0.95rem' }}>
-                          OAuth 2.0 Client Credentials
+                        <Typography sx={{ fontWeight: 800, color: '#0f172a', fontSize: '1rem' }}>
+                          Workspace Activation &amp; OAuth 2.0
                         </Typography>
-                        <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.7rem' }}>
-                          Authenticate this workspace with your tenant credentials
+                        <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.75rem' }}>
+                          Authenticate this tenant workspace with Renic Soft Master credentials
                         </Typography>
                       </Box>
                     </Box>
                     <Chip 
-                      label={!oauthEnforced ? 'Optional' : (oauthStatus?.verified ? 'Verified & Active' : 'Action Required')} 
+                      label={!oauthEnforced ? 'Optional' : (oauthStatus?.verified ? 'Verified & Active' : 'Activation Required')} 
                       size="small" 
                       sx={{ 
-                        height: 20,
-                        bgcolor: !oauthEnforced ? '#f1f5f9' : (oauthStatus?.verified ? '#dcfce7' : '#ffedd5'), 
-                        color: !oauthEnforced ? '#64748b' : (oauthStatus?.verified ? '#166534' : '#c2410c'), 
+                        height: 22,
+                        bgcolor: !oauthEnforced ? '#f1f5f9' : (oauthStatus?.verified ? '#dcfce7' : '#fef3c7'), 
+                        color: !oauthEnforced ? '#64748b' : (oauthStatus?.verified ? '#166534' : '#92400e'), 
                         fontWeight: 800, 
-                        fontSize: '0.68rem',
-                        border: !oauthEnforced ? '1px solid #cbd5e1' : (oauthStatus?.verified ? '1px solid #86efac' : '1px solid #fdba74')
+                        fontSize: '0.7rem',
+                        border: !oauthEnforced ? '1px solid #cbd5e1' : (oauthStatus?.verified ? '1px solid #86efac' : '1px solid #fde68a')
                       }} 
                     />
                   </Box>
 
-                  {oauthStatus?.verified && (
-                    <Alert severity="success" sx={{ mb: 1.5, py: 0.3, borderRadius: '6px', '& .MuiAlert-message': { fontSize: '0.75rem' } }}>
-                      <strong>OAuth 2.0 Active</strong> — Credentials verified with Renic Soft. All automation features unlocked.
+                  {oauthStatus?.verified ? (
+                    <Alert severity="success" icon={<CheckCircleIcon />} sx={{ mb: 2.5, py: 0.8, borderRadius: '8px', '& .MuiAlert-message': { fontSize: '0.8rem' } }}>
+                      <strong>Workspace Active &amp; Verified</strong> — All modules (Appointments, Campaigns, Workflows, Templates, Catalog, AI features) are unlocked and operational.
                     </Alert>
+                  ) : (
+                    <Paper variant="outlined" sx={{ p: 1.8, mb: 2.5, bgcolor: '#f8fafc', borderRadius: 2, borderColor: '#e2e8f0' }}>
+                      <Typography variant="body2" sx={{ color: '#334155', fontSize: '0.82rem', lineHeight: 1.5 }}>
+                        Paste your <strong>Client ID</strong> and <strong>Client Secret</strong> from Renic Soft Master HQ below, then click <strong>Verify Credentials</strong>. Once verified, all restricted features will unlock immediately.
+                      </Typography>
+                    </Paper>
                   )}
 
-                  <Stack spacing={1.5}>
+                  <Stack spacing={2}>
                     <Box>
-                      <Typography variant="caption" sx={{ fontWeight: 700, color: '#475569', mb: 0.4, display: 'block', fontSize: '0.72rem' }}>
+                      <Typography variant="caption" sx={{ fontWeight: 700, color: '#475569', mb: 0.5, display: 'block', fontSize: '0.75rem' }}>
                         Client ID
                       </Typography>
                       <TextField
                         fullWidth
                         size="small"
-                        placeholder="e.g. rnc_cli_live_..."
+                        placeholder="e.g. renic_apx-wa01_..."
                         value={tenantClientId}
                         onChange={(e) => setTenantClientId(e.target.value)}
                         slotProps={{
                           input: {
-                            sx: { fontFamily: 'monospace', fontSize: '0.8rem', bgcolor: '#f8fafc', fontWeight: 600, borderRadius: '6px' }
+                            sx: { fontFamily: 'monospace', fontSize: '0.82rem', bgcolor: '#f8fafc', fontWeight: 600, borderRadius: '6px' }
                           }
                         }}
                       />
                     </Box>
 
                     <Box>
-                      <Typography variant="caption" sx={{ fontWeight: 700, color: '#475569', mb: 0.4, display: 'block', fontSize: '0.72rem' }}>
+                      <Typography variant="caption" sx={{ fontWeight: 700, color: '#475569', mb: 0.5, display: 'block', fontSize: '0.75rem' }}>
                         Client Secret
                       </Typography>
                       <TextField
                         fullWidth
                         size="small"
-                        type="password"
+                        type={showClientSecret ? 'text' : 'password'}
                         placeholder="Enter Client Secret from Renic Soft"
                         value={tenantClientSecret}
                         onChange={(e) => setTenantClientSecret(e.target.value)}
                         slotProps={{
                           input: {
-                            sx: { fontFamily: 'monospace', bgcolor: '#f8fafc', borderRadius: '6px', fontSize: '0.8rem' }
+                            sx: { fontFamily: 'monospace', bgcolor: '#f8fafc', borderRadius: '6px', fontSize: '0.82rem' },
+                            endAdornment: (
+                              <InputAdornment position="end">
+                                <IconButton size="small" onClick={() => setShowClientSecret(!showClientSecret)} edge="end">
+                                  {showClientSecret ? <VisibilityOff sx={{ fontSize: 18 }} /> : <Visibility sx={{ fontSize: 18 }} />}
+                                </IconButton>
+                              </InputAdornment>
+                            )
                           }
                         }}
                       />
                     </Box>
 
-                    <Box sx={{ display: 'flex', gap: 1, pt: 0.5 }}>
+                    <Box sx={{ display: 'flex', gap: 1.2, pt: 0.5 }}>
                       <Button
                         variant="contained"
                         size="small"
@@ -1484,11 +1501,12 @@ export default function Settings() {
                           bgcolor: '#84cc16',
                           color: '#0f172a',
                           fontWeight: 800,
-                          fontSize: '0.78rem',
+                          fontSize: '0.82rem',
                           textTransform: 'none',
-                          px: 2.5,
-                          py: 0.6,
+                          px: 3,
+                          py: 0.8,
                           borderRadius: '6px',
+                          boxShadow: '0 2px 8px rgba(132, 204, 22, 0.3)',
                           '&:hover': { bgcolor: '#65a30d' }
                         }}
                       >
@@ -1503,8 +1521,10 @@ export default function Settings() {
                           borderColor: '#cbd5e1',
                           color: '#334155',
                           fontWeight: 700,
-                          fontSize: '0.78rem',
+                          fontSize: '0.82rem',
                           textTransform: 'none',
+                          px: 2.5,
+                          py: 0.8,
                           borderRadius: '6px',
                           '&:hover': { borderColor: '#94a3b8' }
                         }}

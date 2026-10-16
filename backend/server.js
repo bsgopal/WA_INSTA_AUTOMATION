@@ -283,6 +283,48 @@ app.get('/api/tenant/screens', async (req, res) => {
       license = await License.findOne().sort({ createdAt: -1 });
     }
 
+    // Auto-provision or sync license from renic_soft if missing in tenant DB
+    if (!license && req.customerCode) {
+      try {
+        if (mongoose.connection && mongoose.connection.readyState === 1) {
+          const renicSoftDb = mongoose.connection.useDb('renic_soft', { useCache: true });
+          const code = (req.customerCode || '').toLowerCase().trim();
+          const client = await renicSoftDb.collection('clients').findOne({
+            $or: [
+              { customerCode: code },
+              { customerCode: new RegExp(`^${code}$`, 'i') },
+              { subdomain: code }
+            ]
+          });
+          if (client && client.licenseStatus === 'active') {
+            const { getModel } = require('./middlewares/tenantContext');
+            const TenantLicense = getModel('License');
+            license = await TenantLicense.create({
+              key: client.licenseKey || `RENIC-${code.toUpperCase()}`,
+              email: client.contactEmail || 'admin@renic.store',
+              firstName: client.name || 'Admin',
+              lastName: 'User',
+              phone: client.contact || '9999999999',
+              companyName: client.name || 'Client',
+              customerCode: client.customerCode || code,
+              password: 'ACTIVE',
+              licenseStart: client.licenseStart || new Date(),
+              licenseEnd: client.licenseEnd || new Date(Date.now() + 365 * 24 * 3600 * 1000),
+              planTier: client.planTier || 'pro',
+              featurePermissions: client.screenPermissions || {},
+              isUsed: true
+            });
+            if (config && (!config.screenPermissions || Object.keys(config.screenPermissions).length === 0)) {
+              config.screenPermissions = client.screenPermissions || {};
+              await config.save();
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Auto-sync license on screens error:', err.message);
+      }
+    }
+
     const oauthStatus = await getOauthStatus(req.customerCode);
     const isActive = Boolean(license && (!license.licenseEnd || new Date(license.licenseEnd) > new Date()) && !config?.emergencyLock);
     res.json({
@@ -339,6 +381,10 @@ app.post('/api/settings/verify-oauth', async (req, res) => {
   const customerCode = (license?.customerCode || config?.customerCode || req.customerCode || process.env.CUSTOMER_CODE || '').toLowerCase();
   const clientName = license?.companyName || config?.shopName || 'WhatsApp Automation';
 
+  let verified = false;
+  let clientInfo = null;
+
+  // 1. Try HQ Token endpoint first
   try {
     const axios = require('axios');
     const tokenRes = await axios.post(`${hqUrl}/api/v1/oauth/token`, {
@@ -347,48 +393,129 @@ app.post('/api/settings/verify-oauth', async (req, res) => {
       client_secret: cleanClientSecret,
       customerCode,
       clientName
-    }, { timeout: 5000 });
+    }, { timeout: 3000 });
 
     if (tokenRes.data?.access_token) {
-      if (!config) {
-        config = new (require('./models/ShopConfig'))({ userId: new mongoose.Types.ObjectId() });
-      }
-      if (!config.userId) {
-        config.userId = new mongoose.Types.ObjectId();
-      }
-      config.oauthConfig = {
-        clientId: cleanClientId,
-        clientSecret: cleanClientSecret,
-        verified: true,
-        lastVerifiedAt: new Date()
-      };
-      config.oauthEnforced = true;
-      await config.save();
+      verified = true;
+    }
+  } catch (err) {
+    // HQ HTTP call failed or offline - fall back to direct DB verification
+  }
 
-      broadcastTenantUpdate({
-        type: 'PERMISSIONS_UPDATED',
-        oauthEnforced: true,
-        oauthStatus: {
-          configured: true,
-          verified: true,
-          clientId: cleanClientId,
-          lastVerifiedAt: new Date()
+  // 2. Direct database verification fallback against Atlas renic_soft.clients
+  if (!verified) {
+    try {
+      if (mongoose.connection && mongoose.connection.readyState === 1) {
+        const renicSoftDb = mongoose.connection.useDb('renic_soft', { useCache: true });
+        const client = await renicSoftDb.collection('clients').findOne({
+          $or: [
+            { clientId: cleanClientId },
+            { customerCode: customerCode }
+          ]
+        });
+
+        if (client) {
+          clientInfo = client;
+          let secretValid = false;
+          if (client.clientId === cleanClientId) {
+            if (client.clientSecret === cleanClientSecret) secretValid = true;
+            if (!secretValid && client.clientSecretHash) {
+              const bcrypt = require('bcryptjs');
+              secretValid = await bcrypt.compare(cleanClientSecret, client.clientSecretHash);
+            }
+            if (!secretValid && client.apiSecretKey === cleanClientSecret) secretValid = true;
+          }
+
+          if (secretValid) {
+            if (client.licenseStatus === 'locked' || client.licenseStatus === 'cancelled') {
+              return res.status(403).json({ success: false, error: `Tenant license is currently ${client.licenseStatus}` });
+            }
+            verified = true;
+          }
         }
-      });
+      }
+    } catch (dbErr) {
+      console.warn('DB OAuth check error:', dbErr.message);
+    }
+  }
 
-      return res.json({
-        success: true,
-        message: 'OAuth 2.0 Credentials successfully verified with Renic Soft Master HQ!',
-        verified: true,
-        expiresIn: tokenRes.data.expires_in
-      });
+  if (verified) {
+    if (!config) {
+      const ShopConfig = require('./models/ShopConfig');
+      config = new ShopConfig({ userId: new mongoose.Types.ObjectId() });
+    }
+    if (!config.userId) {
+      config.userId = new mongoose.Types.ObjectId();
+    }
+    config.oauthConfig = {
+      clientId: cleanClientId,
+      clientSecret: cleanClientSecret,
+      verified: true,
+      lastVerifiedAt: new Date()
+    };
+    config.oauthEnforced = true;
+    config.emergencyLock = false;
+    if (clientInfo?.screenPermissions) {
+      config.screenPermissions = clientInfo.screenPermissions;
+    }
+    await config.save();
+
+    // Ensure tenant License exists and is active
+    try {
+      const { getModel } = require('./middlewares/tenantContext');
+      const TenantLicense = getModel('License');
+      let tLicense = await TenantLicense.findOne().sort({ createdAt: -1 });
+      if (!tLicense) {
+        await TenantLicense.create({
+          key: clientInfo?.licenseKey || `RENIC-${customerCode.toUpperCase()}`,
+          email: clientInfo?.contactEmail || 'admin@renic.store',
+          firstName: clientInfo?.name || clientName,
+          lastName: 'Admin',
+          phone: clientInfo?.contact || '9999999999',
+          companyName: clientInfo?.name || clientName,
+          customerCode: clientInfo?.customerCode || customerCode,
+          password: 'ACTIVE',
+          licenseStart: clientInfo?.licenseStart || new Date(),
+          licenseEnd: clientInfo?.licenseEnd || new Date(Date.now() + 365 * 24 * 3600 * 1000),
+          planTier: clientInfo?.planTier || 'pro',
+          featurePermissions: clientInfo?.screenPermissions || config.screenPermissions || {},
+          isUsed: true
+        });
+      } else {
+        tLicense.licenseEnd = clientInfo?.licenseEnd || new Date(Date.now() + 365 * 24 * 3600 * 1000);
+        tLicense.isUsed = true;
+        await tLicense.save();
+      }
+    } catch (licErr) {
+      console.warn('Tenant license save error:', licErr.message);
     }
 
-    res.status(400).json({ success: false, error: 'Failed to verify token with Renic Soft Master HQ' });
-  } catch (err) {
-    const msg = err.response?.data?.error_description || err.response?.data?.message || err.response?.data?.error || err.message;
-    res.status(400).json({ success: false, error: `Verification failed: ${msg}` });
+    broadcastTenantUpdate({
+      type: 'PERMISSIONS_UPDATED',
+      oauthEnforced: true,
+      active: true,
+      licenseRequired: false,
+      isLocked: false,
+      screenPermissions: config.screenPermissions,
+      oauthStatus: {
+        configured: true,
+        verified: true,
+        clientId: cleanClientId,
+        lastVerifiedAt: new Date()
+      }
+    });
+
+    return res.json({
+      success: true,
+      message: 'OAuth 2.0 Credentials successfully verified! Workspace fully unlocked.',
+      verified: true
+    });
   }
+
+  res.status(401).json({
+    success: false,
+    error: 'Authentication Rejected: Invalid Client ID or Client Secret. Please verify against Renic Soft Master HQ.'
+  });
 });
 
 app.post('/api/settings/oauth-credentials', async (req, res) => {
