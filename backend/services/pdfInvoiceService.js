@@ -34,9 +34,9 @@ function generateInvoicePDF(invoiceData = {}) {
         grandTotal = 2950,
         paymentMethod = 'UPI / Online',
         shopName = process.env.SHOP_NAME || 'RENIC TECH & AUTOMATION HUB',
-        shopAddress = process.env.SHOP_ADDRESS || 'Commercial Complex, Tech Boulevard, Tamil Nadu',
-        shopPhone = process.env.SHOP_PHONE || '+91 93455 78103',
-        gstin = process.env.SHOP_GSTIN || '33AAAAA0000A1Z5'
+        shopAddress = process.env.SHOP_ADDRESS || '',
+        shopPhone = process.env.SHOP_PHONE || '',
+        gstin = invoiceData.gstin || process.env.SHOP_GSTIN || ''
       } = invoiceData;
 
       const fileName = `TaxInvoice_${billNumber}.pdf`;
@@ -62,14 +62,19 @@ function generateInvoicePDF(invoiceData = {}) {
       doc.fillColor('#ffffff').fontSize(16).font('Helvetica-Bold')
         .text(shopName, 50, 48);
 
-      doc.fontSize(8.5).font('Helvetica').fillColor('#94a3b8')
-        .text(`${shopAddress} · Ph: ${shopPhone}`, 50, 70);
+      const subHeader = [shopAddress, shopPhone ? `Ph: ${shopPhone}` : ''].filter(Boolean).join(' · ');
+      if (subHeader) {
+        doc.fontSize(8.5).font('Helvetica').fillColor('#94a3b8')
+          .text(subHeader, 50, 70);
+      }
 
       doc.fillColor(accentColor).fontSize(11).font('Helvetica-Bold')
         .text('TAX INVOICE', pageWidth - 80, 52, { align: 'right' });
 
-      doc.fontSize(8).font('Helvetica').fillColor('#cbd5e1')
-        .text(`GSTIN: ${gstin}`, pageWidth - 80, 70, { align: 'right' });
+      if (gstin && String(gstin).trim()) {
+        doc.fontSize(8).font('Helvetica').fillColor('#cbd5e1')
+          .text(`GSTIN: ${String(gstin).trim()}`, pageWidth - 80, 70, { align: 'right' });
+      }
 
       // ── Invoice Meta Bar ──
       doc.rect(36, 110, pageWidth, 52).fill('#f8fafc');

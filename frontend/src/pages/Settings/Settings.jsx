@@ -51,7 +51,7 @@ export default function Settings() {
     address: '123, Main Road, Gobichettipalayam, Erode - 638452, Tamil Nadu, India',
     operatingHours: '9:00 AM - 7:00 PM (Monday to Saturday)',
     contactPhone: '+91 88070 25752',
-    gstin: '33AAAAA0000A1Z5',
+    gstin: '',
     currency: 'INR',
     currencySymbol: '₹',
     themeColor: '#84CC16',

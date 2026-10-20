@@ -22,7 +22,7 @@ const shopConfigSchema = new mongoose.Schema({
   address: { type: String, default: '123, Main Road, Gobichettipalayam, Erode - 638452, Tamil Nadu, India' },
   operatingHours: { type: String, default: '9:00 AM - 7:00 PM (Monday to Saturday)' },
   contactPhone: { type: String, default: '+91 88070 25752' },
-  gstin: { type: String, default: '33AAAAA0000A1Z5' },
+  gstin: { type: String, default: '' },
   currency: { type: String, default: 'INR' },
   currencySymbol: { type: String, default: '₹' },
   themeColor: { type: String, default: '#DC2626' },
