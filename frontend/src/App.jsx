@@ -27,6 +27,7 @@ const AppointmentSettings = lazy(() => import('./pages/Appointments/AppointmentS
 const AppointmentServices = lazy(() => import('./pages/Appointments/AppointmentServices'));
 const AppointmentStaff = lazy(() => import('./pages/Appointments/AppointmentStaff'));
 const WorkflowGuidePage = lazy(() => import('./pages/Documentation/WorkflowGuidePage'));
+const Wallet = lazy(() => import('./pages/Wallet/Wallet'));
 
 const ProtectedRoute = ({ children }) => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
@@ -94,6 +95,7 @@ function App() {
           <Route path="response-rules" element={<ResponseRules />} />
           <Route path="rules" element={<Navigate to="/response-rules" replace />} />
           <Route path="ai-features" element={<AIFeatures />} />
+          <Route path="wallet" element={<Wallet />} />
           <Route path="settings" element={<Settings />} />
         </Route>
       </Routes>

@@ -109,6 +109,21 @@ router.post('/send', [
       return res.status(400).json({ error: `Customer has not opted in for ${channel}` });
     }
 
+    // Enterprise WhatsApp Prepaid Wallet & Balance Gate Check
+    const License = require('../models/License');
+    const license = await License.findOne().sort({ createdAt: -1 });
+    const isBypassActive = !!(license?.allowWithoutBalance);
+
+    if (license && !isBypassActive) {
+      const balance = Number(license.walletBalance || 0);
+      const rate = Number(license.messageRate || 0.90);
+      if (balance < rate) {
+        return res.status(402).json({
+          error: `Insufficient message credits. Need at least Rs ${rate.toFixed(2)} to send a message, but your wallet balance is Rs ${balance.toFixed(2)}. Please recharge your wallet in Renic Soft.`
+        });
+      }
+    }
+
     let result;
     let finalContent = await VariableInterpolationService.interpolateVariables(content, req.user.id, {
       customer
@@ -197,6 +212,22 @@ router.post('/send', [
     });
 
     await message.save();
+
+    // Consume 1 WhatsApp credit in Renic Soft HQ
+    if (result.success && channel === 'whatsapp') {
+      try {
+        const axios = require('axios');
+        const hqUrl = process.env.RENIC_HQ_URL || 'http://127.0.0.1:5050';
+        const clientIdentifier = req.customerCode || req.clientId || license?.customerCode || 'default';
+        await axios.post(`${hqUrl}/api/wallet/${clientIdentifier}/consume`, {
+          messagesCount: 1,
+          referenceId: `MSG-${customer._id}-${Date.now()}`,
+          description: `Dispatched 1 WhatsApp message to ${customer.whatsappNumber || customer.phone}`
+        }, { timeout: 3000 });
+      } catch (e) {
+        console.warn('[Messages Route] Wallet consumption report error:', e.message);
+      }
+    }
 
     // Update customer stats
     customer.lastMessageSentDate = new Date();

@@ -162,6 +162,7 @@ app.use('/api/appointments', require('./middlewares/auth-middleware'), require('
 app.use('/api/appointment-settings', require('./middlewares/auth-middleware'), require('./routes/appointmentSettings'));
 app.use('/api/webhooks', require('./routes/webhooks'));
 app.use('/api/notifications', require('./routes/notifications'));
+app.use(['/api/wallet', '/wallet'], require('./routes/walletRoutes'));
 
 // ============ TENANT SSE & OAUTH 2.0 GATING ============
 const sseClients = new Set();
@@ -877,11 +878,44 @@ const startServer = async () => {
         console.warn('⚠️ Failed to initialize appointment reminder cron:', cronErr.message);
       }
 
-      // Auto-start ngrok tunnel if packaged as an EXE or explicitly enabled
+      // ============ TUNNEL PROVIDER (CLOUDFLARED LOCAL / UNTOUCHED IN CLOUD) ============
       const isExe = typeof process.pkg !== 'undefined';
-      const shouldStartNgrok = isExe || process.env.START_NGROK === 'true';
-      
-      if (shouldStartNgrok) {
+      const isCloudEnv = process.env.NODE_ENV === 'production' && !isExe && !process.env.LOCAL_DEV;
+      const tunnelProvider = (process.env.TUNNEL_PROVIDER || (process.env.START_CLOUDFLARED === 'true' ? 'cloudflared' : (process.env.START_NGROK === 'true' ? 'ngrok' : 'cloudflared'))).toLowerCase();
+      const shouldStartTunnel = !isCloudEnv && (process.env.START_CLOUDFLARED === 'true' || process.env.START_NGROK === 'true' || isExe || process.env.AUTO_TUNNEL === 'true');
+
+      if (shouldStartTunnel && tunnelProvider === 'cloudflared') {
+        console.log(`⚡ [Auto-Cloudflare] Initializing Cloudflare Tunnel on port ${PORT}...`);
+        const { spawn } = require('child_process');
+        const cfProcess = spawn('cloudflared', ['tunnel', '--config', '', '--url', `http://127.0.0.1:${PORT}`]);
+        let cfCaptured = false;
+
+        cfProcess.stderr.on('data', (d) => {
+          const text = d.toString();
+          if (!cfCaptured) {
+            const match = text.match(/https:\/\/[a-zA-Z0-9-]+\.trycloudflare\.com/i);
+            if (match) {
+              cfCaptured = true;
+              const tunnelUrl = match[0];
+              console.log(`\x1b[32m✅ [Auto-Cloudflare] Tunnel online: ${tunnelUrl} -> http://localhost:${PORT}\x1b[0m`);
+              console.log(`\x1b[36m🔗 [Auto-Cloudflare] WhatsApp Webhook URL: ${tunnelUrl}/api/webhooks/whatsapp\x1b[0m`);
+              console.log(`\x1b[35m🛡️  [Auto-Cloudflare] Cloudflare SSL Active - WhatsApp Webhooks Unblocked!\x1b[0m`);
+              global.tunnelStatus = { running: true, provider: 'cloudflared', url: tunnelUrl };
+              global.ngrokStatus = global.tunnelStatus;
+            }
+          }
+        });
+
+        cfProcess.on('error', (err) => {
+          console.error(`❌ [Auto-Cloudflare] Failed to spawn cloudflared: ${err.message}`);
+          global.tunnelStatus = { running: false, url: null, error: err.message };
+          global.ngrokStatus = global.tunnelStatus;
+        });
+
+        process.on('exit', () => {
+          try { cfProcess.kill(); } catch (e) {}
+        });
+      } else if (shouldStartTunnel && tunnelProvider === 'ngrok') {
         const webhookUrl = process.env.WAHA_WEBHOOK_URL || '';
         let ngrokDomain = process.env.NGROK_DOMAIN || null;
         if (!ngrokDomain && webhookUrl) {
@@ -914,9 +948,11 @@ const startServer = async () => {
             console.log(`\x1b[32m✅ [Auto-Ngrok] Tunnel online: ${tunnelUrl} -> http://localhost:${PORT}\x1b[0m`);
             console.log(`\x1b[36m🔗 [Auto-Ngrok] Webhook URL: ${tunnelUrl}/api/webhooks/whatsapp\x1b[0m`);
             global.ngrokStatus = { running: true, url: tunnelUrl };
+            global.tunnelStatus = global.ngrokStatus;
           }).catch(e => {
             console.error(`❌ [Auto-Ngrok] Failed to start programmatic tunnel: ${e.message}`);
             global.ngrokStatus = { running: false, url: null, error: e.message };
+            global.tunnelStatus = global.ngrokStatus;
             if (e.message.includes('authentication failed') || e.message.includes('authtoken')) {
               console.error('❌ [Auto-Ngrok] Please provide a valid NGROK_AUTHTOKEN in your .env file.');
             }
@@ -933,6 +969,7 @@ const startServer = async () => {
             if (error) {
               console.error(`❌ [Auto-Ngrok] Process failed: ${error.message}`);
               global.ngrokStatus = { running: false, url: null };
+              global.tunnelStatus = global.ngrokStatus;
             }
           });
           

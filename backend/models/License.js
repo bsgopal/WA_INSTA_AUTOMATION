@@ -91,6 +91,27 @@ const LicenseSchema = new mongoose.Schema({
     maxMonthlyMessages: { type: Number, default: 50000 },
     maxConcurrentSessions: { type: Number, default: 2 }
   },
+  // Enterprise WhatsApp Wallet & Credit State (Synced from Renic Soft)
+  walletBalance: {
+    type: Number,
+    default: 0
+  },
+  messageRate: {
+    type: Number,
+    default: 0.90
+  },
+  availableCredits: {
+    type: Number,
+    default: 0
+  },
+  allowWithoutBalance: {
+    type: Boolean,
+    default: false
+  },
+  lowBalanceThreshold: {
+    type: Number,
+    default: 200
+  },
   lastSyncAt: {
     type: Date,
     default: Date.now

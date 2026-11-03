@@ -109,6 +109,8 @@ async function tenantResolver(req, res, next) {
                         rawHost.endsWith('.render.com') || 
                         rawHost.endsWith('.netlify.app') || 
                         rawHost.endsWith('.pages.dev') ||
+                        rawHost.endsWith('.trycloudflare.com') ||
+                        rawHost.endsWith('.cloudflare.com') ||
                         rawHost.endsWith('.ngrok.io') ||
                         rawHost.endsWith('.ngrok-free.app') ||
                         rawHost.endsWith('.ngrok-free.dev') ||
@@ -124,7 +126,7 @@ async function tenantResolver(req, res, next) {
       } else if (parts.length >= 2 && !knownAppSlugs.includes(parts[0])) {
         sub = parts[0];
       }
-      const reserved = ['localhost', 'lvh', 'renictech', 'com', 'me', 'io', 'dev', '127', '0', 'vercel', 'railway', 'app'];
+      const reserved = ['localhost', 'lvh', 'renictech', 'com', 'me', 'io', 'dev', '127', '0', 'vercel', 'railway', 'app', 'trycloudflare', 'cloudflare'];
       if (sub && !reserved.includes(sub) && !knownAppSlugs.includes(sub)) {
         customerCode = sub.toLowerCase();
       }
@@ -137,8 +139,28 @@ async function tenantResolver(req, res, next) {
     if (resolved) customerCode = resolved;
   }
 
-  // 7. Fallback default: prioritize apx-wa01 over unverified default
-  if (!customerCode || customerCode === 'default' || customerCode === 'wa-insta-automation') {
+  // Check if route is a public exempt path (health checks, webhooks, or public license checks)
+  const reqPath = (req.path || req.url || '').split('?')[0].toLowerCase();
+  const isPublicExempt = reqPath === '/' ||
+                         reqPath === '/api' ||
+                         reqPath === '/api/health' ||
+                         reqPath.startsWith('/uploads') ||
+                         reqPath.startsWith('/api/webhooks') ||
+                         reqPath === '/api/v1/license/sync' ||
+                         reqPath === '/api/v1/license/current';
+
+  // Strict Tenant Isolation Guard: Block unauthenticated requests missing customer ID
+  if (!customerCode && !isPublicExempt) {
+    console.warn(`[Tenant Guard] 🛑 BLOCKED request to ${req.method} ${req.url}: Missing Customer ID / Tenant identifier.`);
+    return res.status(400).json({
+      success: false,
+      code: 'CUSTOMER_ID_REQUIRED',
+      message: 'Security Violation: Customer ID / Client ID is required. Every API request must pass "x-client-id" or "x-customer-code" header (or ?clientId= parameter) to access customer data.'
+    });
+  }
+
+  // If public exempt without explicit header, fall back to environment customer code
+  if (!customerCode) {
     customerCode = (process.env.DEFAULT_CUSTOMER_CODE || process.env.CUSTOMER_CODE || 'apx-wa01').toLowerCase();
   }
 

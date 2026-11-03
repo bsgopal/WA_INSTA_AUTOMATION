@@ -326,55 +326,30 @@ async function sendMessage(to, message, options = {}) {
           parameters: bodyParameters
         });
       }
-    } else {
-      payload = {
-        messaging_product: 'whatsapp',
-        to: formattedPhone,
-        type: 'text',
-        text: { body: message }
-      };
 
-      if (options.buttons && options.buttons.length > 0) {
-        payload.type = 'interactive';
-        delete payload.text;
-        payload.interactive = {
+      // Amazon / Flipkart style dynamic template button parameters
+      const templateBtnUrl = options.buttonUrl || options.buttons?.find(b => b.type === 'URL' || b.actionType === 'URL' || b.value?.startsWith('http'))?.value;
+      if (templateBtnUrl) {
+        payload.template.components.push({
           type: 'button',
-          body: { text: message },
-          action: {
-            buttons: options.buttons.map(b => ({
-              type: 'reply',
-              reply: { id: b.value, title: b.label }
-            }))
-          }
-        };
+          sub_type: 'url',
+          index: '0',
+          parameters: [{ type: 'text', text: templateBtnUrl }]
+        });
       }
-
-      if (options.list) {
-        payload.type = 'interactive';
-        delete payload.text;
-        payload.interactive = {
-          type: 'list',
-          body: { text: message },
-          action: {
-            button: options.list.buttonText || 'View Options',
-            sections: options.list.sections || []
-          }
-        };
-      }
-
+    } else {
+      // 1. Resolve Media Payload (if image/video/document attached)
       let mediaData = options.mediaData;
       let mediaUrl = options.mediaUrl;
+      const mediaType = options.mediaType || 'image';
+      let mediaPayload = null;
 
       if (mediaUrl || mediaData) {
-        const mediaType = options.mediaType || 'image';
-        let mediaPayload;
-
         // If it's a local URL but no base64 is provided, try to read the local file to send as base64 upload
         if (!mediaData && mediaUrl && (mediaUrl.includes('/uploads/') || mediaUrl.includes('localhost') || mediaUrl.includes('127.0.0.1'))) {
           try {
             const fs = require('fs');
             const path = require('path');
-            
             let relativePath = '';
             const uploadsIndex = mediaUrl.indexOf('/uploads/');
             if (uploadsIndex !== -1) {
@@ -382,7 +357,6 @@ async function sendMessage(to, message, options = {}) {
             } else if (mediaUrl.startsWith('uploads/')) {
               relativePath = mediaUrl.substring('uploads/'.length);
             }
-            
             if (relativePath) {
               const localFilePath = path.join(__dirname, '..', 'uploads', relativePath);
               if (fs.existsSync(localFilePath)) {
@@ -390,20 +364,12 @@ async function sendMessage(to, message, options = {}) {
                 const base64Content = fileBuffer.toString('base64');
                 const ext = path.extname(localFilePath).toLowerCase();
                 const mimeTypes = {
-                  '.png': 'image/png',
-                  '.jpg': 'image/jpeg',
-                  '.jpeg': 'image/jpeg',
-                  '.gif': 'image/gif',
-                  '.webp': 'image/webp',
-                  '.mp4': 'video/mp4',
-                  '.pdf': 'application/pdf',
-                  '.mp3': 'audio/mpeg',
-                  '.wav': 'audio/wav',
-                  '.ogg': 'audio/ogg'
+                  '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+                  '.gif': 'image/gif', '.webp': 'image/webp', '.mp4': 'video/mp4',
+                  '.pdf': 'application/pdf', '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.ogg': 'audio/ogg'
                 };
                 const fileMime = mimeTypes[ext] || 'application/octet-stream';
                 mediaData = `data:${fileMime};base64,${base64Content}`;
-                console.log(`🔄 MetaService: Converted local file to base64 for upload: ${localFilePath}`);
               }
             }
           } catch (readErr) {
@@ -421,63 +387,132 @@ async function sendMessage(to, message, options = {}) {
         } else {
           mediaPayload = { link: mediaUrl };
         }
+      }
 
-        // If media + buttons are requested, send media first then an interactive button message
-        if (options.buttons && Array.isArray(options.buttons) && options.buttons.length > 0) {
-          // Send media payload first
-          const mediaPayloadWrapper = {}
-          if (mediaType === 'image') mediaPayloadWrapper.image = mediaPayload;
-          else if (mediaType === 'video') mediaPayloadWrapper.video = mediaPayload;
-          else if (mediaType === 'document') mediaPayloadWrapper.document = mediaPayload;
-          else mediaPayloadWrapper.image = mediaPayload;
-
-          const mediaResponse = await axios.post(
-            `https://graph.facebook.com/${META_API_VERSION}/${phoneNumberId}/messages`,
-            Object.assign({ messaging_product: 'whatsapp', to: formattedPhone }, mediaPayloadWrapper),
-            { headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' }, timeout: 15000 }
-          );
-
-          if (mediaResponse.data?.error) {
-            const metaErr = mediaResponse.data.error;
-            throw new Error(metaErr.message || 'Meta API rejected the media');
+      // 2. Identify Button Format (Amazon/Flipkart CTA URL vs Quick Reply Buttons)
+      const rawButtons = Array.isArray(options.buttons) ? options.buttons : [];
+      const ctaUrlBtn = options.buttonUrl
+        ? { url: options.buttonUrl, label: options.buttonLabel || 'Open Link' }
+        : rawButtons.find(b => b.type === 'URL' || b.actionType === 'URL' || (typeof b.value === 'string' && b.value.startsWith('http')))
+        ? {
+            url: rawButtons.find(b => b.type === 'URL' || b.actionType === 'URL' || (typeof b.value === 'string' && b.value.startsWith('http'))).value,
+            label: rawButtons.find(b => b.type === 'URL' || b.actionType === 'URL' || (typeof b.value === 'string' && b.value.startsWith('http'))).label || 'Open Link'
           }
+        : null;
 
-          // Now send interactive button message as a separate message
-          payload = {
-            messaging_product: 'whatsapp',
-            to: formattedPhone,
-            type: 'interactive',
-            interactive: {
-              type: 'button',
-              body: { text: message || 'Please select an option' },
-              action: {
-                buttons: options.buttons.map(b => ({ type: 'reply', reply: { id: b.value, title: b.label } }))
-              }
+      const replyButtons = rawButtons.filter(b => b !== ctaUrlBtn && b.type !== 'URL' && b.actionType !== 'URL' && !(typeof b.value === 'string' && b.value.startsWith('http')));
+
+      // Format Header Object if media exists
+      const headerObj = mediaPayload ? {
+        type: mediaType === 'video' ? 'video' : mediaType === 'document' ? 'document' : 'image',
+        [mediaType === 'video' ? 'video' : mediaType === 'document' ? 'document' : 'image']: mediaPayload
+      } : null;
+
+      // --- FORMAT A: Amazon / Flipkart Style Call-To-Action (CTA URL) Button ---
+      if (ctaUrlBtn && ctaUrlBtn.url) {
+        const displayText = String(ctaUrlBtn.label || 'Track Order').trim().slice(0, 20); // Meta 20 char limit
+        const interactiveCta = {
+          type: 'cta_url',
+          body: { text: message || 'Click the button below to view details:' },
+          action: {
+            name: 'cta_url',
+            parameters: {
+              display_text: displayText,
+              url: ctaUrlBtn.url
             }
-          };
-        } else {
-          if (mediaType === 'image') {
-            payload.type = 'image';
-            payload.image = mediaPayload;
-            delete payload.text;
-            if (message) payload.image.caption = message;
-          } else if (mediaType === 'video') {
-            payload.type = 'video';
-            payload.video = mediaPayload;
-            delete payload.text;
-            if (message) payload.video.caption = message;
-          } else if (mediaType === 'document') {
-            payload.type = 'document';
-            payload.document = mediaPayload;
-            delete payload.text;
-            if (message) payload.document.caption = message;
-          } else {
-            payload.type = 'image';
-            payload.image = mediaPayload;
-            delete payload.text;
-            if (message) payload.image.caption = message;
           }
+        };
+
+        if (headerObj) {
+          interactiveCta.header = headerObj;
         }
+
+        if (options.footer || options.footerText) {
+          interactiveCta.footer = { text: String(options.footer || options.footerText).slice(0, 60) };
+        }
+
+        payload = {
+          messaging_product: 'whatsapp',
+          to: formattedPhone,
+          type: 'interactive',
+          interactive: interactiveCta
+        };
+        console.log(`[MetaService] 🛍️ Formatted Amazon/Flipkart CTA URL Button message: "${displayText}" -> ${ctaUrlBtn.url}`);
+      }
+      // --- FORMAT B: Amazon / Flipkart Style Quick Reply Choices (Up to 3 buttons) ---
+      else if (replyButtons.length > 0) {
+        const formattedReplyButtons = replyButtons.slice(0, 3).map((b, idx) => ({
+          type: 'reply',
+          reply: {
+            id: String(b.value || b.id || `btn_${idx}`).slice(0, 256),
+            title: String(b.label || b.title || `Option ${idx + 1}`).trim().slice(0, 20) // Meta 20 char limit
+          }
+        }));
+
+        const interactiveReply = {
+          type: 'button',
+          body: { text: message || 'Please select an option below:' },
+          action: {
+            buttons: formattedReplyButtons
+          }
+        };
+
+        if (headerObj) {
+          interactiveReply.header = headerObj;
+        }
+
+        if (options.footer || options.footerText) {
+          interactiveReply.footer = { text: String(options.footer || options.footerText).slice(0, 60) };
+        }
+
+        payload = {
+          messaging_product: 'whatsapp',
+          to: formattedPhone,
+          type: 'interactive',
+          interactive: interactiveReply
+        };
+        console.log(`[MetaService] 🔘 Formatted Amazon/Flipkart Quick Reply Buttons: [${formattedReplyButtons.map(b => b.reply.title).join(' | ')}]`);
+      }
+      // --- FORMAT C: Interactive List Menu ---
+      else if (options.list) {
+        const interactiveList = {
+          type: 'list',
+          body: { text: message || 'Select from list:' },
+          action: {
+            button: (options.list.buttonText || 'View Options').trim().slice(0, 20),
+            sections: options.list.sections || []
+          }
+        };
+        if (headerObj) interactiveList.header = headerObj;
+        if (options.footer) interactiveList.footer = { text: String(options.footer).slice(0, 60) };
+
+        payload = {
+          messaging_product: 'whatsapp',
+          to: formattedPhone,
+          type: 'interactive',
+          interactive: interactiveList
+        };
+      }
+      // --- FORMAT D: Media with Caption (No Buttons) ---
+      else if (mediaPayload) {
+        payload = {
+          messaging_product: 'whatsapp',
+          to: formattedPhone,
+          type: mediaType,
+          [mediaType]: {
+            ...mediaPayload,
+            caption: message || undefined
+          }
+        };
+      }
+      // --- FORMAT E: Plain Text Message ---
+      else {
+        payload = {
+          messaging_product: 'whatsapp',
+          to: formattedPhone,
+          type: 'text',
+          text: { body: message }
+        };
       }
     }
 

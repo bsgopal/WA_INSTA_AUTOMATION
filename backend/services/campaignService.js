@@ -77,8 +77,29 @@ async function executeCampaign(campaign, customers) {
       console.log(`[CampaignService] 🐳 Docker WAHA mode active for campaign ${campaign.name}. Using ${activeThrottleDelay / 1000}s anti-ban delay per message.`);
     }
 
+    // Enterprise WhatsApp Prepaid Wallet & Balance Gate Check
+    const License = require('../models/License');
+    const license = await License.findOne().sort({ createdAt: -1 });
+    const isBypassActive = !!(license?.allowWithoutBalance);
+
+    if (license && !isBypassActive) {
+      const balance = Number(license.walletBalance || 0);
+      const rate = Number(license.messageRate || 0.90);
+      const availableCredits = rate > 0 ? Math.floor(balance / rate) : 0;
+      const requiredCredits = customers.length;
+
+      if (availableCredits < requiredCredits) {
+        console.warn(`[CampaignService] 🛑 Pre-flight wallet gate BLOCKED campaign '${campaign.name}'. Required: ${requiredCredits} msgs, Available: ${availableCredits} msgs (Balance: Rs ${balance} @ Rs ${rate}/msg)`);
+        campaign.status = 'FAILED';
+        campaign.errorMessage = `Insufficient message credits. Campaign targets ${requiredCredits} contacts, but your wallet only has ${availableCredits} messages remaining (Balance: Rs ${balance.toFixed(2)} @ Rs ${rate.toFixed(2)}/msg). Please recharge your wallet in Renic Soft.`;
+        await campaign.save();
+        return;
+      }
+    }
+
     // Docker anti-ban pattern: 6s between messages, but a longer 30s pause after every 5th message
     let dockerMessageCount = 0;
+    let campaignMessagesSentCount = 0;
 
     for (let i = 0; i < customers.length; i += batchSize) {
       // Check if campaign is still running/active
@@ -157,6 +178,8 @@ async function executeCampaign(campaign, customers) {
             const sendOptions = {
               ...mediaPayload,
               ...(buttons ? { buttons } : {}),
+              buttonUrl: campaign.buttonUrl,
+              buttonLabel: campaign.buttonLabel,
               userId: campaign.userId,
               forceMeta: !isDockerMode,
               forceWaha: isDockerMode
@@ -178,6 +201,7 @@ async function executeCampaign(campaign, customers) {
             // Update campaign stats based on the ACTUAL send result
             if (result.success) {
               campaign.totalSent++;
+              campaignMessagesSentCount++;
             } else {
               campaign.totalFailed++;
             }
@@ -257,6 +281,25 @@ async function executeCampaign(campaign, customers) {
       }
 
       await campaign.save();
+    }
+
+    // Sync consumed message credits to Renic Soft HQ
+    if (campaignMessagesSentCount > 0) {
+      try {
+        const axios = require('axios');
+        const hqUrl = process.env.RENIC_HQ_URL || 'http://127.0.0.1:5050';
+        const clientIdentifier = license?.customerCode || license?.subdomain || 'default';
+        await axios.post(`${hqUrl}/api/wallet/${clientIdentifier}/consume`, {
+          messagesCount: campaignMessagesSentCount,
+          campaignId: campaign._id,
+          campaignName: campaign.name,
+          referenceId: `CAMP-${campaign._id}`,
+          description: `Dispatched ${campaignMessagesSentCount} messages for campaign: ${campaign.name}`
+        }, { timeout: 4000 });
+        console.log(`[CampaignService] 💳 Successfully reported ${campaignMessagesSentCount} consumed messages to Renic Soft HQ.`);
+      } catch (hqErr) {
+        console.warn('[CampaignService] Note: Failed to report message consumption to Renic Soft HQ:', hqErr.message);
+      }
     }
 
     // Mark campaign as completed

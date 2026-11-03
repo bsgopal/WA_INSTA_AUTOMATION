@@ -25,7 +25,8 @@ import {
   History as HistoryIcon, Receipt as QuotationIcon,
   EventAvailable as EventAvailableIcon, MedicalServices as ServiceIcon,
   Badge as StaffIcon, EventNote as CalendarIcon,
-  Lock as LockIcon
+  Lock as LockIcon,
+  AccountBalanceWallet as AccountBalanceWalletIcon
 } from '@mui/icons-material';
 import apiClient from '../../api/client';
 import useAuthStore from '../../store/authStore';
@@ -43,6 +44,7 @@ const menuGroups = [
     label: 'Workspace',
     items: [
       { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
+      { text: 'WhatsApp Wallet', icon: <AccountBalanceWalletIcon />, path: '/wallet' },
       { text: 'Conversations', icon: <ChatIcon />, path: '/conversations' },
       { text: 'Customers', icon: <PeopleIcon />, path: '/customers' },
     ],
@@ -317,6 +319,29 @@ export default function DashboardLayout() {
       clearInterval(timer);
     };
   }, []);
+
+  // Live WhatsApp Wallet Status in Header
+  const [walletStatus, setWalletStatus] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+    const fetchWallet = async () => {
+      try {
+        const res = await apiClient.get('/wallet/status');
+        if (active && res.data && res.data.success) {
+          setWalletStatus(res.data);
+        }
+      } catch (err) {
+        // silent
+      }
+    };
+    fetchWallet();
+    const interval = setInterval(fetchWallet, 15000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [location.pathname]);
 
   const handleRenewPlan = async () => {
     try {
@@ -797,6 +822,36 @@ export default function DashboardLayout() {
                 fontSize: '0.72rem'
               }}
             />
+          </Box>
+
+          {/* Live WhatsApp Wallet Pill */}
+          <Box sx={{ mr: 1.5, display: { xs: 'none', sm: 'flex' }, alignItems: 'center' }}>
+            <Tooltip title="WhatsApp Wallet • Click to View & Add Money">
+              <Chip
+                icon={<AccountBalanceWalletIcon sx={{ fontSize: '16px !important', color: '#84cc16 !important' }} />}
+                label={
+                  walletStatus?.allowWithoutBalance 
+                    ? `Wallet: Free Bypass Active`
+                    : `₹${Number(walletStatus?.walletBalance || 0).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} (${Number(walletStatus?.availableCredits || 0).toLocaleString('en-IN')} msgs)`
+                }
+                size="small"
+                clickable
+                onClick={() => navigate('/wallet')}
+                sx={{
+                  bgcolor: 'rgba(132, 204, 22, 0.16)',
+                  color: '#ffffff',
+                  border: '1px solid rgba(132, 204, 22, 0.45)',
+                  fontWeight: 700,
+                  fontSize: '0.74rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  '&:hover': {
+                    bgcolor: 'rgba(132, 204, 22, 0.3)',
+                    borderColor: '#84cc16'
+                  }
+                }}
+              />
+            </Tooltip>
           </Box>
 
           {/* Plus / Super Admin Badge */}

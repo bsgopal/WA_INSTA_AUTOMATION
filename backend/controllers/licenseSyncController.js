@@ -110,6 +110,11 @@ exports.receiveLicensePush = async (req, res) => {
       if (licenseEnd) license.licenseEnd = new Date(licenseEnd);
       license.featurePermissions = mergedPermissions;
       license.limits = { ...license.limits, ...limits };
+      if (req.body.walletBalance !== undefined) license.walletBalance = Number(req.body.walletBalance);
+      if (req.body.messageRate !== undefined) license.messageRate = Number(req.body.messageRate);
+      if (req.body.availableCredits !== undefined) license.availableCredits = Number(req.body.availableCredits);
+      if (req.body.allowWithoutBalance !== undefined) license.allowWithoutBalance = !!req.body.allowWithoutBalance;
+      if (req.body.lowBalanceThreshold !== undefined) license.lowBalanceThreshold = Number(req.body.lowBalanceThreshold);
       license.lastSyncAt = new Date();
     }
 
@@ -242,7 +247,14 @@ exports.getCurrentLicenseStatus = async (req, res) => {
       whatsappSenderMode: activeSenderMode,
       featurePermissions: perms,
       screenPermissions: perms,
-      limits: license.limits
+      limits: license.limits,
+      wallet: {
+        balance: Number((license.walletBalance || 0).toFixed(2)),
+        messageRate: Number((license.messageRate || 0.90).toFixed(2)),
+        availableCredits: license.messageRate > 0 ? Math.floor((license.walletBalance || 0) / license.messageRate) : 0,
+        allowWithoutBalance: !!license.allowWithoutBalance,
+        lowBalanceThreshold: license.lowBalanceThreshold || 200
+      }
     });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
