@@ -147,7 +147,10 @@ async function tenantResolver(req, res, next) {
                          reqPath.startsWith('/uploads') ||
                          reqPath.startsWith('/api/webhooks') ||
                          reqPath === '/api/v1/license/sync' ||
-                         reqPath === '/api/v1/license/current';
+                         reqPath === '/api/v1/license/current' ||
+                         reqPath === '/api/tenant/screens' ||
+                         reqPath === '/api/tenant/stream' ||
+                         reqPath === '/api/settings/verify-oauth';
 
   // Strict Tenant Isolation Guard: Block unauthenticated requests missing customer ID
   if (!customerCode && !isPublicExempt) {

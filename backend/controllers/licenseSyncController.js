@@ -121,19 +121,31 @@ exports.receiveLicensePush = async (req, res) => {
     await license.save();
 
     // Ingest and synchronize OAuth credentials if provided by HQ
-    if (req.body.clientId && req.body.clientSecretHash) {
+    if (req.body.clientId && (req.body.clientSecretHash || req.body.clientSecret)) {
       try {
         const OAuthClient = require('../models/OAuthClient');
         await OAuthClient.findOneAndUpdate(
           { clientId: req.body.clientId },
           {
             clientId: req.body.clientId,
-            clientSecretHash: req.body.clientSecretHash,
+            clientSecretHash: req.body.clientSecretHash || '',
             name: `${clientName} API Connector`,
             isActive: true
           },
           { upsert: true, new: true }
         );
+
+        let shopConfig = await ShopConfig.findOne({});
+        if (shopConfig) {
+          shopConfig.oauthConfig = {
+            clientId: req.body.clientId,
+            clientSecret: req.body.clientSecret || shopConfig.oauthConfig?.clientSecret || '',
+            verified: true,
+            lastVerifiedAt: new Date()
+          };
+          shopConfig.oauthEnforced = true;
+          await shopConfig.save();
+        }
       } catch (oauthErr) {
         console.warn('OAuth sync warning:', oauthErr.message);
       }

@@ -193,15 +193,88 @@ const getOauthStatus = async (customerCode) => {
       const ShopConfig = require('./models/ShopConfig');
       config = await ShopConfig.findOne({});
     }
-    const hasClientId = Boolean(config?.oauthConfig?.clientId?.trim());
-    const hasClientSecret = Boolean(config?.oauthConfig?.clientSecret?.trim());
-    const configured = hasClientId && hasClientSecret;
-    const verified = Boolean(config?.oauthConfig?.verified && configured);
+
+    const cleanCode = (customerCode || config?.customerCode || process.env.CUSTOMER_CODE || 'apx-wa01').toLowerCase().trim();
+
+    let localClientId = (config?.oauthConfig?.clientId || '').trim();
+    let localClientSecret = (config?.oauthConfig?.clientSecret || '').trim();
+    let isVerified = Boolean(config?.oauthConfig?.verified);
+
+    // Cross-validate and self-heal against Renic Soft Master DB
+    if (mongoose.connection && mongoose.connection.readyState === 1) {
+      try {
+        const renicSoftDb = mongoose.connection.useDb('renic_soft', { useCache: true });
+        const client = await renicSoftDb.collection('clients').findOne({
+          $or: [
+            { customerCode: cleanCode },
+            { customerCode: new RegExp(`^${cleanCode}$`, 'i') },
+            { subdomain: cleanCode },
+            ...(localClientId ? [{ clientId: localClientId }] : [])
+          ]
+        });
+
+        if (client) {
+          const masterClientId = client.clientId || client.oauthConfig?.clientId || '';
+          const masterSecret = client.clientSecret || client.oauthConfig?.clientSecret || client.apiSecretKey || '';
+          const masterSecretHash = client.clientSecretHash || client.oauthConfig?.clientSecretHash || '';
+
+          // Case 1: Local credentials exist -> check if they match Renic Soft
+          if (localClientId && masterClientId) {
+            if (localClientId === masterClientId) {
+              let secretMatches = !localClientSecret || (localClientSecret === masterSecret) || (localClientSecret === client.apiSecretKey);
+              if (!secretMatches && masterSecretHash && localClientSecret) {
+                try {
+                  const bcrypt = require('bcryptjs');
+                  secretMatches = await bcrypt.compare(localClientSecret, masterSecretHash);
+                } catch (bErr) {}
+              }
+              if (secretMatches) {
+                // Secret matches Renic Soft -> permanently verified!
+                isVerified = true;
+                if (!config?.oauthConfig?.verified && config) {
+                  config.oauthConfig = config.oauthConfig || {};
+                  config.oauthConfig.verified = true;
+                  config.oauthConfig.lastVerifiedAt = new Date();
+                  await config.save();
+                }
+              } else {
+                // Secret explicitly mismatched in Renic Soft -> invalidate
+                isVerified = false;
+              }
+            } else {
+              // Client ID mismatched -> invalidate
+              isVerified = false;
+            }
+          }
+          // Case 2: Local credentials empty, but Renic Soft has provisioned credentials -> Auto-populate and verify!
+          else if (!localClientId && masterClientId && masterSecret) {
+            localClientId = masterClientId;
+            localClientSecret = masterSecret;
+            isVerified = true;
+            if (config) {
+              config.oauthConfig = {
+                clientId: masterClientId,
+                clientSecret: masterSecret,
+                verified: true,
+                lastVerifiedAt: new Date()
+              };
+              await config.save();
+            }
+          }
+        }
+      } catch (err) {
+        // Renic Soft master DB read error - fallback to existing verified state
+      }
+    }
+
+    const configured = Boolean(localClientId && localClientSecret);
+    const verified = Boolean(configured && isVerified);
+
     return {
       configured,
       verified,
-      clientId: config?.oauthConfig?.clientId || '',
-      clientSecret: config?.oauthConfig?.clientSecret || '',
+      clientId: localClientId,
+      clientSecret: localClientSecret,
       lastVerifiedAt: config?.oauthConfig?.lastVerifiedAt || null
     };
   } catch (e) {
