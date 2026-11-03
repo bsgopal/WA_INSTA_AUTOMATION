@@ -114,6 +114,47 @@ router.get('/count', async (req, res) => {
   }
 });
 
+// ============ GET RFM SEGMENTS STATS ============
+router.get('/stats/rfm-segments', async (req, res) => {
+  try {
+    const userId = req.user?.id || req.userId;
+    const userQuery = userId ? { userId } : {};
+
+    const totalCount = await Customer.countDocuments(userQuery);
+
+    const segmentAggregation = await Customer.aggregate([
+      { $match: userQuery },
+      { $group: { _id: '$rfmSegment', count: { $sum: 1 } } }
+    ]);
+
+    const countMap = {};
+    segmentAggregation.forEach(item => {
+      if (item._id) {
+        countMap[item._id] = item.count;
+      }
+    });
+
+    const segments = [
+      { id: 'ALL', name: 'All Customers', count: totalCount },
+      { id: 'CHAMPIONS', name: 'Champions (Top Buyers)', count: countMap['CHAMPIONS'] || countMap['Champions'] || 0 },
+      { id: 'LOYAL', name: 'Loyal Customers', count: countMap['LOYAL'] || countMap['Loyal Customers'] || 0 },
+      { id: 'POTENTIAL_LOYALIST', name: 'Potential Loyalists', count: countMap['POTENTIAL_LOYALIST'] || countMap['Potential Loyalists'] || 0 },
+      { id: 'NEW_CUSTOMERS', name: 'Recent / New Customers', count: countMap['NEW_CUSTOMERS'] || countMap['New Customers'] || countMap['Recent Customers'] || 0 },
+      { id: 'AT_RISK', name: 'At Risk / Need Attention', count: countMap['AT_RISK'] || countMap['At Risk'] || 0 },
+      { id: 'HIBERNATING', name: 'Hibernating / Inactive', count: countMap['HIBERNATING'] || countMap['Hibernating'] || countMap['Lost'] || 0 }
+    ];
+
+    res.json({
+      success: true,
+      segments,
+      totalCount
+    });
+  } catch (error) {
+    console.error('Get RFM Segments Error:', error);
+    res.status(500).json({ error: 'Failed to fetch RFM segments', details: error.message });
+  }
+});
+
 // ============ GET CUSTOMER BY ID ============
 router.get('/:id', async (req, res) => {
   try {

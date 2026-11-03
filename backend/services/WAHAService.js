@@ -51,7 +51,8 @@ const buildReadableListFallback = (message, listConfig = {}) => {
     }
 
     (section?.rows || []).forEach((row) => {
-      const rowTitle = String(row?.title || row?.label || 'Option').trim();
+      const rawTitle = String(row?.title || row?.label || row?.name || row?.text || 'Option').trim();
+      const rowTitle = rawTitle.replace(/^\d+[\.\)]\s*/, '').trim() || rawTitle;
       const rowDescription = String(row?.description || '').trim();
       if (!rowTitle) return;
       
@@ -645,11 +646,13 @@ const sendMessage = async (to, message, options = {}) => {
         let fallbackText = message + '\n';
         options.buttons.forEach((b, idx) => {
           const num = idx + 1;
+          const rawLabel = String(b.label || b.title || b.name || b.text || b.value || `Option ${num}`).trim();
+          const cleanLabel = rawLabel.replace(/^\d+[\.\)]\s*/, '').trim() || rawLabel;
           if (b.type === 'URL' || b.actionType === 'URL' || b.value?.startsWith('http')) {
-            fallbackText += `\n${num}. 🔗 ${b.label}`;
+            fallbackText += `\n${num}. 🔗 ${cleanLabel}`;
             if (!message.includes(b.value)) fallbackText += `\n   ${b.value}`;
           } else {
-            fallbackText += `\n${num}. ${b.label}`;
+            fallbackText += `\n${num}. ${cleanLabel}`;
           }
         });
         fallbackText += '\n\n_Reply with the number to select_';

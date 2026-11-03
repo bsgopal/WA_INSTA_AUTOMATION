@@ -73,15 +73,23 @@ export default function Workflows() {
     name: '',
     description: '',
     category: '',
-    triggerField: 'intent',
+    triggerType: 'KEYWORD',
+    triggerField: 'KEYWORD',
+    triggerKeywords: 'hi, hello, menu, start, catalog',
     triggerOperator: 'equals',
     triggerValue: 'order_inquiry',
+    selectedRuleId: '',
     steps: [
       {
         id: 'step_1',
         type: 'SEND_MESSAGE',
         name: 'Send Automated Reply',
-        config: { value: 'Namaste! Thank you for reaching out to Renic Tech. How can our team assist you today?' }
+        config: { value: 'Hello {{customerName}}! Welcome to our store 🌟\nHow can we help you today?' },
+        buttons: [
+          { id: 'b1', title: '📅 Book Appointment', value: 'Book' },
+          { id: 'b2', title: '🛍️ View Services', value: 'Services' },
+          { id: 'b3', title: '💬 Talk to Agent', value: 'Support' }
+        ]
       }
     ]
   });
@@ -287,15 +295,23 @@ export default function Workflows() {
       name: '',
       description: '',
       category: '',
-      triggerField: 'intent',
+      triggerType: 'KEYWORD',
+      triggerField: 'KEYWORD',
+      triggerKeywords: 'hi, hello, menu, start, catalog',
       triggerOperator: 'equals',
       triggerValue: 'order_inquiry',
+      selectedRuleId: '',
       steps: [
         {
           id: 'step_1',
           type: 'SEND_MESSAGE',
           name: 'Send Automated Reply',
-          config: { value: 'Namaste! Thank you for reaching out to Renic Tech. How can our team assist you today?' }
+          config: { value: 'Hello {{customerName}}! Welcome to our store 🌟\nHow can we help you today?' },
+          buttons: [
+            { id: 'b1', title: '📅 Book Appointment', value: 'Book' },
+            { id: 'b2', title: '🛍️ View Services', value: 'Services' },
+            { id: 'b3', title: '💬 Talk to Agent', value: 'Support' }
+          ]
         }
       ]
     });
@@ -307,10 +323,20 @@ export default function Workflows() {
       name: preset.name,
       description: preset.description,
       category: workflowForm.category,
+      triggerType: preset.triggerField === 'intent' ? 'INTENT' : 'KEYWORD',
       triggerField: preset.triggerField,
-      triggerOperator: preset.triggerOperator,
+      triggerKeywords: preset.triggerValue || 'hi, hello',
+      triggerOperator: preset.triggerOperator || 'equals',
       triggerValue: preset.triggerValue,
-      steps: JSON.parse(JSON.stringify(preset.steps))
+      selectedRuleId: '',
+      steps: JSON.parse(JSON.stringify(preset.steps)).map(s => ({
+        ...s,
+        buttons: s.buttons || [
+          { id: 'b1', title: '📅 Book Appointment', value: 'Book' },
+          { id: 'b2', title: '🛍️ View Services', value: 'Services' },
+          { id: 'b3', title: '💬 Talk to Agent', value: 'Support' }
+        ]
+      }))
     });
     setSnackbar({ open: true, message: `Loaded "${preset.label}" preset!`, severity: 'success' });
   };
@@ -321,22 +347,27 @@ export default function Workflows() {
       return;
     }
     setEditingId(workflow._id);
+    const triggerType = workflow.trigger?.type || (workflow.trigger?.conditions?.[0]?.field === 'intent' ? 'INTENT' : 'KEYWORD');
     const firstCondition = workflow.trigger?.conditions?.[0] || {};
     setWorkflowForm({
       name: workflow.name || '',
       description: workflow.description || '',
       category: workflow.category || '',
-      triggerField: firstCondition.field || 'intent',
+      triggerType: triggerType === 'RESPONSE_RULE' ? 'RESPONSE_RULE' : triggerType === 'INTENT' ? 'INTENT' : 'KEYWORD',
+      triggerField: triggerType,
+      triggerKeywords: workflow.trigger?.keywords?.join(', ') || workflow.trigger?.value || '',
       triggerOperator: firstCondition.operator || 'equals',
-      triggerValue: firstCondition.value || '',
+      triggerValue: firstCondition.value || workflow.trigger?.value || '',
+      selectedRuleId: workflow.trigger?.responseRuleId || '',
       steps: (workflow.steps && workflow.steps.length > 0)
         ? workflow.steps.map((s, i) => ({
             id: s.id || `step_${i + 1}`,
             type: s.type || 'SEND_MESSAGE',
             name: s.name || 'Step Action',
-            config: { value: s.config?.value || '' }
+            config: { value: s.config?.value || s.config?.message || '' },
+            buttons: s.config?.buttons || s.buttons || []
           }))
-        : [{ id: 'step_1', type: 'SEND_MESSAGE', name: 'Send Automated Reply', config: { value: '' } }]
+        : [{ id: 'step_1', type: 'SEND_MESSAGE', name: 'Send Automated Reply', config: { value: '' }, buttons: [] }]
     });
     setOpenDialog(true);
   };
@@ -367,25 +398,108 @@ export default function Workflows() {
       return;
     }
 
+    let triggerPayload = {};
+    if (workflowForm.triggerType === 'RESPONSE_RULE') {
+      if (!workflowForm.selectedRuleId) {
+        setSnackbar({ open: true, message: 'Please select an AI Response Rule to link', severity: 'warning' });
+        return;
+      }
+      const selectedRule = rules.find(r => r._id === workflowForm.selectedRuleId);
+      triggerPayload = {
+        type: 'RESPONSE_RULE',
+        responseRuleId: workflowForm.selectedRuleId,
+        responseRuleName: selectedRule?.name || 'AI Response Rule',
+        keywords: [],
+        conditions: []
+      };
+    } else if (workflowForm.triggerType === 'KEYWORD') {
+      const keywords = (workflowForm.triggerKeywords || 'hi, hello').split(',').map(s => s.trim()).filter(Boolean);
+      triggerPayload = {
+        type: 'KEYWORD',
+        keywords,
+        value: keywords.join(', '),
+        conditions: [{ field: 'keywords', operator: 'contains', value: keywords.join(', ') }]
+      };
+    } else {
+      triggerPayload = {
+        type: 'INTENT',
+        value: workflowForm.triggerValue || 'order_inquiry',
+        conditions: [{
+          field: 'intent',
+          operator: workflowForm.triggerOperator || 'equals',
+          value: workflowForm.triggerValue || 'order_inquiry'
+        }]
+      };
+    }
+
+    // Auto-generate 2D Visual Flow nodes so the workflow opens seamlessly in Visual Studio too!
+    const startNode = {
+      id: 'node_start',
+      type: workflowForm.triggerType === 'RESPONSE_RULE' ? 'RESPONSE_RULE' : 'START',
+      label: workflowForm.triggerType === 'RESPONSE_RULE'
+        ? `Rule: ${triggerPayload.responseRuleName}`
+        : 'Start Trigger',
+      position: { x: 80, y: 220 },
+      config: workflowForm.triggerType === 'RESPONSE_RULE'
+        ? { ruleId: workflowForm.selectedRuleId, ruleName: triggerPayload.responseRuleName }
+        : { triggerType: 'KEYWORD', keywords: triggerPayload.keywords || ['hi'] }
+    };
+
+    const actionNodes = workflowForm.steps.map((step, idx) => ({
+      id: `node_step_${idx + 1}`,
+      type: step.type === 'TAG' ? 'TAG' : step.type === 'AI_ACTION' ? 'AI_SCRIPT' : 'SEND_TEXT',
+      label: step.name || 'Send Reply',
+      position: { x: 380 + idx * 340, y: 220 },
+      config: {
+        message: step.config?.value || '',
+        value: step.config?.value || '',
+        buttons: (step.buttons || []).map((b, bIdx) => ({
+          id: b.id || `b_${bIdx + 1}`,
+          title: String(b.title || b.label || `Option ${bIdx + 1}`).replace(/^\d+[\.\)]\s*/, '').trim(),
+          value: b.value || b.title || `Option ${bIdx + 1}`
+        }))
+      }
+    }));
+
+    const endNode = {
+      id: 'node_end',
+      type: 'END',
+      label: 'End Flow',
+      position: { x: 380 + workflowForm.steps.length * 340, y: 220 },
+      config: { terminationType: 'COMPLETE' }
+    };
+
+    const nodes = [startNode, ...actionNodes, endNode];
+    const edges = [];
+    if (actionNodes.length > 0) {
+      edges.push({ id: 'edge_start_1', fromNodeId: startNode.id, fromPort: 'out', toNodeId: actionNodes[0].id, toPort: 'in', label: '' });
+      for (let i = 0; i < actionNodes.length - 1; i++) {
+        edges.push({ id: `edge_${i + 1}_${i + 2}`, fromNodeId: actionNodes[i].id, fromPort: 'out', toNodeId: actionNodes[i + 1].id, toPort: 'in', label: '' });
+      }
+      edges.push({ id: 'edge_last_end', fromNodeId: actionNodes[actionNodes.length - 1].id, fromPort: 'out', toNodeId: endNode.id, toPort: 'in', label: '' });
+    } else {
+      edges.push({ id: 'edge_start_end', fromNodeId: startNode.id, fromPort: 'out', toNodeId: endNode.id, toPort: 'in', label: '' });
+    }
+
     const payload = {
       name: workflowForm.name.trim(),
       description: workflowForm.description.trim(),
       category: workflowForm.category || undefined,
-      trigger: {
-        type: 'EVENT',
-        event: 'message_received',
-        conditions: [{
-          field: workflowForm.triggerField,
-          operator: workflowForm.triggerOperator,
-          value: workflowForm.triggerValue
-        }]
-      },
+      trigger: triggerPayload,
+      nodes,
+      edges,
       steps: workflowForm.steps.map((step, idx) => ({
         id: step.id || `step_${idx + 1}`,
         type: step.type,
         name: step.name,
         config: {
-          value: step.config?.value || ''
+          value: step.config?.value || '',
+          message: step.config?.value || '',
+          buttons: (step.buttons || []).map((b, bIdx) => ({
+            id: b.id || `b_${bIdx + 1}`,
+            title: String(b.title || b.label || `Option ${bIdx + 1}`).replace(/^\d+[\.\)]\s*/, '').trim(),
+            value: b.value || b.title || `Option ${bIdx + 1}`
+          }))
         }
       }))
     };
@@ -401,12 +515,8 @@ export default function Workflows() {
       setOpenDialog(false);
       fetchWorkflows();
     } catch (error) {
-      console.error('Failed to save workflow:', error);
-      setSnackbar({
-        open: true,
-        message: error.response?.data?.error || 'Failed to save workflow',
-        severity: 'error'
-      });
+      console.error(error);
+      setSnackbar({ open: true, message: error.response?.data?.error || 'Failed to save workflow', severity: 'error' });
     }
   };
 
@@ -433,15 +543,43 @@ export default function Workflows() {
 
   const handleAddStep = () => {
     const newStep = {
-      id: `step_${Date.now()}`,
+      id: `step_${workflowForm.steps.length + 1}`,
       type: 'SEND_MESSAGE',
-      name: 'Send Automated Reply',
-      config: { value: '' }
+      name: `Step Action ${workflowForm.steps.length + 1}`,
+      config: { value: '' },
+      buttons: []
     };
     setWorkflowForm(prev => ({
       ...prev,
       steps: [...prev.steps, newStep]
     }));
+  };
+
+  const handleAddButtonToStep = (stepIndex) => {
+    const updated = [...workflowForm.steps];
+    const curButtons = updated[stepIndex].buttons || [];
+    if (curButtons.length >= 3) return;
+    const newBtn = {
+      id: `b_${Date.now()}_${curButtons.length + 1}`,
+      title: `Option ${curButtons.length + 1}`,
+      value: `Option ${curButtons.length + 1}`
+    };
+    updated[stepIndex].buttons = [...curButtons, newBtn];
+    setWorkflowForm(prev => ({ ...prev, steps: updated }));
+  };
+
+  const handleButtonChange = (stepIndex, btnIndex, field, val) => {
+    const updated = [...workflowForm.steps];
+    const btns = [...(updated[stepIndex].buttons || [])];
+    btns[btnIndex] = { ...btns[btnIndex], [field]: val };
+    updated[stepIndex].buttons = btns;
+    setWorkflowForm(prev => ({ ...prev, steps: updated }));
+  };
+
+  const handleRemoveButtonFromStep = (stepIndex, btnIndex) => {
+    const updated = [...workflowForm.steps];
+    updated[stepIndex].buttons = (updated[stepIndex].buttons || []).filter((_, i) => i !== btnIndex);
+    setWorkflowForm(prev => ({ ...prev, steps: updated }));
   };
 
   const handleStepChange = (index, field, value) => {
@@ -1455,7 +1593,7 @@ export default function Workflows() {
         </DialogActions>
       </Dialog>
 
-      {/* ELEVATED 2-COLUMN QUICK AUTOMATION DIALOG */}
+      {/* ENTERPRISE GUIDED WORKFLOW BUILDER (WITHOUT STUDIO) */}
       <Dialog
         open={openDialog}
         onClose={() => setOpenDialog(false)}
@@ -1463,9 +1601,10 @@ export default function Workflows() {
         fullWidth
         PaperProps={{
           sx: {
-            borderRadius: '16px',
+            borderRadius: '18px',
             overflow: 'hidden',
-            boxShadow: '0 25px 50px -12px rgba(15,23,42,0.3)'
+            boxShadow: '0 25px 50px -12px rgba(15,23,42,0.35)',
+            bgcolor: '#ffffff'
           }
         }}
       >
@@ -1478,17 +1617,18 @@ export default function Workflows() {
             bgcolor: '#0f172a',
             color: '#ffffff',
             py: 2,
-            px: 3
+            px: 3,
+            borderBottom: '1px solid rgba(255,255,255,0.1)'
           }}
         >
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
             <Box
               sx={{
-                width: 36,
-                height: 36,
-                borderRadius: '8px',
-                bgcolor: '#84cc16',
-                color: '#0f172a',
+                width: 38,
+                height: 38,
+                borderRadius: '10px',
+                bgcolor: 'rgba(132, 204, 22, 0.15)',
+                color: '#84cc16',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center'
@@ -1497,11 +1637,11 @@ export default function Workflows() {
               <FlashOnIcon />
             </Box>
             <Box>
-              <Typography variant="h6" sx={{ fontWeight: 800, color: '#ffffff', lineHeight: 1.2 }}>
-                {editingId ? 'Edit Automation Workflow' : 'Create Automation Workflow'}
+              <Typography variant="h6" sx={{ fontWeight: 800, color: '#ffffff', lineHeight: 1.2, fontSize: '1.05rem' }}>
+                {editingId ? 'Edit Automation Flow' : 'Create Automation Flow (Guided Builder)'}
               </Typography>
-              <Typography variant="caption" sx={{ color: '#94a3b8' }}>
-                Instant auto-responder and customer funnel triggers
+              <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.72rem' }}>
+                Connect customer triggers, AI Response Rules, and Amazon/Flipkart buttons without complex node graphs
               </Typography>
             </Box>
           </Box>
@@ -1523,7 +1663,7 @@ export default function Workflows() {
                 fontWeight: 800,
                 borderRadius: '8px',
                 px: 2.5,
-                '&:hover': { backgroundColor: '#65a30d' }
+                '&:hover': { backgroundColor: '#65a30d', color: '#ffffff' }
               }}
             >
               {editingId ? 'Update Workflow' : 'Deploy & Activate'}
@@ -1531,12 +1671,12 @@ export default function Workflows() {
           </Stack>
         </DialogTitle>
 
-        <DialogContent sx={{ p: 3, bgcolor: '#f8fafc' }}>
-          {/* 1-Click Seller Presets Bar */}
+        <DialogContent sx={{ p: { xs: 2, md: 3 }, bgcolor: '#f8fafc', maxHeight: 'calc(85vh - 130px)', overflowY: 'auto' }}>
+          {/* Quick Presets Bar */}
           {!editingId && (
-            <Box sx={{ mb: 3, p: 2, bgcolor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px' }}>
-              <Typography variant="caption" sx={{ fontWeight: 800, color: '#64748b', textTransform: 'uppercase', display: 'block', mb: 1 }}>
-                ⚡ Quick E-Commerce Presets (Click to Auto-fill):
+            <Box sx={{ mb: 2.5, p: 2, bgcolor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px' }}>
+              <Typography variant="caption" sx={{ fontWeight: 800, color: '#64748b', textTransform: 'uppercase', display: 'block', mb: 1, letterSpacing: '0.5px' }}>
+                ⚡ Quick 1-Click Starter Flows:
               </Typography>
               <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                 {workflowPresets.map((preset, i) => (
@@ -1547,7 +1687,7 @@ export default function Workflows() {
                     clickable
                     sx={{
                       fontWeight: 700,
-                      fontSize: '0.8rem',
+                      fontSize: '0.78rem',
                       bgcolor: '#f1f5f9',
                       border: '1px solid #cbd5e1',
                       '&:hover': { bgcolor: '#84cc16', color: '#0f172a', borderColor: '#84cc16' }
@@ -1558,14 +1698,14 @@ export default function Workflows() {
             </Box>
           )}
 
-          <Grid container spacing={3}>
-            {/* Left Column: Workflow Configuration */}
+          <Grid container spacing={3} alignItems="flex-start">
+            {/* Left Column: Form Configuration */}
             <Grid item xs={12} md={7}>
               <Stack spacing={2.5}>
-                {/* Meta details */}
-                <Paper elevation={0} sx={{ p: 2.5, borderRadius: '12px', border: '1px solid #e2e8f0', bgcolor: '#ffffff' }}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#0f172a', mb: 2 }}>
-                    1. Basic Information
+                {/* 1. Basic Details */}
+                <Paper elevation={0} sx={{ p: 2.2, borderRadius: '12px', border: '1px solid #e2e8f0', bgcolor: '#ffffff' }}>
+                  <Typography variant="caption" sx={{ fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', mb: 1.5 }}>
+                    📌 1. Basic Flow Details
                   </Typography>
                   <Stack spacing={2}>
                     <TextField
@@ -1574,100 +1714,177 @@ export default function Workflows() {
                       fullWidth
                       value={workflowForm.name}
                       onChange={(e) => setWorkflowForm({ ...workflowForm, name: e.target.value })}
-                      placeholder="e.g. Abandoned Cart Recovery Funnel"
+                      placeholder="e.g. Greeting & Interactive Menu"
+                      sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px' } }}
                     />
                     <TextField
-                      label="Description"
+                      label="Description (Optional)"
                       size="small"
                       fullWidth
                       value={workflowForm.description}
                       onChange={(e) => setWorkflowForm({ ...workflowForm, description: e.target.value })}
                       placeholder="Brief note about when this automation triggers..."
+                      sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px' } }}
                     />
-                    <FormControl fullWidth size="small">
-                      <InputLabel>Category Folder</InputLabel>
-                      <Select
-                        value={workflowForm.category}
-                        label="Category Folder"
-                        onChange={(e) => setWorkflowForm({ ...workflowForm, category: e.target.value })}
+                  </Stack>
+                </Paper>
+
+                {/* 2. Trigger Selection: WHEN THIS HAPPENS */}
+                <Paper elevation={0} sx={{ p: 2.2, borderRadius: '12px', border: '1px solid #e2e8f0', bgcolor: '#ffffff' }}>
+                  <Typography variant="caption" sx={{ fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', mb: 1.5 }}>
+                    ⚡ 2. WHEN THIS HAPPENS (Select Trigger Source)
+                  </Typography>
+
+                  {/* 3 Selector Cards */}
+                  <Grid container spacing={1.5} sx={{ mb: 2 }}>
+                    <Grid item xs={12} sm={4}>
+                      <Box
+                        onClick={() => setWorkflowForm(prev => ({ ...prev, triggerType: 'KEYWORD' }))}
+                        sx={{
+                          p: 1.5,
+                          borderRadius: '10px',
+                          border: workflowForm.triggerType === 'KEYWORD' ? '2px solid #84cc16' : '1px solid #cbd5e1',
+                          bgcolor: workflowForm.triggerType === 'KEYWORD' ? 'rgba(132, 204, 22, 0.08)' : '#f8fafc',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease',
+                          textAlign: 'center'
+                        }}
                       >
-                        <MenuItem value="">Unassigned (General)</MenuItem>
-                        {categories.map((cat) => (
-                          <MenuItem key={cat._id} value={cat._id}>
-                            {cat.name}
+                        <Typography sx={{ fontSize: '1.5rem', mb: 0.5 }}>💬</Typography>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 800, fontSize: '0.82rem', color: '#0f172a' }}>
+                          Customer Keywords
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.68rem', display: 'block', mt: 0.3 }}>
+                          e.g. hi, hello, order, menu
+                        </Typography>
+                      </Box>
+                    </Grid>
+
+                    <Grid item xs={12} sm={4}>
+                      <Box
+                        onClick={() => setWorkflowForm(prev => ({ ...prev, triggerType: 'RESPONSE_RULE' }))}
+                        sx={{
+                          p: 1.5,
+                          borderRadius: '10px',
+                          border: workflowForm.triggerType === 'RESPONSE_RULE' ? '2px solid #84cc16' : '1px solid #cbd5e1',
+                          bgcolor: workflowForm.triggerType === 'RESPONSE_RULE' ? 'rgba(132, 204, 22, 0.08)' : '#f8fafc',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease',
+                          textAlign: 'center'
+                        }}
+                      >
+                        <Typography sx={{ fontSize: '1.5rem', mb: 0.5 }}>⚡</Typography>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 800, fontSize: '0.82rem', color: '#0f172a' }}>
+                          AI Response Rule
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.68rem', display: 'block', mt: 0.3 }}>
+                          Linked to AI rule studio
+                        </Typography>
+                      </Box>
+                    </Grid>
+
+                    <Grid item xs={12} sm={4}>
+                      <Box
+                        onClick={() => setWorkflowForm(prev => ({ ...prev, triggerType: 'INTENT' }))}
+                        sx={{
+                          p: 1.5,
+                          borderRadius: '10px',
+                          border: workflowForm.triggerType === 'INTENT' ? '2px solid #84cc16' : '1px solid #cbd5e1',
+                          bgcolor: workflowForm.triggerType === 'INTENT' ? 'rgba(132, 204, 22, 0.08)' : '#f8fafc',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease',
+                          textAlign: 'center'
+                        }}
+                      >
+                        <Typography sx={{ fontSize: '1.5rem', mb: 0.5 }}>🧠</Typography>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 800, fontSize: '0.82rem', color: '#0f172a' }}>
+                          AI Intent Detect
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.68rem', display: 'block', mt: 0.3 }}>
+                          Purchase, inquiry, complaint
+                        </Typography>
+                      </Box>
+                    </Grid>
+                  </Grid>
+
+                  {/* Trigger Detail Input */}
+                  {workflowForm.triggerType === 'KEYWORD' && (
+                    <TextField
+                      label="Customer Trigger Words (comma-separated) *"
+                      fullWidth
+                      size="small"
+                      value={workflowForm.triggerKeywords}
+                      onChange={(e) => setWorkflowForm({ ...workflowForm, triggerKeywords: e.target.value })}
+                      placeholder="e.g. hi, hello, start, menu, book, catalog"
+                      helperText="Whenever customer sends any of these words, this automation starts immediately."
+                      sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px' } }}
+                    />
+                  )}
+
+                  {workflowForm.triggerType === 'RESPONSE_RULE' && (
+                    <FormControl fullWidth size="small">
+                      <InputLabel>Select Linked AI Response Rule *</InputLabel>
+                      <Select
+                        label="Select Linked AI Response Rule *"
+                        value={workflowForm.selectedRuleId}
+                        onChange={(e) => setWorkflowForm({ ...workflowForm, selectedRuleId: e.target.value })}
+                        sx={{ borderRadius: '10px' }}
+                      >
+                        {rules.map((rule) => (
+                          <MenuItem key={rule._id} value={rule._id}>
+                            ⚡ {rule.name} ({rule.triggerValue || 'Intent'})
                           </MenuItem>
                         ))}
                       </Select>
                     </FormControl>
-                  </Stack>
+                  )}
+
+                  {workflowForm.triggerType === 'INTENT' && (
+                    <Grid container spacing={1.5}>
+                      <Grid item xs={12} sm={6}>
+                        <FormControl fullWidth size="small">
+                          <InputLabel>AI Intent Category</InputLabel>
+                          <Select
+                            label="AI Intent Category"
+                            value={workflowForm.triggerValue}
+                            onChange={(e) => setWorkflowForm({ ...workflowForm, triggerValue: e.target.value })}
+                            sx={{ borderRadius: '10px' }}
+                          >
+                            <MenuItem value="order_inquiry">🛍️ Order Inquiry</MenuItem>
+                            <MenuItem value="appointment_booking">📅 Appointment Booking</MenuItem>
+                            <MenuItem value="pricing_inquiry">💰 Gold & Jewelry Pricing</MenuItem>
+                            <MenuItem value="complaint">⚠️ Customer Complaint</MenuItem>
+                            <MenuItem value="support">💬 General Support</MenuItem>
+                          </Select>
+                        </FormControl>
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          label="Matching Rule"
+                          fullWidth
+                          size="small"
+                          disabled
+                          value="Auto-classified by Gemini AI"
+                          sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px' } }}
+                        />
+                      </Grid>
+                    </Grid>
+                  )}
                 </Paper>
 
-                {/* Trigger Condition */}
-                <Paper elevation={0} sx={{ p: 2.5, borderRadius: '12px', border: '1px solid #e2e8f0', bgcolor: '#ffffff' }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-                    <Typography sx={{ fontSize: '1.2rem' }}>⚡</Typography>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#0f172a' }}>
-                      2. Trigger Condition (When message is received)
+                {/* 3. Action Steps: THEN DO THIS */}
+                <Paper elevation={0} sx={{ p: 2.2, borderRadius: '12px', border: '1px solid #e2e8f0', bgcolor: '#ffffff' }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+                    <Typography variant="caption" sx={{ fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      ⚙️ 3. THEN DO THIS (Automated WhatsApp Actions)
                     </Typography>
-                  </Box>
-                  <Grid container spacing={1.5}>
-                    <Grid item xs={12} sm={4}>
-                      <FormControl fullWidth size="small">
-                        <InputLabel>Condition Type</InputLabel>
-                        <Select
-                          value={workflowForm.triggerField}
-                          label="Condition Type"
-                          onChange={(e) => setWorkflowForm({ ...workflowForm, triggerField: e.target.value })}
-                        >
-                          <MenuItem value="intent">Customer Intent</MenuItem>
-                          <MenuItem value="sentiment">Sentiment</MenuItem>
-                          <MenuItem value="budget">Estimated Budget</MenuItem>
-                        </Select>
-                      </FormControl>
-                    </Grid>
-                    <Grid item xs={12} sm={4}>
-                      <FormControl fullWidth size="small">
-                        <InputLabel>Operator</InputLabel>
-                        <Select
-                          value={workflowForm.triggerOperator}
-                          label="Operator"
-                          onChange={(e) => setWorkflowForm({ ...workflowForm, triggerOperator: e.target.value })}
-                        >
-                          <MenuItem value="equals">Equals</MenuItem>
-                          <MenuItem value="contains">Contains</MenuItem>
-                          <MenuItem value="greater_than">Is Greater Than</MenuItem>
-                        </Select>
-                      </FormControl>
-                    </Grid>
-                    <Grid item xs={12} sm={4}>
-                      <TextField
-                        label="Trigger Value"
-                        fullWidth
-                        size="small"
-                        value={workflowForm.triggerValue}
-                        onChange={(e) => setWorkflowForm({ ...workflowForm, triggerValue: e.target.value })}
-                        placeholder="e.g. abandoned_cart"
-                      />
-                    </Grid>
-                  </Grid>
-                </Paper>
-
-                {/* Execution Steps */}
-                <Paper elevation={0} sx={{ p: 2.5, borderRadius: '12px', border: '1px solid #e2e8f0', bgcolor: '#ffffff' }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Typography sx={{ fontSize: '1.2rem' }}>⚙️</Typography>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#0f172a' }}>
-                        3. Action Steps ({workflowForm.steps.length})
-                      </Typography>
-                    </Box>
                     <Button
                       size="small"
                       startIcon={<AddIcon />}
                       onClick={handleAddStep}
-                      sx={{ textTransform: 'none', fontWeight: 700, color: '#16a34a', bgcolor: '#f0fdf4', '&:hover': { bgcolor: '#dcfce7' } }}
+                      sx={{ textTransform: 'none', fontWeight: 800, color: '#16a34a', bgcolor: '#f0fdf4', borderRadius: '8px', '&:hover': { bgcolor: '#dcfce7' } }}
                     >
-                      Add Step
+                      + Add Action Step
                     </Button>
                   </Box>
 
@@ -1677,21 +1894,18 @@ export default function Workflows() {
                         key={step.id || index}
                         sx={{
                           p: 2,
-                          borderRadius: '10px',
+                          borderRadius: '12px',
                           border: '1px solid #e2e8f0',
-                          bgcolor: '#f8fafc',
-                          position: 'relative'
+                          bgcolor: '#f8fafc'
                         }}
                       >
-                        <Stack direction="row" spacing={1.5} alignItems="center" mb={1.5}>
-                          <Avatar sx={{ width: 24, height: 24, fontSize: '0.75rem', fontWeight: 800, bgcolor: '#0f172a', color: '#ffffff' }}>
+                        <Stack direction="row" spacing={1.2} alignItems="center" mb={1.5}>
+                          <Avatar sx={{ width: 24, height: 24, fontSize: '0.72rem', fontWeight: 900, bgcolor: '#0f172a', color: '#ffffff' }}>
                             {index + 1}
                           </Avatar>
-                          <Box sx={{ flexGrow: 1 }}>
-                            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#0f172a' }}>
-                              {step.name}
-                            </Typography>
-                          </Box>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#0f172a', flexGrow: 1, fontSize: '0.85rem' }}>
+                            {step.name}
+                          </Typography>
                           <Stack direction="row" spacing={0.5}>
                             <IconButton size="small" disabled={index === 0} onClick={() => handleMoveStep(index, -1)}>
                               <ArrowUpwardIcon fontSize="inherit" />
@@ -1705,45 +1919,66 @@ export default function Workflows() {
                           </Stack>
                         </Stack>
 
-                        <Grid container spacing={1.5}>
-                          <Grid item xs={12} sm={4}>
-                            <FormControl fullWidth size="small">
-                              <InputLabel>Step Action</InputLabel>
-                              <Select
-                                value={step.type}
-                                label="Step Action"
-                                onChange={(e) => handleStepChange(index, 'type', e.target.value)}
-                              >
-                                <MenuItem value="SEND_MESSAGE">Send WhatsApp Reply</MenuItem>
-                                <MenuItem value="TAG">Tag Customer Profile</MenuItem>
-                                <MenuItem value="AI_ACTION">AI Escalation Action</MenuItem>
-                              </Select>
-                            </FormControl>
-                          </Grid>
-                          <Grid item xs={12} sm={8}>
-                            {step.type === 'SEND_MESSAGE' ? (
-                              <TextField
-                                label="WhatsApp Message Copy"
-                                fullWidth
-                                multiline
-                                rows={3}
-                                size="small"
-                                value={step.config.value}
-                                onChange={(e) => handleStepChange(index, 'value', e.target.value)}
-                                placeholder="Type your response copy here..."
-                              />
-                            ) : (
-                              <TextField
-                                label={step.type === 'TAG' ? 'Tag Name (e.g. VIP_CLIENT)' : 'Escalation Note'}
-                                fullWidth
-                                size="small"
-                                value={step.config.value}
-                                onChange={(e) => handleStepChange(index, 'value', e.target.value)}
-                                placeholder={step.type === 'TAG' ? 'e.g. VIP_CLIENT' : 'e.g. Notify manager'}
-                              />
-                            )}
-                          </Grid>
-                        </Grid>
+                        <Stack spacing={1.5}>
+                          <TextField
+                            label="WhatsApp Message Copy *"
+                            fullWidth
+                            multiline
+                            rows={3}
+                            size="small"
+                            value={step.config?.value || ''}
+                            onChange={(e) => handleStepChange(index, 'value', e.target.value)}
+                            placeholder="e.g. Hello {{customerName}}! Welcome to our store 🌟 How can we help you today?"
+                            helperText="Supports variables: {{customerName}}, {{shop_name}}, {{today_date}}"
+                            sx={{ '& .MuiOutlinedInput-root': { bgcolor: '#ffffff', borderRadius: '10px' } }}
+                          />
+
+                          {/* Amazon / Flipkart Style Interactive Buttons */}
+                          <Box sx={{ p: 1.5, bgcolor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '10px' }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                              <Typography variant="caption" sx={{ fontWeight: 800, color: '#0f172a', fontSize: '0.75rem' }}>
+                                🛍️ Amazon / Flipkart Quick Reply Buttons (Max 3):
+                              </Typography>
+                              {(step.buttons || []).length < 3 && (
+                                <Button
+                                  size="small"
+                                  onClick={() => handleAddButtonToStep(index)}
+                                  sx={{ textTransform: 'none', fontWeight: 700, fontSize: '0.72rem', color: '#2563eb' }}
+                                >
+                                  + Add Button
+                                </Button>
+                              )}
+                            </Box>
+
+                            <Stack spacing={1}>
+                              {(step.buttons || []).map((btn, bIdx) => (
+                                <Stack key={btn.id || bIdx} direction="row" spacing={1} alignItems="center">
+                                  <TextField
+                                    size="small"
+                                    fullWidth
+                                    label={`Button ${bIdx + 1} Label (max 20 chars)`}
+                                    value={btn.title}
+                                    onChange={(e) => handleButtonChange(index, bIdx, 'title', e.target.value)}
+                                    placeholder="e.g. 📅 Book Appointment"
+                                    sx={{ '& .MuiOutlinedInput-root': { borderRadius: '8px' } }}
+                                  />
+                                  <IconButton
+                                    size="small"
+                                    color="error"
+                                    onClick={() => handleRemoveButtonFromStep(index, bIdx)}
+                                  >
+                                    <DeleteIcon fontSize="small" />
+                                  </IconButton>
+                                </Stack>
+                              ))}
+                              {(!step.buttons || step.buttons.length === 0) && (
+                                <Typography variant="caption" sx={{ color: '#94a3b8', fontStyle: 'italic', display: 'block' }}>
+                                  No interactive buttons added yet. Click "+ Add Button" above to provide Flipkart/Amazon style clickable options.
+                                </Typography>
+                              )}
+                            </Stack>
+                          </Box>
+                        </Stack>
                       </Box>
                     ))}
                   </Stack>
@@ -1751,123 +1986,151 @@ export default function Workflows() {
               </Stack>
             </Grid>
 
-            {/* Right Column: Live WhatsApp Mobile Simulator Preview */}
-            <Grid item xs={12} md={5}>
-              <Paper
-                elevation={0}
-                sx={{
-                  p: 2.5,
-                  borderRadius: '16px',
-                  border: '1px solid #e2e8f0',
-                  bgcolor: '#ffffff',
-                  position: 'sticky',
-                  top: 20
-                }}
-              >
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#0f172a' }}>
-                    📱 Customer WhatsApp Simulator
-                  </Typography>
-                  <Chip
-                    label="LIVE PREVIEW"
-                    size="small"
-                    sx={{ bgcolor: '#84cc16', color: '#0f172a', fontWeight: 800, fontSize: '0.65rem' }}
-                  />
-                </Box>
-
-                {/* Mobile Device Frame */}
-                <Box
+            {/* Right Column: Sticky Live WhatsApp Simulator */}
+            <Grid item xs={12} md={5} sx={{ display: { xs: 'none', md: 'block' } }}>
+              <Box sx={{ position: 'sticky', top: '10px' }}>
+                <Paper
+                  elevation={0}
                   sx={{
-                    borderRadius: '20px',
-                    border: '4px solid #1e293b',
-                    overflow: 'hidden',
-                    bgcolor: '#efeae2',
-                    boxShadow: '0 10px 25px rgba(0,0,0,0.15)'
+                    p: 2,
+                    borderRadius: '16px',
+                    border: '1px solid #e2e8f0',
+                    bgcolor: '#ffffff'
                   }}
                 >
-                  {/* WhatsApp Chat Header */}
-                  <Box sx={{ bgcolor: '#075e54', p: 1.5, display: 'flex', alignItems: 'center', gap: 1.5, color: '#ffffff' }}>
-                    <Avatar sx={{ width: 34, height: 34, bgcolor: '#84cc16', color: '#0f172a', fontWeight: 800, fontSize: '0.8rem' }}>
-                      R
-                    </Avatar>
-                    <Box sx={{ flexGrow: 1 }}>
-                      <Typography variant="body2" sx={{ fontWeight: 700, color: '#ffffff', lineHeight: 1.2 }}>
-                        RENIC TECH Official
-                      </Typography>
-                      <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.75)', fontSize: '0.65rem' }}>
-                        Business Account • Automated
-                      </Typography>
-                    </Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#0f172a' }}>
+                      📱 Live WhatsApp Simulator
+                    </Typography>
+                    <Chip
+                      label="REAL-TIME"
+                      size="small"
+                      sx={{ bgcolor: '#84cc16', color: '#0f172a', fontWeight: 800, fontSize: '0.65rem', height: 20 }}
+                    />
                   </Box>
 
-                  {/* WhatsApp Messages Canvas */}
-                  <Box sx={{ p: 2, minHeight: 260, display: 'flex', flexDirection: 'column', gap: 1.5, justifyContent: 'flex-end' }}>
-                    {/* Incoming customer trigger simulated bubble */}
-                    <Box sx={{ alignSelf: 'flex-start', maxWidth: '80%' }}>
-                      <Box sx={{ bgcolor: '#ffffff', p: 1.2, borderRadius: '8px 8px 8px 0px', boxShadow: '0 1px 2px rgba(0,0,0,0.1)' }}>
-                        <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 700, display: 'block', fontSize: '0.65rem' }}>
-                          Customer Inquiry (Matches: {workflowForm.triggerValue || 'intent'})
-                        </Typography>
-                        <Typography variant="body2" sx={{ color: '#1e293b', fontSize: '0.8rem' }}>
-                          {workflowForm.triggerField === 'intent' && workflowForm.triggerValue === 'abandoned_cart'
-                            ? 'I was checking out jewelry on your website earlier.'
-                            : workflowForm.triggerField === 'intent' && workflowForm.triggerValue === 'customization'
-                            ? 'Can you make a customized bridal necklace set?'
-                            : 'Hello, can you help me with my order?'}
-                        </Typography>
-                        <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.6rem', textAlign: 'right', display: 'block', mt: 0.3 }}>
-                          10:42 AM
-                        </Typography>
-                      </Box>
-                    </Box>
-
-                    {/* Outgoing automated reply simulated bubble */}
-                    <Box sx={{ alignSelf: 'flex-end', maxWidth: '85%' }}>
-                      <Box sx={{ bgcolor: '#d9fdd3', p: 1.2, borderRadius: '8px 8px 0px 8px', boxShadow: '0 1px 2px rgba(0,0,0,0.1)' }}>
-                        <Typography variant="body2" sx={{ color: '#111b21', fontSize: '0.82rem', whiteSpace: 'pre-wrap', lineHeight: 1.4 }}>
-                          {primaryMessageStep?.config?.value || 'Configure automated reply copy in Step 1 to see preview here...'}
-                        </Typography>
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 0.5, mt: 0.5 }}>
-                          <Typography variant="caption" sx={{ color: '#667781', fontSize: '0.6rem' }}>
-                            10:42 AM
-                          </Typography>
-                          <span style={{ color: '#53bdeb', fontSize: '0.75rem', lineHeight: 1 }}>✓✓</span>
-                        </Box>
-                      </Box>
-                    </Box>
-                  </Box>
-                </Box>
-
-                {/* Flow studio promo */}
-                <Box sx={{ mt: 2.5, p: 2, bgcolor: '#f1f5f9', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                  <Typography variant="caption" sx={{ fontWeight: 800, color: '#0f172a', display: 'block', mb: 0.5 }}>
-                    Need Complex Branching Logic?
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mb: 1.5 }}>
-                    Launch the visual flowchart canvas to design branching decision nodes, wait delays, and webhooks.
-                  </Typography>
-                  <Button
-                    fullWidth
-                    variant="outlined"
-                    size="small"
-                    startIcon={<AccountTreeIcon />}
-                    onClick={() => {
-                      setOpenDialog(false);
-                      navigate('/workflows/create');
-                    }}
+                  {/* Device Bezel */}
+                  <Box
                     sx={{
-                      borderColor: '#0f172a',
-                      color: '#0f172a',
-                      textTransform: 'none',
-                      fontWeight: 700,
-                      borderRadius: '8px',
-                      '&:hover': { bgcolor: '#0f172a', color: '#ffffff' }
+                      borderRadius: '24px',
+                      border: '8px solid #0f172a',
+                      overflow: 'hidden',
+                      bgcolor: '#efeae2',
+                      backgroundImage: 'url("https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png")',
+                      backgroundSize: 'cover',
+                      boxShadow: '0 15px 30px rgba(0,0,0,0.15)',
+                      height: '420px',
+                      display: 'flex',
+                      flexDirection: 'column'
                     }}
                   >
-                    Open Flow Studio
-                  </Button>
-                </Box>
-              </Paper>
+                    {/* Header */}
+                    <Box sx={{ bgcolor: '#075e54', p: 1.2, px: 1.5, display: 'flex', alignItems: 'center', gap: 1, color: '#ffffff' }}>
+                      <Avatar sx={{ width: 28, height: 28, bgcolor: '#84cc16', color: '#0f172a', fontWeight: 800, fontSize: '0.75rem' }}>
+                        WA
+                      </Avatar>
+                      <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 700, color: '#ffffff', fontSize: '11px', lineHeight: 1.1 }}>
+                          Renic Official Store
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: '#d1fae5', fontSize: '9px', display: 'block', lineHeight: 1 }}>
+                          Verified WhatsApp Business
+                        </Typography>
+                      </Box>
+                    </Box>
+
+                    {/* Messages Body */}
+                    <Box sx={{ p: 1.5, flex: 1, display: 'flex', flexDirection: 'column', gap: 1, justifyContent: 'flex-end', overflowY: 'auto' }}>
+                      {/* Incoming customer trigger bubble */}
+                      <Box sx={{ alignSelf: 'flex-start', maxWidth: '85%' }}>
+                        <Box sx={{ bgcolor: '#ffffff', p: 1, borderRadius: '8px 8px 8px 0px', boxShadow: '0 1px 2px rgba(0,0,0,0.1)' }}>
+                          <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 700, display: 'block', fontSize: '9px' }}>
+                            Customer Trigger:
+                          </Typography>
+                          <Typography variant="body2" sx={{ color: '#1e293b', fontSize: '11.5px' }}>
+                            {workflowForm.triggerType === 'KEYWORD'
+                              ? (workflowForm.triggerKeywords?.split(',')?.[0]?.trim() || 'Hi')
+                              : workflowForm.triggerType === 'RESPONSE_RULE'
+                              ? 'Triggered from AI Response Rule'
+                              : 'Hello, I have an inquiry!'}
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '8px', textAlign: 'right', display: 'block', mt: 0.2 }}>
+                            10:42 AM
+                          </Typography>
+                        </Box>
+                      </Box>
+
+                      {/* Outgoing automated response bubble */}
+                      <Box sx={{ alignSelf: 'flex-end', maxWidth: '90%' }}>
+                        <Box sx={{ bgcolor: '#E2F9CB', p: 1.2, borderRadius: '8px 8px 0px 8px', boxShadow: '0 1px 2px rgba(0,0,0,0.1)' }}>
+                          <Typography variant="body2" sx={{ color: '#111b21', fontSize: '11.5px', whiteSpace: 'pre-wrap', lineHeight: 1.35 }}>
+                            {(workflowForm.steps[0]?.config?.value || 'Configure automated reply copy...')
+                              .replace(/{{s*customerNames*}}/gi, 'Rahul')}
+                          </Typography>
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 0.3, mt: 0.3 }}>
+                            <Typography variant="caption" sx={{ color: '#667781', fontSize: '8px' }}>
+                              10:42 AM
+                            </Typography>
+                            <span style={{ color: '#34b7f1', fontSize: '9px', fontWeight: 800 }}>✓✓</span>
+                          </Box>
+                        </Box>
+                      </Box>
+
+                      {/* Render Amazon / Flipkart Style Buttons */}
+                      {(workflowForm.steps[0]?.buttons || []).map((b, i) => (
+                        <Box
+                          key={b.id || i}
+                          sx={{
+                            alignSelf: 'flex-end',
+                            width: '90%',
+                            bgcolor: '#ffffff',
+                            borderRadius: '8px',
+                            border: '1px solid #e2e8f0',
+                            p: 0.7,
+                            textAlign: 'center',
+                            boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                          }}
+                        >
+                          <Typography variant="caption" sx={{ color: '#2563eb', fontWeight: 800, fontSize: '11px' }}>
+                            🔘 {b.title || `Option ${i + 1}`}
+                          </Typography>
+                        </Box>
+                      ))}
+                    </Box>
+                  </Box>
+
+                  {/* Switch to Visual Studio Promo */}
+                  <Box sx={{ mt: 2, p: 1.5, bgcolor: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
+                    <Typography variant="caption" sx={{ fontWeight: 800, color: '#0f172a', display: 'block', mb: 0.3 }}>
+                      Need Multi-Branch Flowcharts?
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mb: 1, fontSize: '10.5px' }}>
+                      Design drag-and-drop nodes, parallel splits, and visual connectors.
+                    </Typography>
+                    <Button
+                      fullWidth
+                      variant="outlined"
+                      size="small"
+                      startIcon={<AccountTreeIcon />}
+                      onClick={() => {
+                        setOpenDialog(false);
+                        handleOpenNewStudioWorkflow();
+                      }}
+                      sx={{
+                        borderColor: '#0f172a',
+                        color: '#0f172a',
+                        textTransform: 'none',
+                        fontWeight: 700,
+                        borderRadius: '8px',
+                        fontSize: '0.75rem',
+                        '&:hover': { bgcolor: '#0f172a', color: '#ffffff' }
+                      }}
+                    >
+                      Open Visual Flow Studio
+                    </Button>
+                  </Box>
+                </Paper>
+              </Box>
             </Grid>
           </Grid>
         </DialogContent>

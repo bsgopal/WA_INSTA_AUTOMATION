@@ -441,13 +441,17 @@ async function sendMessage(to, message, options = {}) {
       }
       // --- FORMAT B: Amazon / Flipkart Style Quick Reply Choices (Up to 3 buttons) ---
       else if (replyButtons.length > 0) {
-        const formattedReplyButtons = replyButtons.slice(0, 3).map((b, idx) => ({
-          type: 'reply',
-          reply: {
-            id: String(b.value || b.id || `btn_${idx}`).slice(0, 256),
-            title: String(b.label || b.title || `Option ${idx + 1}`).trim().slice(0, 20) // Meta 20 char limit
-          }
-        }));
+        const formattedReplyButtons = replyButtons.slice(0, 3).map((b, idx) => {
+          const rawTitle = String(b.label || b.title || b.name || b.text || b.value || `Option ${idx + 1}`).trim();
+          const cleanTitle = rawTitle.replace(/^\d+[\.\)]\s*/, '').trim() || rawTitle;
+          return {
+            type: 'reply',
+            reply: {
+              id: String(b.value || b.id || `btn_${idx}`).slice(0, 256),
+              title: cleanTitle.slice(0, 20) // Meta 20 char limit
+            }
+          };
+        });
 
         const interactiveReply = {
           type: 'button',

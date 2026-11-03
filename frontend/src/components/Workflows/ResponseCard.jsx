@@ -102,11 +102,13 @@ const ResponseCard = ({
               }}
             >
               <Box
+                component="span"
                 sx={{
                   width: 12,
                   height: 12,
                   borderRadius: '50%',
                   backgroundColor: '#2196F3',
+                  display: 'inline-block'
                 }}
               />
               {card.title || 'Untitled Response'}

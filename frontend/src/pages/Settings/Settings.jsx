@@ -1105,13 +1105,14 @@ export default function Settings() {
                       gap: 1.5
                     }}>
                       <Box>
-                        <Typography sx={{ fontWeight: 800, fontSize: '0.88rem', color: whatsappStatus.authenticated ? '#166534' : '#92400e', display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Box sx={{ 
+                        <Typography component="div" sx={{ fontWeight: 800, fontSize: '0.88rem', color: whatsappStatus.authenticated ? '#166534' : '#92400e', display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Box component="span" sx={{ 
                             width: 10, 
                             height: 10, 
                             borderRadius: '50%', 
                             bgcolor: whatsappStatus.authenticated ? '#84cc16' : '#f59e0b',
-                            boxShadow: whatsappStatus.authenticated ? '0 0 10px #84cc16' : '0 0 10px #f59e0b'
+                            boxShadow: whatsappStatus.authenticated ? '0 0 10px #84cc16' : '0 0 10px #f59e0b',
+                            display: 'inline-block'
                           }} />
                           {whatsappStatus.authenticated ? 'WhatsApp Active & Connected' : 'WhatsApp Connection Required'}
                         </Typography>
@@ -1172,7 +1173,7 @@ export default function Settings() {
                           <Paper variant="outlined" sx={{ p: 1.5, borderRadius: '8px', textAlign: 'left', bgcolor: '#f0fdf4', borderColor: '#86efac', height: '100%' }}>
                             <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, fontSize: '0.68rem', display: 'flex', alignItems: 'center', gap: 0.8 }}>
                               GATEWAY
-                              <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: '#16a34a' }} />
+                              <Box component="span" sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: '#16a34a', display: 'inline-block' }} />
                             </Typography>
                             <Typography sx={{ fontWeight: 800, color: '#166534', fontSize: '0.82rem' }}>
                               Active

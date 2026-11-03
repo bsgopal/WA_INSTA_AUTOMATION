@@ -45,20 +45,31 @@ const executeWorkflow = async (workflowId, customerId, context = {}) => {
           messageText = `🛍️ Product Catalog:\n${catalogUrl}\n\n${targetNode.config?.message || ''}`.trim();
         }
 
-        const buttons = (targetNode.config?.buttons || []).map(b => ({
-          label: b.title,
-          value: b.value || b.title,
-          type: 'QUICK_REPLY',
-          actionType: 'QUICK_REPLY'
-        }));
+        const buttons = (targetNode.config?.buttons || []).map((b, idx) => {
+          const rawLabel = String(b.title || b.label || b.name || b.text || b.value || `Option ${idx + 1}`).trim();
+          const cleanLabel = rawLabel.replace(/^\d+[\.\)]\s*/, '').trim() || rawLabel;
+          return {
+            label: cleanLabel,
+            title: cleanLabel,
+            value: b.value || b.id || cleanLabel,
+            type: 'QUICK_REPLY',
+            actionType: 'QUICK_REPLY'
+          };
+        });
 
         const personalizedMessage = await aiSmartFeatures.personalizeMessage(messageText, customer, executionContext);
+        const VariableInterpolationService = require('./VariableInterpolationService');
+        const finalMessage = await VariableInterpolationService.interpolateVariables(
+          personalizedMessage || messageText,
+          customer.userId || workflow.userId,
+          { customer, ...executionContext }
+        );
         const targetNumber = customer.whatsappNumber || customer.phone;
 
         if (!context.testMode && targetNumber) {
           const sendRes = await WhatsAppService.sendMessage(
             targetNumber,
-            personalizedMessage,
+            finalMessage,
             {
               buttons: buttons.length > 0 ? buttons : null,
               userId: customer.userId || workflow.userId
@@ -74,7 +85,7 @@ const executeWorkflow = async (workflowId, customerId, context = {}) => {
             await aiChatHandler.logOutboundMessage(
               customer.userId || workflow.userId,
               customer._id,
-              personalizedMessage,
+              finalMessage,
               'whatsapp',
               sendRes?.externalMessageId,
               null,
@@ -280,8 +291,27 @@ const executeSendMessage = async (step, customer, context) => {
       }];
     }
 
+    if (Array.isArray(buttons)) {
+      buttons = buttons.map((b, idx) => {
+        const rawLabel = String(b.label || b.title || b.name || b.text || b.value || `Option ${idx + 1}`).trim();
+        const cleanLabel = rawLabel.replace(/^\d+[\.\)]\s*/, '').trim() || rawLabel;
+        return {
+          ...b,
+          label: cleanLabel,
+          title: cleanLabel,
+          value: b.value || b.id || cleanLabel
+        };
+      });
+    }
+
     // Personalize message
     const personalizedMessage = await aiSmartFeatures.personalizeMessage(template, customer, context);
+    const VariableInterpolationService = require('./VariableInterpolationService');
+    const finalMessage = await VariableInterpolationService.interpolateVariables(
+      personalizedMessage || template,
+      customer.userId || context.userId,
+      { customer, ...context }
+    );
 
     let result;
 
@@ -292,7 +322,7 @@ const executeSendMessage = async (step, customer, context) => {
         const targetNumber = customer.whatsappNumber || customer.phone;
         result = await WhatsAppService.sendMessage(
           targetNumber,
-          personalizedMessage,
+          finalMessage,
           {
             mediaUrl,
             buttons,
@@ -300,10 +330,29 @@ const executeSendMessage = async (step, customer, context) => {
             userId: customer.userId
           }
         );
+
+        // Keep unified inbox synced
+        try {
+          const aiChatHandler = require('./aiChatHandler');
+          const ShopConfig = require('../models/ShopConfig');
+          const shop = await ShopConfig.findOne({ userId: customer.userId });
+          const displayNum = shop?.metaDisplayPhoneNumber || shop?.contactPhone || '';
+          await aiChatHandler.logOutboundMessage(
+            customer.userId,
+            customer._id,
+            finalMessage,
+            'whatsapp',
+            result?.externalMessageId,
+            mediaUrl,
+            { businessPhoneNumber: displayNum }
+          );
+        } catch (logErr) {
+          console.error('[Workflow Step Log Error]:', logErr.message);
+        }
       } else if (channel === 'instagram') {
         result = await InstagramService.sendDirectMessage(
           customer.instagramHandle || customer.phone,
-          personalizedMessage,
+          finalMessage,
           { mediaUrl }
         );
       }
@@ -314,7 +363,7 @@ const executeSendMessage = async (step, customer, context) => {
       data: {
         messageSent: true,
         messageId: result?.externalMessageId || 'simulated_id',
-        messageText: personalizedMessage,
+        messageText: finalMessage,
         channel,
         buttons,
         list
@@ -734,8 +783,11 @@ const triggerResponseRuleWorkflows = async (responseRuleId, eventData) => {
   try {
     const workflows = await Workflow.find({
       status: 'ACTIVE',
-      'trigger.type': 'RESPONSE_RULE_SELECTION',
-      'trigger.responseRuleId': responseRuleId
+      $or: [
+        { 'trigger.type': 'RESPONSE_RULE_SELECTION', 'trigger.responseRuleId': String(responseRuleId) },
+        { 'trigger.type': 'RESPONSE_RULE', 'trigger.responseRuleId': String(responseRuleId) },
+        { 'trigger.responseRuleId': String(responseRuleId) }
+      ]
     });
 
     console.log(`Triggering RESPONSE_RULE_SELECTION workflows for rule ${responseRuleId}. Found ${workflows.length} workflows.`);

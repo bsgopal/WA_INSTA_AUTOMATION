@@ -1080,4 +1080,81 @@ router.get('/:id/recipients', async (req, res) => {
   }
 });
 
+// ============ PAUSE CAMPAIGN ============
+router.post('/:id/pause', async (req, res) => {
+  try {
+    const campaign = await Campaign.findById(req.params.id);
+    if (!campaign) {
+      return res.status(404).json({ error: 'Campaign not found' });
+    }
+
+    campaign.status = 'PAUSED';
+    await campaign.save();
+
+    console.log(`⏸️ Campaign "${campaign.name}" (${campaign._id}) paused.`);
+    res.json({
+      success: true,
+      message: 'Campaign paused successfully',
+      campaign
+    });
+  } catch (error) {
+    console.error('Pause Campaign Error:', error);
+    res.status(500).json({ error: 'Failed to pause campaign', details: error.message });
+  }
+});
+
+// ============ RESUME CAMPAIGN ============
+router.post('/:id/resume', async (req, res) => {
+  try {
+    const campaign = await Campaign.findById(req.params.id);
+    if (!campaign) {
+      return res.status(404).json({ error: 'Campaign not found' });
+    }
+
+    // If campaign was scheduled in the future, return to SCHEDULED; otherwise PROCESSING / RUNNING
+    const now = new Date();
+    if (campaign.scheduledAt && new Date(campaign.scheduledAt) > now) {
+      campaign.status = 'SCHEDULED';
+    } else {
+      campaign.status = 'PROCESSING';
+    }
+    await campaign.save();
+
+    console.log(`▶️ Campaign "${campaign.name}" (${campaign._id}) resumed to ${campaign.status}.`);
+    res.json({
+      success: true,
+      message: 'Campaign resumed successfully',
+      campaign
+    });
+  } catch (error) {
+    console.error('Resume Campaign Error:', error);
+    res.status(500).json({ error: 'Failed to resume campaign', details: error.message });
+  }
+});
+
+// ============ COMPLETE CAMPAIGN ============
+router.post('/:id/complete', async (req, res) => {
+  try {
+    const campaign = await Campaign.findById(req.params.id);
+    if (!campaign) {
+      return res.status(404).json({ error: 'Campaign not found' });
+    }
+
+    campaign.status = 'COMPLETED';
+    campaign.completedAt = new Date();
+    await campaign.save();
+
+    console.log(`✅ Campaign "${campaign.name}" (${campaign._id}) marked as completed.`);
+    res.json({
+      success: true,
+      message: 'Campaign marked as completed',
+      campaign
+    });
+  } catch (error) {
+    console.error('Complete Campaign Error:', error);
+    res.status(500).json({ error: 'Failed to complete campaign', details: error.message });
+  }
+});
+
 module.exports = router;
+

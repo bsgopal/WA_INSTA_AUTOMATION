@@ -60,11 +60,13 @@ const ConditionCard = ({
               }}
             >
               <Box
+                component="span"
                 sx={{
                   width: 12,
                   height: 12,
                   borderRadius: '50%',
                   backgroundColor: '#FFC107',
+                  display: 'inline-block'
                 }}
               />
               Condition

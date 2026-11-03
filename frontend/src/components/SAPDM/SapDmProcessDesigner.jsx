@@ -72,10 +72,11 @@ import { broadcastWorkspaceEvent } from '../../utils/workspaceSync';
 // ========================================================
 const FLOW_CONTROLS = [
   { type: 'START', label: 'Start Trigger', icon: '▷', desc: 'Process entry point trigger on keyword', color: '#D97706', shape: 'circle_start' },
+  { type: 'RESPONSE_RULE', label: 'AI Response Rule Trigger', icon: '⚡', desc: 'Trigger flow when an AI Response Rule fires', color: '#84CC16', shape: 'circle_rule' },
   { type: 'IF_ELSE', label: 'Condition Split', icon: '✕', desc: 'Branch based on user selection or keyword', color: '#10B981', shape: 'diamond_condition' },
   { type: 'PARALLEL_SPLIT', label: 'Parallel Split', icon: '+', desc: 'Run concurrent actions simultaneously', color: '#0D9488', shape: 'diamond_parallel' },
   { type: 'WAIT_TIMER', label: 'Wait / Delay', icon: '⏱️', desc: 'Pause execution for seconds or minutes', color: '#059669', shape: 'circle_wait' },
-  { type: 'AI_SCRIPT', label: 'AI Assistant', icon: '🤖', desc: 'AI smart response or custom prompt', color: '#6366F1', shape: 'circle_ai' },
+  { type: 'AI_SCRIPT', label: 'AI Intent Classifier', icon: '🤖', desc: 'Gemini AI intent or smart response', color: '#6366F1', shape: 'circle_ai' },
   { type: 'END', label: 'End Flow', icon: '◎', desc: 'Flow completion termination', color: '#DC2626', shape: 'circle_end' }
 ];
 
@@ -171,10 +172,25 @@ function KeywordConfigEditor({ node, onChange }) {
 // PRESET WORKFLOW STARTER TEMPLATES
 // ========================================================
 const PRESET_WORKFLOW_TEMPLATES = {
+  BLANK: {
+    id: 'BLANK',
+    name: 'Blank Canvas',
+    description: 'Empty starter canvas with only Start Trigger ready for dragging nodes',
+    nodes: [
+      {
+        id: 'node_start',
+        type: 'START',
+        label: 'Start Trigger',
+        position: { x: 120, y: 220 },
+        config: { triggerType: 'KEYWORD', keywords: ['hi', 'hello', 'hey', 'start', 'menu'], matchType: 'CONTAINS' }
+      }
+    ],
+    edges: []
+  },
   MINIMAL: {
     id: 'MINIMAL',
-    name: 'Basic Greeting Flow',
-    description: 'Clean starter with Start Trigger, Welcome Message, and End Flow',
+    name: 'Basic Greeting & Options Flow',
+    description: 'Clean starter with Start Trigger, Welcome Message, and Amazon/Flipkart buttons',
     nodes: [
       {
         id: 'node_start',
@@ -191,9 +207,9 @@ const PRESET_WORKFLOW_TEMPLATES = {
         config: {
           message: 'Hello {{customerName}}! Welcome to our store 🌟\nHow can we help you today?',
           buttons: [
-            { id: 'b1', title: '1. 📅 Book Appointment', value: 'Book' },
-            { id: 'b2', title: '2. 🛍️ View Services', value: 'Services' },
-            { id: 'b3', title: '3. 💬 Talk to Agent', value: 'Support' }
+            { id: 'b1', title: '📅 Book Appointment', value: 'Book' },
+            { id: 'b2', title: '🛍️ View Services', value: 'Services' },
+            { id: 'b3', title: '💬 Talk to Agent', value: 'Support' }
           ]
         }
       },
@@ -230,8 +246,8 @@ const PRESET_WORKFLOW_TEMPLATES = {
         config: {
           message: 'Please choose the service you would like to book with us:',
           buttons: [
-            { id: 'b_s1', title: '1. Consultation (30m)', value: 'Consultation' },
-            { id: 'b_s2', title: '2. Comprehensive (1h)', value: 'Comprehensive' }
+            { id: 'b_s1', title: 'Consultation (30m)', value: 'Consultation' },
+            { id: 'b_s2', title: 'Comprehensive (1h)', value: 'Comprehensive' }
           ]
         }
       },
@@ -279,9 +295,9 @@ const PRESET_WORKFLOW_TEMPLATES = {
         config: {
           message: 'Namaste! Welcome to our store 💎\nPlease select a category or type your choice:',
           buttons: [
-            { id: 'b1', title: '1. 💍 Category A', value: 'Category A' },
-            { id: 'b2', title: '2. 📿 Category B', value: 'Category B' },
-            { id: 'b3', title: '3. 🛍️ Full Catalog', value: 'Catalog' }
+            { id: 'b1', title: '💍 Category A', value: 'Category A' },
+            { id: 'b2', title: '📿 Category B', value: 'Category B' },
+            { id: 'b3', title: '🛍️ Full Catalog', value: 'Catalog' }
           ]
         }
       },
@@ -325,35 +341,13 @@ const PRESET_WORKFLOW_TEMPLATES = {
     ],
     edges: [
       { id: 'edge_start_menu', fromNodeId: 'node_start', fromPort: 'out', toNodeId: 'node_menu_card', toPort: 'in', label: '' },
-      { id: 'edge_b1_a', fromNodeId: 'node_menu_card', fromPort: 'b1', toNodeId: 'node_cat_a', toPort: 'in', label: '1. Option A' },
-      { id: 'edge_b2_b', fromNodeId: 'node_menu_card', fromPort: 'b2', toNodeId: 'node_cat_b', toPort: 'in', label: '2. Option B' },
-      { id: 'edge_b3_c', fromNodeId: 'node_menu_card', fromPort: 'b3', toNodeId: 'node_catalog_card', toPort: 'in', label: '3. Catalog' },
+      { id: 'edge_b1_a', fromNodeId: 'node_menu_card', fromPort: 'b1', toNodeId: 'node_cat_a', toPort: 'in', label: 'Option A' },
+      { id: 'edge_b2_b', fromNodeId: 'node_menu_card', fromPort: 'b2', toNodeId: 'node_cat_b', toPort: 'in', label: 'Option B' },
+      { id: 'edge_b3_c', fromNodeId: 'node_menu_card', fromPort: 'b3', toNodeId: 'node_catalog_card', toPort: 'in', label: 'Catalog' },
       { id: 'edge_a_end', fromNodeId: 'node_cat_a', fromPort: 'out', toNodeId: 'node_end', toPort: 'in', label: '' },
       { id: 'edge_b_end', fromNodeId: 'node_cat_b', fromPort: 'out', toNodeId: 'node_end', toPort: 'in', label: '' },
       { id: 'edge_c_end', fromNodeId: 'node_catalog_card', fromPort: 'out', toNodeId: 'node_end', toPort: 'in', label: '' }
     ]
-  },
-  BLANK: {
-    id: 'BLANK',
-    name: 'Blank Canvas',
-    description: 'Empty starter canvas with only Start and End nodes',
-    nodes: [
-      {
-        id: 'node_start',
-        type: 'START',
-        label: 'Start Trigger',
-        position: { x: 100, y: 220 },
-        config: { triggerType: 'KEYWORD', keywords: ['hi', 'hello', 'menu'], matchType: 'CONTAINS' }
-      },
-      {
-        id: 'node_end',
-        type: 'END',
-        label: 'End Flow',
-        position: { x: 500, y: 220 },
-        config: { terminationType: 'COMPLETE' }
-      }
-    ],
-    edges: []
   }
 };
 
@@ -386,14 +380,14 @@ export default function SapDmProcessDesigner({
       }));
     }
     // Clean default starter
-    return PRESET_WORKFLOW_TEMPLATES.MINIMAL.nodes;
+    return PRESET_WORKFLOW_TEMPLATES.BLANK.nodes;
   });
 
   const [edges, setEdges] = useState(() => {
     if (initialData.edges && initialData.edges.length > 0) {
       return initialData.edges;
     }
-    return PRESET_WORKFLOW_TEMPLATES.MINIMAL.edges;
+    return PRESET_WORKFLOW_TEMPLATES.BLANK.edges;
   });
 
   const handleApplyTemplate = (templateKey) => {
@@ -2426,6 +2420,41 @@ export default function SapDmProcessDesigner({
                         Customer Trigger Keywords
                       </Typography>
                       <KeywordConfigEditor node={selectedNode} onChange={updateSelectedNodeConfig} />
+                    </Box>
+                  )}
+
+                  {/* RESPONSE_RULE Trigger */}
+                  {selectedNode.type === 'RESPONSE_RULE' && (
+                    <Box>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1, color: '#1E293B' }}>
+                        Linked AI Response Rule
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: '#64748B', display: 'block', mb: 1.5 }}>
+                        Select the AI Response Rule that triggers this workflow when fired:
+                      </Typography>
+                      <FormControl fullWidth size="small">
+                        <InputLabel>Select Response Rule</InputLabel>
+                        <Select
+                          label="Select Response Rule"
+                          value={selectedNode.config?.ruleId || ''}
+                          onChange={(e) => {
+                            const found = (availableRules || []).find(r => r._id === e.target.value);
+                            updateSelectedNodeConfig({
+                              ruleId: e.target.value,
+                              ruleName: found?.name || ''
+                            });
+                            if (found?.name) {
+                              updateSelectedNodeLabel(`Rule: ${found.name}`);
+                            }
+                          }}
+                        >
+                          {(availableRules || []).map((r) => (
+                            <MenuItem key={r._id} value={r._id}>
+                              ⚡ {r.name} ({r.triggerValue || 'Intent'})
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
                     </Box>
                   )}
 

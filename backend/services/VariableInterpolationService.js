@@ -326,7 +326,20 @@ class VariableInterpolationService {
         '{{coupon_code}}': promotion.couponCode || 'PROMO2025'
       };
 
+      const customerResolvedName = firstName || customer?.displayName || customer?.customFields?.displayName || customer?.customFields?.pushName || customer?.pushName || 'there';
+
       const aliasMap = {
+        '{{customerName}}': customerResolvedName,
+        '{{customername}}': customerResolvedName,
+        '{{CustomerName}}': customerResolvedName,
+        '{{customer_name}}': customerResolvedName,
+        '{{name}}': customerResolvedName,
+        '{{Name}}': customerResolvedName,
+        '{customerName}': customerResolvedName,
+        '{customer_name}': customerResolvedName,
+        '{name}': customerResolvedName,
+        '[Customer Name]': customerResolvedName,
+        '[CustomerName]': customerResolvedName,
         '{{firstname}}': variableMap['{{customer_name}}'],
         '{{first_name}}': variableMap['{{customer_name}}'],
         '{{firstName}}': variableMap['{{customer_name}}'],
@@ -357,6 +370,14 @@ class VariableInterpolationService {
       Object.entries({ ...variableMap, ...aliasMap }).forEach(([placeholder, value]) => {
         result = result.replace(new RegExp(escapeRegExp(placeholder), 'g'), String(value ?? ''));
       });
+
+      // Flexible regex fallback for {{ customerName }} or {customerName} with arbitrary spaces
+      result = result
+        .replace(/\{\{\s*customerName\s*\}\}/gi, customerResolvedName)
+        .replace(/\{\{\s*customer_name\s*\}\}/gi, customerResolvedName)
+        .replace(/\{\{\s*name\s*\}\}/gi, customerResolvedName)
+        .replace(/\{\s*customerName\s*\}/gi, customerResolvedName)
+        .replace(/\{\s*customer_name\s*\}/gi, customerResolvedName);
 
       // CONDITIONAL BLOCKS
       result = this.processConditionalBlocks(result, contextData);
