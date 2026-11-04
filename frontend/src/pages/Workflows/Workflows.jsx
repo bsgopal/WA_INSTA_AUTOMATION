@@ -252,8 +252,12 @@ export default function Workflows() {
     try {
       setLoading(true);
       const response = await apiClient.get('/workflows');
-      setWorkflows(response.data || []);
+      const list = Array.isArray(response.data) 
+        ? response.data 
+        : (Array.isArray(response.data?.workflows) ? response.data.workflows : []);
+      setWorkflows(list);
     } catch (error) {
+      setWorkflows([]);
       setSnackbar({ open: true, message: 'Failed to fetch workflows', severity: 'error' });
       console.error('Failed to fetch workflows:', error);
     } finally {
@@ -264,8 +268,12 @@ export default function Workflows() {
   const fetchCategories = async () => {
     try {
       const response = await apiClient.get('/categories/workflow');
-      setCategories(response.data || []);
+      const list = Array.isArray(response.data) 
+        ? response.data 
+        : (Array.isArray(response.data?.categories) ? response.data.categories : []);
+      setCategories(list);
     } catch (error) {
+      setCategories([]);
       console.error('Failed to fetch categories:', error);
     }
   };
@@ -273,8 +281,12 @@ export default function Workflows() {
   const fetchRules = async () => {
     try {
       const response = await apiClient.get('/response-rules');
-      setRules(response.data || []);
+      const list = Array.isArray(response.data) 
+        ? response.data 
+        : (Array.isArray(response.data?.rules) ? response.data.rules : []);
+      setRules(list);
     } catch (error) {
+      setRules([]);
       console.error('Failed to fetch response rules in Workflows:', error);
     }
   };
@@ -708,12 +720,16 @@ export default function Workflows() {
   };
 
   // Stats calculation
-  const totalCount = workflows.length;
-  const activeCount = workflows.filter(w => w.status === 'ACTIVE').length;
-  const pausedCount = workflows.filter(w => w.status !== 'ACTIVE').length;
-  const totalRuns = workflows.reduce((acc, w) => acc + (w.stats?.successfulExecutions || 0), 0);
+  const safeWorkflows = Array.isArray(workflows) ? workflows : [];
+  const safeRules = Array.isArray(rules) ? rules : [];
+  const safeCategories = Array.isArray(categories) ? categories : [];
 
-  const filteredWorkflows = workflows.filter(w => {
+  const totalCount = safeWorkflows.length;
+  const activeCount = safeWorkflows.filter(w => w.status === 'ACTIVE').length;
+  const pausedCount = safeWorkflows.filter(w => w.status !== 'ACTIVE').length;
+  const totalRuns = safeWorkflows.reduce((acc, w) => acc + (w.stats?.successfulExecutions || 0), 0);
+
+  const filteredWorkflows = safeWorkflows.filter(w => {
     if (selectedCategory && w.category !== selectedCategory) return false;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
@@ -1273,7 +1289,7 @@ export default function Workflows() {
                 </Avatar>
                 <Box>
                   <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>Total Response Rules</Typography>
-                  <Typography variant="h5" sx={{ fontWeight: 800, color: '#0f172a' }}>{rules.length}</Typography>
+                  <Typography variant="h5" sx={{ fontWeight: 800, color: '#0f172a' }}>{safeRules.length}</Typography>
                 </Box>
               </Paper>
             </Grid>
@@ -1284,7 +1300,7 @@ export default function Workflows() {
                 </Avatar>
                 <Box>
                   <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>Active Keyword Responders</Typography>
-                  <Typography variant="h5" sx={{ fontWeight: 800, color: '#16a34a' }}>{rules.filter(r => r.isActive).length}</Typography>
+                  <Typography variant="h5" sx={{ fontWeight: 800, color: '#16a34a' }}>{safeRules.filter(r => r.isActive).length}</Typography>
                 </Box>
               </Paper>
             </Grid>
@@ -1295,7 +1311,7 @@ export default function Workflows() {
                 </Avatar>
                 <Box>
                   <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>Paused / Inactive</Typography>
-                  <Typography variant="h5" sx={{ fontWeight: 800, color: '#ca8a04' }}>{rules.filter(r => !r.isActive).length}</Typography>
+                  <Typography variant="h5" sx={{ fontWeight: 800, color: '#ca8a04' }}>{safeRules.filter(r => !r.isActive).length}</Typography>
                 </Box>
               </Paper>
             </Grid>
@@ -1324,7 +1340,7 @@ export default function Workflows() {
               />
               <Stack direction="row" spacing={1.5} alignItems="center">
                 <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 600 }}>
-                  {rules.filter(r => {
+                  {safeRules.filter(r => {
                     if (!ruleSearchQuery.trim()) return true;
                     const q = ruleSearchQuery.toLowerCase();
                     return (r.name || '').toLowerCase().includes(q) || (r.triggerValue || '').toLowerCase().includes(q);
@@ -1352,7 +1368,7 @@ export default function Workflows() {
           </Paper>
 
           {/* Response Rules Table */}
-          {rules.filter(r => {
+          {safeRules.filter(r => {
             if (!ruleSearchQuery.trim()) return true;
             const q = ruleSearchQuery.toLowerCase();
             return (r.name || '').toLowerCase().includes(q) || (r.triggerValue || '').toLowerCase().includes(q);
@@ -1397,7 +1413,7 @@ export default function Workflows() {
                   </Box>
 
                   {/* Rules Rows */}
-                  {rules
+                  {safeRules
                     .filter(r => {
                       if (!ruleSearchQuery.trim()) return true;
                       const q = ruleSearchQuery.toLowerCase();

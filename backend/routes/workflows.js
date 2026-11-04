@@ -8,13 +8,23 @@ const { body, validationResult } = require('express-validator');
 // ============ GET ALL WORKFLOWS ============
 router.get('/', async (req, res) => {
   try {
-    const workflows = await Workflow.find({ userId: req.user.id })
+    let WorkflowModel = Workflow;
+    try {
+      const { getModel } = require('../middlewares/tenantContext');
+      WorkflowModel = getModel('Workflow');
+    } catch (e) {}
+
+    const query = req.user?.id 
+      ? { $or: [{ userId: req.user.id }, { userId: { $exists: false } }, { customerCode: req.customerCode }] } 
+      : {};
+
+    const workflows = await WorkflowModel.find(query)
       .sort({ createdAt: -1 });
 
-    res.json(workflows);
+    res.json(Array.isArray(workflows) ? workflows : []);
   } catch (error) {
     console.error('Get Workflows Error:', error);
-    res.status(500).json({ error: 'Failed to fetch workflows' });
+    res.status(500).json({ error: 'Failed to fetch workflows', workflows: [] });
   }
 });
 
