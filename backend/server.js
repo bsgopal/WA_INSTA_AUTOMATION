@@ -396,14 +396,16 @@ app.get('/api/tenant/screens', async (req, res) => {
               await config.save();
             }
           }
-        if (client && client.licenseStatus === 'active') {
-          let validEnd = client.licenseEnd;
-          if (!validEnd || new Date(validEnd) <= new Date()) {
-            validEnd = new Date(Date.now() + 365 * 24 * 3600 * 1000);
-          }
-          if (license && (!license.licenseEnd || new Date(license.licenseEnd) <= new Date())) {
-            license.licenseEnd = validEnd;
-            try { await license.save(); } catch (e) {}
+
+          if (client && client.licenseStatus === 'active') {
+            let validEnd = client.licenseEnd;
+            if (!validEnd || new Date(validEnd) <= new Date()) {
+              validEnd = new Date(Date.now() + 365 * 24 * 3600 * 1000);
+            }
+            if (license && (!license.licenseEnd || new Date(license.licenseEnd) <= new Date())) {
+              license.licenseEnd = validEnd;
+              try { await license.save(); } catch (e) {}
+            }
           }
         }
       } catch (err) {

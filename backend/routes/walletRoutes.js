@@ -1,4 +1,4 @@
-﻿const express = require('express');
+const express = require('express');
 const router = express.Router();
 const axios = require('axios');
 const License = require('../models/License');
@@ -18,6 +18,59 @@ const formatIstTimestamp = (d = new Date()) => {
 };
 
 /**
+ * Helper to sync real ledger transactions from Renic Soft HQ
+ */
+async function syncWalletTransactionsFromHq(customerCode, renicClientId) {
+  const cleanCode = (customerCode || '').toLowerCase().trim();
+  try {
+    let clientId = renicClientId;
+    if (!clientId) {
+      const hqRes = await axios.get(`${RENIC_HQ_URL}/api/wallet/client/${cleanCode}`, { timeout: 2500 });
+      if (hqRes.data && hqRes.data.success && hqRes.data.client?._id) {
+        clientId = hqRes.data.client._id;
+      }
+    }
+    if (!clientId) return;
+
+    const ledgerRes = await axios.get(`${RENIC_HQ_URL}/api/wallet/${clientId}/ledger?limit=200`, { timeout: 3500 });
+    if (ledgerRes.data && ledgerRes.data.success && Array.isArray(ledgerRes.data.transactions)) {
+      for (const t of ledgerRes.data.transactions) {
+        const txnId = t.referenceId || String(t._id);
+        let type = 'MANUAL_ADJUSTMENT';
+        if (t.transactionType === 'RECHARGE') type = 'RECHARGE';
+        else if (t.transactionType === 'USAGE_DEDUCTION') type = 'MESSAGE_CONSUMPTION';
+        else if (t.transactionType === 'REFUND') type = 'REFUND';
+
+        await WalletTransaction.updateOne(
+          { transactionId: txnId },
+          {
+            $set: {
+              transactionId: txnId,
+              customerCode: (t.customerCode || cleanCode || 'apx-wa01').toLowerCase().trim(),
+              type,
+              amount: Math.abs(t.amount || 0),
+              messagesCount: Math.abs(t.messagesCount || 0),
+              messageRate: t.ratePerMessage || 0.90,
+              balanceBefore: t.balanceBefore !== undefined ? t.balanceBefore : 0,
+              balanceAfter: t.balanceAfter !== undefined ? t.balanceAfter : 0,
+              description: t.description || '',
+              referenceId: t.referenceId || '',
+              performedBy: t.performedBy || { name: 'Admin', role: 'SUPER_ADMIN' },
+              status: 'SUCCESS',
+              timestampIst: t.formattedTimestamp || (t.createdAt ? formatIstTimestamp(new Date(t.createdAt)) : formatIstTimestamp()),
+              createdAt: new Date(t.createdAt || Date.now())
+            }
+          },
+          { upsert: true }
+        );
+      }
+    }
+  } catch (err) {
+    // HQ unreachable or sync error - gracefully continue
+  }
+}
+
+/**
  * Helper to get or sync active client license
  */
 async function getClientLicense(customerCode) {
@@ -31,23 +84,28 @@ async function getClientLicense(customerCode) {
 
   // Try sync with Renic Soft HQ if available
   try {
-    const hqRes = await axios.get(`${RENIC_HQ_URL}/api/wallet/client/${cleanCode}`, { timeout: 2000 });
+    const hqRes = await axios.get(`${RENIC_HQ_URL}/api/wallet/client/${cleanCode}`, { timeout: 2500 });
     if (hqRes.data && hqRes.data.success && hqRes.data.wallet) {
       const hqW = hqRes.data.wallet;
+      const hqClient = hqRes.data.client || {};
       if (!license) {
         license = new License({
           key: `RENIC-AUTO-${Date.now()}`,
           email: `${cleanCode}@renic.store`,
-          firstName: hqRes.data.client?.name || cleanCode,
+          firstName: hqClient.name || cleanCode,
           lastName: 'Client',
-          phone: hqRes.data.client?.mobile || '9345578103',
-          companyName: hqRes.data.client?.name || cleanCode,
+          phone: hqClient.mobile || '9345578103',
+          companyName: hqClient.name || cleanCode,
           customerCode: cleanCode,
           walletBalance: Number(hqW.balance || 0),
           messageRate: Number(hqW.messageRate || 0.90),
           availableCredits: Number(hqW.availableCredits || 0),
           allowWithoutBalance: !!hqW.allowWithoutBalance,
-          lowBalanceThreshold: Number(hqW.lowBalanceThreshold || 200)
+          lowBalanceThreshold: Number(hqW.lowBalanceThreshold || 200),
+          totalRecharged: Number(hqW.totalRecharged || 0),
+          totalSpent: Number(hqW.totalSpent || 0),
+          totalMessagesSent: Number(hqW.totalMessagesSent || 0),
+          renicClientId: hqClient._id ? String(hqClient._id) : undefined
         });
       } else {
         license.walletBalance = Number(hqW.balance || 0);
@@ -55,8 +113,15 @@ async function getClientLicense(customerCode) {
         license.availableCredits = Number(hqW.availableCredits || 0);
         license.allowWithoutBalance = !!hqW.allowWithoutBalance;
         license.lowBalanceThreshold = Number(hqW.lowBalanceThreshold || 200);
+        license.totalRecharged = Number(hqW.totalRecharged || 0);
+        license.totalSpent = Number(hqW.totalSpent || 0);
+        license.totalMessagesSent = Number(hqW.totalMessagesSent || 0);
+        if (hqClient._id) license.renicClientId = String(hqClient._id);
       }
       await license.save();
+
+      // Trigger transaction sync in background
+      syncWalletTransactionsFromHq(cleanCode, hqClient._id).catch(() => {});
     }
   } catch (e) {
     // HQ offline or unreachable, use local DB
@@ -120,6 +185,11 @@ router.get('/status', async (req, res) => {
         totalMessagesSent = s.totalMessages;
       }
     });
+
+    // Fallback to license synced values from Renic HQ if local aggregation is empty
+    if (!totalRecharged && license.totalRecharged) totalRecharged = license.totalRecharged;
+    if (!totalSpent && license.totalSpent) totalSpent = license.totalSpent;
+    if (!totalMessagesSent && license.totalMessagesSent) totalMessagesSent = license.totalMessagesSent;
 
     res.json({
       success: true,
@@ -236,11 +306,31 @@ router.get('/transactions', async (req, res) => {
     const customerCode = req.customerCode || req.clientId || req.query.clientId || 'apx-wa01';
     const { type, page = 1, limit = 50 } = req.query;
 
+    const cleanCode = (customerCode || 'apx-wa01').toLowerCase().trim();
+
+    // Ensure local database has real transactions synced from Renic Soft HQ
+    try {
+      await syncWalletTransactionsFromHq(cleanCode);
+    } catch (e) {
+      // Continue even if sync failed
+    }
+
     const query = {
-      customerCode: (customerCode || '').toLowerCase().trim()
+      $or: [
+        { customerCode: cleanCode },
+        { customerCode: 'apx-wa01' }
+      ]
     };
     if (type && type !== 'ALL') {
-      query.type = type;
+      if (type === 'RECHARGE') {
+        query.type = 'RECHARGE';
+      } else if (type === 'MESSAGE_CONSUMPTION') {
+        query.type = 'MESSAGE_CONSUMPTION';
+      } else if (type === 'MANUAL_ADJUSTMENT') {
+        query.type = { $in: ['MANUAL_ADJUSTMENT', 'ADJUSTMENT_CREDIT', 'ADJUSTMENT_DEBIT'] };
+      } else {
+        query.type = type;
+      }
     }
 
     const total = await WalletTransaction.countDocuments(query);

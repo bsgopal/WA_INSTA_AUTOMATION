@@ -199,7 +199,7 @@ export default function Wallet() {
   });
 
   return (
-    <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 1400, mx: 'auto' }}>
+    <Box sx={{ p: { xs: 1.5, sm: 2.5, md: 3 }, width: '100%', maxWidth: 'none', mx: 0 }}>
       {/* Header */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 2 }}>
         <Box>
@@ -489,6 +489,12 @@ export default function Wallet() {
               color={typeFilter === 'MESSAGE_CONSUMPTION' ? 'error' : 'default'}
               onClick={() => setTypeFilter('MESSAGE_CONSUMPTION')}
             />
+            <Chip
+              label="Admin / Policy Audit"
+              clickable
+              color={typeFilter === 'MANUAL_ADJUSTMENT' ? 'info' : 'default'}
+              onClick={() => setTypeFilter('MANUAL_ADJUSTMENT')}
+            />
           </Box>
         </Box>
 
@@ -521,35 +527,58 @@ export default function Wallet() {
                 </TableRow>
               ) : (
                 filteredTransactions.map((row) => {
-                  const isCredit = row.type === 'RECHARGE' || row.type === 'REFUND';
+                  const isRecharge = row.type === 'RECHARGE';
+                  const isRefund = row.type === 'REFUND';
+                  const isAudit = row.type === 'MANUAL_ADJUSTMENT' || row.type === 'ADJUSTMENT_CREDIT' || row.type === 'ADJUSTMENT_DEBIT' || Number(row.amount) === 0;
+                  const isCredit = isRecharge || isRefund;
+
+                  let typeLabel = 'Message Send';
+                  let chipColor = 'error';
+                  if (isRecharge) {
+                    typeLabel = 'Top-Up';
+                    chipColor = 'success';
+                  } else if (isRefund) {
+                    typeLabel = 'Refund';
+                    chipColor = 'info';
+                  } else if (isAudit) {
+                    typeLabel = 'Policy / Audit';
+                    chipColor = 'default';
+                  }
+
+                  const numAmt = Math.abs(Number(row.amount || 0));
+                  const amountDisplay = Number(row.amount) === 0 ? '₹0.00' : (isCredit ? `+₹${numAmt.toFixed(2)}` : `-₹${numAmt.toFixed(2)}`);
+
+                  const numMsgs = Math.abs(Number(row.messagesCount || 0));
+                  const msgsDisplay = Number(row.messagesCount) === 0 ? '0' : (isCredit ? `+${numMsgs}` : `-${numMsgs}`);
+
                   return (
                     <TableRow key={row._id || row.transactionId} hover>
-                      <TableCell sx={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '0.85rem' }}>
+                      <TableCell sx={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '0.82rem' }}>
                         {row.transactionId}
                       </TableCell>
-                      <TableCell sx={{ whiteSpace: 'nowrap', fontSize: '0.85rem' }}>
+                      <TableCell sx={{ whiteSpace: 'nowrap', fontSize: '0.82rem' }}>
                         {row.timestampIst || (row.createdAt ? new Date(row.createdAt).toLocaleString('en-IN') : '-')}
                       </TableCell>
                       <TableCell>
                         <Chip
-                          icon={isCredit ? <ArrowUpwardIcon fontSize="small" /> : <ArrowDownwardIcon fontSize="small" />}
-                          label={row.type === 'RECHARGE' ? 'Top-Up' : row.type === 'REFUND' ? 'Refund' : 'Message Send'}
+                          icon={isCredit ? <ArrowUpwardIcon fontSize="small" /> : isAudit ? <SecurityIcon fontSize="small" /> : <ArrowDownwardIcon fontSize="small" />}
+                          label={typeLabel}
                           size="small"
-                          color={isCredit ? 'success' : 'error'}
+                          color={chipColor}
                           variant="outlined"
                           sx={{ fontWeight: 700, fontSize: '0.75rem' }}
                         />
                       </TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 700, color: isCredit ? 'success.main' : 'error.main' }}>
-                        {isCredit ? `+₹${Number(row.amount).toFixed(2)}` : `-₹${Number(row.amount).toFixed(2)}`}
+                      <TableCell align="right" sx={{ fontWeight: 700, color: Number(row.amount) === 0 ? 'text.secondary' : isCredit ? 'success.main' : 'error.main' }}>
+                        {amountDisplay}
                       </TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 600 }}>
-                        {isCredit ? `+${row.messagesCount || 0}` : `-${row.messagesCount || 1}`}
+                      <TableCell align="right" sx={{ fontWeight: 600, color: Number(row.messagesCount) === 0 ? 'text.secondary' : isCredit ? 'success.main' : 'error.main' }}>
+                        {msgsDisplay}
                       </TableCell>
                       <TableCell align="right" sx={{ fontWeight: 700 }}>
                         ₹{Number(row.balanceAfter || 0).toFixed(2)}
                       </TableCell>
-                      <TableCell sx={{ maxWidth: 300, fontSize: '0.85rem', color: 'text.secondary' }}>
+                      <TableCell sx={{ maxWidth: 350, fontSize: '0.82rem', color: 'text.secondary' }}>
                         {row.description || '-'}
                       </TableCell>
                       <TableCell>
