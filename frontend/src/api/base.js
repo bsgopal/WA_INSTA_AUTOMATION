@@ -3,20 +3,20 @@
 const win = typeof window !== 'undefined' ? window : {};
 let envBase = import.meta.env.VITE_API_URL ? String(import.meta.env.VITE_API_URL).trim() : '';
 
-// GUARD: If VITE_API_URL was accidentally set to the WAHA container on Railway,
-// route API traffic to the actual Renic Automation backend API instead!
-if (envBase.includes('railway.app') || envBase.includes('devlikeaprowaha') || envBase.includes(':3000')) {
-  console.warn('⚠️ [API Gateway] Detected Railway WAHA URL in VITE_API_URL. Correcting API base to Renic Automation backend.');
-  envBase = 'https://wa-insta-automation.vercel.app/api';
-}
-
-// In production web environments (e.g. hosted on Vercel), default to the production backend
+// In production web environments (e.g. hosted on Vercel or custom domain), default to current origin
 const isProductionWeb = typeof window !== 'undefined' && 
   window.location.hostname !== 'localhost' && 
   window.location.hostname !== '127.0.0.1';
 
-const defaultBase = isProductionWeb ? 'https://wa-insta-automation.vercel.app/api' : 'http://localhost:5000/api';
-const defaultOrigin = isProductionWeb ? 'https://wa-insta-automation.vercel.app' : 'http://localhost:5000';
+const defaultBase = isProductionWeb ? `${window.location.origin}/api` : 'http://localhost:5000/api';
+const defaultOrigin = isProductionWeb ? window.location.origin : 'http://localhost:5000';
+
+// GUARD: If VITE_API_URL was accidentally set to a standalone WAHA container (e.g. port 3000 or devlikeaprowaha),
+// route frontend API traffic to the actual Renic Automation backend API instead!
+if (envBase && (envBase.includes('devlikeaprowaha') || (envBase.includes('waha') && !envBase.includes('/api')) || (envBase.includes(':3000') && !envBase.includes(':5000')))) {
+  console.warn('⚠️ [API Gateway] Detected WAHA container URL in VITE_API_URL. Correcting API base to Renic Automation backend.');
+  envBase = defaultBase;
+}
 
 export const API_BASE =
   win.renicAPI?.apiBase ||

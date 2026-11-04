@@ -65,6 +65,7 @@ export const TenantProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   const fetchingRef = useRef(false);
+  const initialLoadRef = useRef(true);
 
   const setItemIfChanged = (key, val) => {
     try {
@@ -78,7 +79,9 @@ export const TenantProvider = ({ children }) => {
     if (fetchingRef.current) return;
     fetchingRef.current = true;
     try {
-      setLoading(true);
+      if (initialLoadRef.current) {
+        setLoading(true);
+      }
       const activeCode = resolveCustomerCode() || localStorage.getItem('customerCode') || 'apx-wa01';
       const res = await apiClient.get('/tenant/screens', {
         params: activeCode ? { customerCode: activeCode } : {}
@@ -149,6 +152,7 @@ export const TenantProvider = ({ children }) => {
       console.warn('[TenantContext] Error fetching tenant screens:', err?.message);
     } finally {
       setLoading(false);
+      initialLoadRef.current = false;
       fetchingRef.current = false;
     }
   }, []);

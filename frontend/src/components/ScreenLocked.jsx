@@ -39,7 +39,11 @@ export default function ScreenLocked({ isOauthLock = false, isLicenseLock = fals
     }
   }, [oauthStatus?.clientId, oauthStatus?.clientSecret]);
 
+  const autoRecoverAttemptedRef = React.useRef(false);
+
   const handleAutoRecover = async () => {
+    if (autoRecoverAttemptedRef.current) return false;
+    autoRecoverAttemptedRef.current = true;
     try {
       setVerifying(true);
       setErrorMsg('');
