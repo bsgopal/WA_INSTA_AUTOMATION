@@ -61,6 +61,7 @@ export const TenantProvider = ({ children }) => {
   const [licenseActive, setLicenseActive] = useState(() => localStorage.getItem('wa_license_active') !== 'false');
   const [licenseRequired, setLicenseRequired] = useState(() => localStorage.getItem('wa_license_required') === 'true');
   const [isLocked, setIsLocked] = useState(() => localStorage.getItem('wa_is_locked') === 'true');
+  const [allowWithoutBalance, setAllowWithoutBalance] = useState(() => localStorage.getItem('wa_allow_without_balance') === 'true');
   const [loading, setLoading] = useState(false);
 
   const fetchingRef = useRef(false);
@@ -138,6 +139,10 @@ export const TenantProvider = ({ children }) => {
         if (res.data.isLocked !== undefined) {
           setIsLocked(Boolean(res.data.isLocked));
           setItemIfChanged('wa_is_locked', String(res.data.isLocked));
+        }
+        if (res.data.allowWithoutBalance !== undefined) {
+          setAllowWithoutBalance(Boolean(res.data.allowWithoutBalance));
+          setItemIfChanged('wa_allow_without_balance', String(res.data.allowWithoutBalance));
         }
       }
     } catch (err) {
@@ -217,6 +222,10 @@ export const TenantProvider = ({ children }) => {
               setIsLocked(Boolean(data.isLocked));
               setItemIfChanged('wa_is_locked', String(data.isLocked));
             }
+            if (data && data.allowWithoutBalance !== undefined) {
+              setAllowWithoutBalance(Boolean(data.allowWithoutBalance));
+              setItemIfChanged('wa_allow_without_balance', String(data.allowWithoutBalance));
+            }
           } catch (e) {}
         };
       } catch (e) {
@@ -254,6 +263,7 @@ export const TenantProvider = ({ children }) => {
       oauthEnforced,
       oauthStatus,
       isOauthLocked,
+      allowWithoutBalance,
       setOauthStatus,
       refreshScreens: fetchScreens,
       loading
@@ -280,7 +290,7 @@ export const useTenant = () => useContext(TenantContext) || {
   oauthEnforced: false,
   oauthStatus: { configured: false, verified: false, clientId: '' },
   isOauthLocked: false,
+  allowWithoutBalance: false,
   setOauthStatus: () => {},
-  refreshScreens: () => {},
   loading: false
 };

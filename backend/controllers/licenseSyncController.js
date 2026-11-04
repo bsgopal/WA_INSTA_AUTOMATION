@@ -97,6 +97,11 @@ exports.receiveLicensePush = async (req, res) => {
         licenseEnd: licenseEnd ? new Date(licenseEnd) : new Date(Date.now() + 90 * 24 * 3600 * 1000),
         featurePermissions: mergedPermissions,
         limits,
+        walletBalance: req.body.walletBalance !== undefined ? Number(req.body.walletBalance) : 0,
+        messageRate: req.body.messageRate !== undefined ? Number(req.body.messageRate) : 0.90,
+        availableCredits: req.body.availableCredits !== undefined ? Number(req.body.availableCredits) : 0,
+        allowWithoutBalance: req.body.allowWithoutBalance !== undefined ? !!req.body.allowWithoutBalance : false,
+        lowBalanceThreshold: req.body.lowBalanceThreshold !== undefined ? Number(req.body.lowBalanceThreshold) : 200,
         isUsed: true,
         lastSyncAt: new Date()
       });

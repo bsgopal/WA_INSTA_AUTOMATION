@@ -436,6 +436,8 @@ app.get('/api/tenant/screens', async (req, res) => {
       solutionMode: config?.solutionMode || 'standalone',
       solutionModes: config?.solutionModes || ['standalone'],
       customTerminology: config?.customTerminology || {},
+      allowWithoutBalance: !!license?.allowWithoutBalance,
+      walletBalance: Number(license?.walletBalance || 0),
       customerCode: (license?.customerCode || config?.customerCode || req.customerCode || '').toLowerCase()
     });
   } catch (err) {
@@ -778,6 +780,31 @@ app.post('/api/tenant/sync-push', async (req, res) => {
     console.error('[WA_INSTA OTA Live Push] DB update error:', e.message);
   }
 
+  // Synchronize Live License Wallet State
+  let liveAllowWithoutBalance = req.body.allowWithoutBalance;
+  try {
+    const License = require('./models/License');
+    const targetCode = (customerCode || req.customerCode || '').trim().toLowerCase();
+    let lic = await License.findOne({
+      $or: [
+        { customerCode: targetCode },
+        { subdomain: targetCode }
+      ]
+    });
+    if (!lic) lic = await License.findOne().sort({ createdAt: -1 });
+    if (lic) {
+      if (req.body.allowWithoutBalance !== undefined) lic.allowWithoutBalance = !!req.body.allowWithoutBalance;
+      if (req.body.walletBalance !== undefined) lic.walletBalance = Number(req.body.walletBalance);
+      if (req.body.messageRate !== undefined) lic.messageRate = Number(req.body.messageRate);
+      if (req.body.availableCredits !== undefined) lic.availableCredits = Number(req.body.availableCredits);
+      lic.lastSyncAt = new Date();
+      await lic.save();
+      liveAllowWithoutBalance = !!lic.allowWithoutBalance;
+    }
+  } catch (e) {
+    console.warn('[sync-push] License wallet sync warning:', e.message);
+  }
+
   const oauthStatus = await getOauthStatus(customerCode || req.customerCode);
   broadcastTenantUpdate({
     type: 'PERMISSIONS_UPDATED',
@@ -790,6 +817,8 @@ app.post('/api/tenant/sync-push', async (req, res) => {
     solutionMode: solutionMode || config?.solutionMode || 'standalone',
     solutionModes: solutionModes || config?.solutionModes || ['standalone'],
     customTerminology: customTerminology || config?.customTerminology || {},
+    allowWithoutBalance: liveAllowWithoutBalance !== undefined ? !!liveAllowWithoutBalance : undefined,
+    walletBalance: req.body.walletBalance !== undefined ? Number(req.body.walletBalance) : undefined,
     customerCode: (customerCode || config?.customerCode || req.customerCode || '').toLowerCase()
   });
 
