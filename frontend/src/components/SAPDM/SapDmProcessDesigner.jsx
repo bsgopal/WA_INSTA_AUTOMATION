@@ -2853,13 +2853,13 @@ function getDefaultConfigForType(type) {
       };
     case 'SEND_TEXT':
       return {
-        message: 'Namaste! How can we assist you today?',
-        buttons: [{ id: 'b1', title: '1. Catalog' }, { id: 'b2', title: '2. Talk to Agent' }]
+        message: 'Hello! How can we assist you today?',
+        buttons: [{ id: 'b1', title: '1. Services' }, { id: 'b2', title: '2. Talk to Agent' }]
       };
     case 'QUICK_REPLY':
       return {
         message: 'Please select an option below:',
-        buttons: [{ id: 'b1', title: '1. Jewelry' }, { id: 'b2', title: '2. Support' }]
+        buttons: [{ id: 'b1', title: '1. Services' }, { id: 'b2', title: '2. Support' }]
       };
     case 'ASK_DATA':
       return { question: 'Please enter your delivery address:', saveField: 'address' };
@@ -2868,7 +2868,7 @@ function getDefaultConfigForType(type) {
     case 'AI_SCRIPT':
       return { aiPrompt: 'Help customer with product recommendations and details.' };
     case 'CATALOG':
-      return { catalogUrl: 'https://renicjewels.com/catalog', message: 'Here is our full product catalog!' };
+      return { catalogUrl: 'https://renic.store/catalog', message: 'Here is our full product catalog!' };
     default:
       return {};
   }
