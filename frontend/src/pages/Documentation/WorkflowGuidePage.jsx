@@ -69,7 +69,7 @@ export default function WorkflowGuidePage() {
       </Box>
 
       <Box sx={{ flex: 1, py: 3, pb: 8 }}>
-        <Container maxWidth="lg">
+        <Container maxWidth={false} sx={{ maxWidth: '100%', px: { xs: 2, sm: 3 } }}>
           <WorkflowDocumentationGuide inModal={false} />
         </Container>
       </Box>

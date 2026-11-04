@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Typography, Box, Paper, Divider, Button, Stack, Chip } from '@mui/material';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
@@ -87,6 +87,7 @@ export default function Dashboard() {
     responseRate: 0
   });
   const [activities, setActivities] = useState([]);
+  const [timeline, setTimeline] = useState([]);
 
   useEffect(() => {
     fetchDashboardStats();
@@ -94,19 +95,19 @@ export default function Dashboard() {
 
   const fetchDashboardStats = async () => {
     try {
-      const [customersRes, campaignsRes, statsRes, messagesRes] = await Promise.all([
+      const [customersRes, campaignsRes, overviewRes, messagesRes, timelineRes] = await Promise.all([
         apiClient.get('/customers?limit=1').catch(() => ({ data: { pagination: { total: 0 } } })),
         apiClient.get('/campaigns').catch(() => ({ data: { campaigns: [] } })),
-        apiClient.get('/ai-chat/dashboard-stats').catch(() => ({ data: { stats: {} } })),
-        apiClient.get('/messages?limit=6').catch(() => ({ data: { messages: [] } }))
+        apiClient.get('/analytics/dashboard').catch(() => ({ data: { overview: {} } })),
+        apiClient.get('/messages?limit=10').catch(() => ({ data: { messages: [] } })),
+        apiClient.get('/analytics/engagement/timeline?days=7').catch(() => ({ data: [] }))
       ]);
 
-      const totalCustomers = customersRes.data.pagination?.total || statsRes.data.stats?.totalCustomers || 0;
-      const activeCampaigns = campaignsRes.data.campaigns?.filter(c => c.status === 'RUNNING').length || statsRes.data.stats?.activeCampaigns || 0;
-      const messagesSent = statsRes.data.stats?.messagestoday || 0;
-      const responseRate = statsRes.data.stats?.totalConversations > 0 
-        ? Math.round((statsRes.data.stats?.hotLeadsCount / statsRes.data.stats?.totalConversations) * 100) 
-        : 84;
+      const ov = overviewRes.data?.overview || {};
+      const totalCustomers = customersRes.data.pagination?.total || ov.totalCustomers || 0;
+      const activeCampaigns = campaignsRes.data.campaigns?.filter(c => c.status === 'RUNNING').length || ov.activeCampaigns || 0;
+      const messagesSent = ov.messagesSent || 0;
+      const responseRate = Number(ov.responseRate || 0);
 
       setStats({
         totalCustomers,
@@ -115,21 +116,19 @@ export default function Dashboard() {
         responseRate
       });
 
-      const recentMessages = messagesRes.data.messages || [];
+      setTimeline(Array.isArray(timelineRes.data) ? timelineRes.data : []);
+
+      const recentMessages = messagesRes.data?.messages || [];
       if (recentMessages.length > 0) {
         const mapped = recentMessages.map(msg => ({
-          type: msg.aiGenerated ? 'MESSAGE_SENT' : 'CUSTOMER_ADDED',
-          title: msg.aiGenerated ? 'AI Smart Reply' : 'Incoming Lead Message',
-          description: `"${msg.content.substring(0, 40)}${msg.content.length > 40 ? '...' : ''}"`,
-          createdAt: msg.createdAt
+          type: msg.direction === 'INBOUND' ? 'CUSTOMER_ADDED' : 'MESSAGE_SENT',
+          title: msg.direction === 'INBOUND' ? 'Inbound Customer Lead' : (msg.aiGenerated ? 'AI Smart Reply' : 'Outbound WhatsApp Dispatch'),
+          description: `"${msg.content ? (msg.content.substring(0, 42) + (msg.content.length > 42 ? '...' : '')) : '[Media / Document]'}"`,
+          createdAt: msg.createdAt || new Date()
         }));
         setActivities(mapped);
       } else {
-        setActivities([
-          { type: 'CUSTOMER_ADDED', title: 'New Customer Lead', description: 'Lead inquiry received from catalog showcase.', createdAt: new Date() },
-          { type: 'CAMPAIGN_LAUNCHED', title: 'Mega Savings Broadcast', description: 'WhatsApp promotional campaign dispatched successfully.', createdAt: new Date(Date.now() - 3600000) },
-          { type: 'MESSAGE_SENT', title: 'AI Automation Dispatch', description: 'Automated product catalog response delivered.', createdAt: new Date(Date.now() - 7200000) }
-        ]);
+        setActivities([]);
       }
     } catch (error) {
       console.error('Failed to fetch dashboard stats:', error);
@@ -349,7 +348,7 @@ export default function Dashboard() {
             </Box>
             <Divider sx={{ mb: 1, borderColor: '#f1f5f9' }} />
             <Box sx={{ width: '100%', flexGrow: 1, minHeight: 0, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-              <EngagementChart />
+              <EngagementChart timeline={timeline} />
             </Box>
           </Paper>
         </Box>
@@ -359,7 +358,7 @@ export default function Dashboard() {
             height: '100%', 
             width: '100%',
             display: 'flex', 
-            flexDirection: 'column',
+            flexDirection: 'column', 
             backgroundColor: '#ffffff',
             border: '1px solid #e2e8f0',
             borderRadius: '8px',
@@ -383,8 +382,16 @@ export default function Dashboard() {
               '&::-webkit-scrollbar-thumb': { background: '#cbd5e1', borderRadius: '4px' }
             }}>
               {activities.length === 0 ? (
-                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: '#94a3b8' }}>
-                  <Typography variant="caption">No recent activity</Typography>
+                <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '100%', py: 4, px: 2, textAlign: 'center' }}>
+                  <Box sx={{ width: 34, height: 34, borderRadius: '8px', bgcolor: 'rgba(132, 204, 22, 0.12)', color: '#4d7c0f', display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1, fontSize: '1rem' }}>
+                    ⚡
+                  </Box>
+                  <Typography sx={{ fontWeight: 700, fontSize: '0.78rem', color: '#64748b' }}>
+                    No recent platform activity
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.68rem', mt: 0.3, maxWidth: 220 }}>
+                    Live broadcasts and customer messages will stream here in real time.
+                  </Typography>
                 </Box>
               ) : (
                 <Stack spacing={1}>
@@ -432,7 +439,7 @@ export default function Dashboard() {
   );
 }
 
-const EngagementChart = () => {
+const EngagementChart = ({ timeline = [] }) => {
   const [hoveredIdx, setHoveredIdx] = useState(null);
   const containerRef = useRef(null);
   const [size, setSize] = useState({ width: 800, height: 300 });
@@ -448,15 +455,30 @@ const EngagementChart = () => {
     return () => observer.disconnect();
   }, []);
 
-  const dataset = [
-    { label: 'Mon', count: 42 },
-    { label: 'Tue', count: 58 },
-    { label: 'Wed', count: 86 },
-    { label: 'Thu', count: 72 },
-    { label: 'Fri', count: 110 },
-    { label: 'Sat', count: 154 },
-    { label: 'Sun', count: 132 }
-  ];
+  const dataset = useMemo(() => {
+    const days = [];
+    const timelineMap = {};
+    if (Array.isArray(timeline)) {
+      timeline.forEach(t => {
+        if (t.date) timelineMap[t.date] = (t.sent || 0) + (t.delivered || 0) || t.count || 0;
+        else if (t._id?.date) timelineMap[t._id.date] = t.count || 0;
+      });
+    }
+
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const isoDate = d.toISOString().split('T')[0];
+      const dayLabel = dayNames[d.getDay()];
+      days.push({
+        label: dayLabel,
+        fullDate: isoDate,
+        count: timelineMap[isoDate] || 0
+      });
+    }
+    return days;
+  }, [timeline]);
 
   const width = size.width;
   const height = size.height;
@@ -467,7 +489,8 @@ const EngagementChart = () => {
 
   const chartWidth = Math.max(width - paddingLeft - paddingRight, 100);
   const chartHeight = Math.max(height - paddingTop - paddingBottom, 100);
-  const maxVal = Math.max(...dataset.map(d => d.count)) * 1.15;
+  const rawMax = Math.max(...dataset.map(d => d.count), 0);
+  const maxVal = Math.max(rawMax, 10) * 1.15;
 
   const points = dataset.map((d, i) => {
     const x = paddingLeft + (i * (chartWidth / (dataset.length - 1)));

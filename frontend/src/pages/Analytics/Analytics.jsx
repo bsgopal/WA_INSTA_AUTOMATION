@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Typography, Box, Paper, Grid, Card, CardContent, Stack,
   Select, MenuItem, FormControl, InputLabel, Divider,
@@ -409,15 +409,17 @@ const TimelineChart = ({ data = [] }) => {
     return () => observer.disconnect();
   }, []);
 
-  const chartData = data.length > 0 ? data : [
-    { _id: 'Day 1', sent: 12, delivered: 10 },
-    { _id: 'Day 2', sent: 19, delivered: 18 },
-    { _id: 'Day 3', sent: 24, delivered: 22 },
-    { _id: 'Day 4', sent: 20, delivered: 18 },
-    { _id: 'Day 5', sent: 35, delivered: 33 },
-    { _id: 'Day 6', sent: 48, delivered: 46 },
-    { _id: 'Day 7', sent: 62, delivered: 60 }
-  ];
+  const chartData = useMemo(() => {
+    if (Array.isArray(data) && data.length > 0) return data;
+    const res = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const iso = d.toISOString().split('T')[0];
+      res.push({ _id: iso, date: iso, sent: 0, delivered: 0 });
+    }
+    return res;
+  }, [data]);
 
   const width = size.width;
   const height = size.height;
