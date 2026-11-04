@@ -66,22 +66,22 @@ async function tenantResolver(req, res, next) {
     req.url = pathMatch[2];
   }
 
-  // 2. Check custom headers
+  // 2. Check custom headers (prioritize customer/tenant code)
   if (!customerCode) {
-    const headerCode = req.headers['x-client-id'] || req.headers['x-customer-code'] || req.headers['x-tenant-code'] || req.headers['x-tenant-id'] || req.headers['client-id'] || req.headers['tenant-id'];
+    const headerCode = req.headers['x-customer-code'] || req.headers['x-tenant-code'] || req.headers['x-client-id'] || req.headers['x-tenant-id'] || req.headers['client-id'] || req.headers['tenant-id'];
     if (headerCode) {
       customerCode = String(headerCode).trim().toLowerCase();
     }
   }
 
-  // 3. Check query parameters (?clientId=apx-wa01 or ?customerCode=apx-wa01)
-  if (!customerCode && (req.query?.clientId || req.query?.client_id || req.query?.customerCode || req.query?.tenant || req.query?.tenantId)) {
-    customerCode = String(req.query.clientId || req.query.client_id || req.query.customerCode || req.query.tenant || req.query.tenantId).trim().toLowerCase();
+  // 3. Check query parameters (?customerCode=apx-wa01 or ?clientId=apx-wa01)
+  if (!customerCode && (req.query?.customerCode || req.query?.tenant || req.query?.clientId || req.query?.client_id || req.query?.tenantId)) {
+    customerCode = String(req.query.customerCode || req.query.tenant || req.query.clientId || req.query.client_id || req.query.tenantId).trim().toLowerCase();
   }
 
   // 4. Check request body if parsed
-  if (!customerCode && req.body && (req.body.clientId || req.body.customerCode || req.body.tenantId || req.body.client_id)) {
-    customerCode = String(req.body.clientId || req.body.customerCode || req.body.tenantId || req.body.client_id).trim().toLowerCase();
+  if (!customerCode && req.body && (req.body.customerCode || req.body.clientId || req.body.tenantId || req.body.client_id)) {
+    customerCode = String(req.body.customerCode || req.body.clientId || req.body.tenantId || req.body.client_id).trim().toLowerCase();
   }
 
   // 5. Check Bearer JWT token
@@ -114,6 +114,10 @@ async function tenantResolver(req, res, next) {
                         rawHost.endsWith('.ngrok.io') ||
                         rawHost.endsWith('.ngrok-free.app') ||
                         rawHost.endsWith('.ngrok-free.dev') ||
+                        rawHost.endsWith('.loca.lt') ||
+                        rawHost.endsWith('.azurewebsites.net') ||
+                        rawHost.endsWith('.herokuapp.com') ||
+                        rawHost.endsWith('.fly.dev') ||
                         rawHost.includes('localhost') || 
                         rawHost.includes('127.0.0.1');
 
@@ -126,7 +130,7 @@ async function tenantResolver(req, res, next) {
       } else if (parts.length >= 2 && !knownAppSlugs.includes(parts[0])) {
         sub = parts[0];
       }
-      const reserved = ['localhost', 'lvh', 'renictech', 'com', 'me', 'io', 'dev', '127', '0', 'vercel', 'railway', 'app', 'trycloudflare', 'cloudflare'];
+      const reserved = ['localhost', 'lvh', 'renictech', 'com', 'me', 'io', 'dev', '127', '0', 'vercel', 'railway', 'app', 'trycloudflare', 'cloudflare', 'ngrok', 'loca', 'render'];
       if (sub && !reserved.includes(sub) && !knownAppSlugs.includes(sub)) {
         customerCode = sub.toLowerCase();
       }
@@ -150,7 +154,9 @@ async function tenantResolver(req, res, next) {
                          reqPath === '/api/v1/license/current' ||
                          reqPath === '/api/tenant/screens' ||
                          reqPath === '/api/tenant/stream' ||
-                         reqPath === '/api/settings/verify-oauth';
+                         reqPath === '/api/settings/verify-oauth' ||
+                         reqPath === '/api/settings/auto-recover' ||
+                         reqPath === '/api/settings/oauth-credentials';
 
   // Strict Tenant Isolation Guard: Block unauthenticated requests missing customer ID
   if (!customerCode && !isPublicExempt) {

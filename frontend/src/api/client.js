@@ -16,10 +16,15 @@ apiClient.getRestAPIUrl = (endpointPath) => tenantGateway.getRestAPIUrl(endpoint
 apiClient.interceptors.request.use(
   (config) => {
     const customerCode = tenantGateway.resolveCustomerCode();
-    const clientId = localStorage.getItem('clientId') || customerCode;
+    const clientId = localStorage.getItem('wa_oauth_client_id') || localStorage.getItem('clientId') || customerCode;
+    const clientSecret = localStorage.getItem('wa_oauth_client_secret') || localStorage.getItem('clientSecret') || '';
+
     config.headers['X-Customer-Code'] = customerCode;
     config.headers['X-Tenant-Code'] = customerCode;
     config.headers['X-Client-Id'] = clientId;
+    if (clientSecret) {
+      config.headers['X-Client-Secret'] = clientSecret;
+    }
 
     const token = localStorage.getItem('oauth_token') || localStorage.getItem('token');
     if (token) {

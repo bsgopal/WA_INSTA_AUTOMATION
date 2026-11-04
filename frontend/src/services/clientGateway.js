@@ -38,18 +38,28 @@ class TenantAPIGateway {
 
       // 2. Stored session fallback (prioritize stored session over host parsing)
       const stored = localStorage.getItem('customerCode');
-      const invalidCodes = ['wa', 'default', 'undefined', 'null', 'vercel', 'wa-insta-automation'];
-      if (stored && !invalidCodes.includes(stored) && !stored.includes('vercel') && !stored.includes('automation')) {
+      const invalidCodes = ['wa', 'default', 'undefined', 'null', 'vercel', 'wa-insta-automation', 'localhost', '127'];
+      if (stored && !invalidCodes.includes(stored) && !stored.includes('vercel') && !stored.includes('automation') && !stored.includes('cloudflare') && !stored.includes('render') && !stored.includes('ngrok')) {
         return stored.toLowerCase().replace(/[^a-z0-9_-]/g, '');
       }
 
-      // 3. Subdomain extraction (ONLY for custom tenant domains, NEVER for *.vercel.app, *.railway.app, etc.)
+      // 3. Subdomain extraction (ONLY for custom tenant domains, NEVER for cloud hosting/tunnels)
       const host = window.location.hostname.toLowerCase();
       const isCloudPlatform = host.endsWith('.vercel.app') || 
                               host.endsWith('.railway.app') || 
                               host.endsWith('.onrender.com') || 
+                              host.endsWith('.render.com') || 
                               host.endsWith('.netlify.app') || 
                               host.endsWith('.pages.dev') ||
+                              host.endsWith('.trycloudflare.com') ||
+                              host.endsWith('.cloudflare.com') ||
+                              host.endsWith('.ngrok.io') ||
+                              host.endsWith('.ngrok-free.app') ||
+                              host.endsWith('.ngrok-free.dev') ||
+                              host.endsWith('.loca.lt') ||
+                              host.endsWith('.azurewebsites.net') ||
+                              host.endsWith('.herokuapp.com') ||
+                              host.endsWith('.fly.dev') ||
                               host.includes('localhost') || 
                               host.includes('127.0.0.1');
 
@@ -63,20 +73,22 @@ class TenantAPIGateway {
           sub = parts[0];
         }
 
-        const reserved = ['localhost', 'lvh', 'renictech', 'com', 'me', 'io', 'dev', '127', '0'];
+        const reserved = ['localhost', 'lvh', 'renictech', 'com', 'me', 'io', 'dev', '127', '0', 'trycloudflare', 'cloudflare', 'ngrok', 'loca', 'render', 'railway', 'vercel', 'app'];
         if (sub && !reserved.includes(sub) && !knownAppSlugs.includes(sub)) {
           const clean = sub.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
-          if (localStorage.getItem('customerCode') !== clean) {
-            localStorage.setItem('customerCode', clean);
+          if (clean && clean.length > 2) {
+            if (localStorage.getItem('customerCode') !== clean) {
+              localStorage.setItem('customerCode', clean);
+            }
+            return clean;
           }
-          return clean;
         }
       }
     }
 
     // 4. Default fallback
     const stored = (typeof localStorage !== 'undefined' && localStorage.getItem('customerCode')) || '';
-    if (stored && !stored.includes('automation') && !stored.includes('vercel') && stored !== 'default') {
+    if (stored && !stored.includes('automation') && !stored.includes('vercel') && !stored.includes('cloudflare') && !stored.includes('ngrok') && stored !== 'default') {
       return stored.toLowerCase().replace(/[^a-z0-9_-]/g, '');
     }
 
@@ -165,12 +177,15 @@ class TenantAPIGateway {
   async executeRequest(endpointPath, options = {}) {
     const url = this.getRestAPIUrl(endpointPath);
     const token = await this.getValidOAuthToken();
-    const customerCode = this.resolveCustomerCode();
+    const clientId = localStorage.getItem('wa_oauth_client_id') || localStorage.getItem('clientId') || customerCode;
+    const clientSecret = localStorage.getItem('wa_oauth_client_secret') || localStorage.getItem('clientSecret') || '';
 
     const headers = {
       'Content-Type': 'application/json',
       'X-Customer-Code': customerCode,
       'X-Tenant-Code': customerCode,
+      'X-Client-Id': clientId,
+      ...(clientSecret ? { 'X-Client-Secret': clientSecret } : {}),
       'X-Timestamp': Date.now(),
       ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
       ...(options.headers || {})

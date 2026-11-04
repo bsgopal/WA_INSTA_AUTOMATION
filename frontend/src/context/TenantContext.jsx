@@ -156,14 +156,16 @@ export const TenantProvider = ({ children }) => {
   useEffect(() => {
     fetchScreens();
 
-    const isLocalhost = typeof window !== 'undefined' && 
-      (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-
     let eventSource = null;
-    if (isLocalhost) {
-      try {
-        const sseUrl = `http://localhost:5000/api/tenant/stream`;
-        eventSource = new EventSource(sseUrl);
+    try {
+      const activeCode = resolveCustomerCode() || localStorage.getItem('customerCode') || 'apx-wa01';
+      const sseBase = apiClient.getRestAPIUrl('/tenant/stream');
+      const sseUrl = `${sseBase}?customerCode=${encodeURIComponent(activeCode)}`;
+      eventSource = new EventSource(sseUrl);
+      eventSource.onerror = () => {
+        // Silent error handler to avoid console spamming on network disconnects
+        try { eventSource.close(); } catch (e) {}
+      };
         eventSource.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data);
@@ -231,7 +233,6 @@ export const TenantProvider = ({ children }) => {
       } catch (e) {
         console.warn('[TenantContext] SSE setup error:', e);
       }
-    }
 
     // Safe periodic polling every 45s (NO aggressive storage listener loop)
     const pollInterval = setInterval(fetchScreens, 45000);

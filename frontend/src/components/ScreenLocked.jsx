@@ -49,19 +49,29 @@ export default function ScreenLocked({ isOauthLock = false, isLicenseLock = fals
       });
       if (res.data?.success) {
         setSuccessMsg(res.data.message || 'Workspace auto-recovered successfully! Unlocking...');
-        if (res.data.oauthStatus?.clientId) {
-          setInputClientId(res.data.oauthStatus.clientId);
-          localStorage.setItem('wa_oauth_client_id', res.data.oauthStatus.clientId);
+        const cid = res.data.oauthStatus?.clientId || res.data.clientId || '';
+        const csec = res.data.oauthStatus?.clientSecret || res.data.clientSecret || '';
+        if (cid) {
+          setInputClientId(cid);
+          localStorage.setItem('wa_oauth_client_id', cid);
+          localStorage.setItem('clientId', cid);
         }
-        if (res.data.oauthStatus?.clientSecret) {
-          setInputClientSecret(res.data.oauthStatus.clientSecret);
-          localStorage.setItem('wa_oauth_client_secret', res.data.oauthStatus.clientSecret);
+        if (csec) {
+          setInputClientSecret(csec);
+          localStorage.setItem('wa_oauth_client_secret', csec);
+          localStorage.setItem('clientSecret', csec);
+        }
+        if (res.data.customerCode) {
+          localStorage.setItem('customerCode', res.data.customerCode);
+        }
+        if (res.data.oauthStatus) {
+          localStorage.setItem('wa_oauth_status', JSON.stringify(res.data.oauthStatus));
         }
         setTimeout(async () => {
           if (typeof refreshScreens === 'function') {
             await refreshScreens();
           }
-        }, 500);
+        }, 400);
         return true;
       }
     } catch (err) {
@@ -98,19 +108,25 @@ export default function ScreenLocked({ isOauthLock = false, isLicenseLock = fals
 
       if (res.data?.success) {
         setSuccessMsg(res.data.message || 'Workspace credentials verified successfully! Unlocking...');
-        if (res.data.clientId) {
-          setInputClientId(res.data.clientId);
-          localStorage.setItem('wa_oauth_client_id', res.data.clientId);
+        const cid = res.data.clientId || inputClientId.trim();
+        const csec = res.data.clientSecret || inputClientSecret.trim();
+        setInputClientId(cid);
+        setInputClientSecret(csec);
+        localStorage.setItem('wa_oauth_client_id', cid);
+        localStorage.setItem('wa_oauth_client_secret', csec);
+        localStorage.setItem('clientId', cid);
+        localStorage.setItem('clientSecret', csec);
+        if (res.data.customerCode) {
+          localStorage.setItem('customerCode', res.data.customerCode);
         }
-        if (res.data.clientSecret) {
-          setInputClientSecret(res.data.clientSecret);
-          localStorage.setItem('wa_oauth_client_secret', res.data.clientSecret);
+        if (res.data.oauthStatus) {
+          localStorage.setItem('wa_oauth_status', JSON.stringify(res.data.oauthStatus));
         }
         setTimeout(async () => {
           if (typeof refreshScreens === 'function') {
             await refreshScreens();
           }
-        }, 600);
+        }, 500);
       } else {
         setErrorMsg(res.data?.error || 'Verification failed. Please check credentials.');
       }

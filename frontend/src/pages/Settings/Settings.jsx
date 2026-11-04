@@ -428,6 +428,18 @@ export default function Settings() {
         clientSecret: tenantClientSecret.trim()
       });
       if (response.data?.success) {
+        const cid = response.data.clientId || tenantClientId.trim();
+        const csec = response.data.clientSecret || tenantClientSecret.trim();
+        localStorage.setItem('wa_oauth_client_id', cid);
+        localStorage.setItem('wa_oauth_client_secret', csec);
+        localStorage.setItem('clientId', cid);
+        localStorage.setItem('clientSecret', csec);
+        if (response.data.customerCode) {
+          localStorage.setItem('customerCode', response.data.customerCode);
+        }
+        if (response.data.oauthStatus) {
+          localStorage.setItem('wa_oauth_status', JSON.stringify(response.data.oauthStatus));
+        }
         setSnackbar({
           open: true,
           message: '🎉 ' + (response.data.message || 'OAuth 2.0 Credentials successfully verified!'),
@@ -462,12 +474,20 @@ export default function Settings() {
       setSavingOauth(true);
       localStorage.setItem('wa_oauth_client_id', tenantClientId.trim());
       localStorage.setItem('wa_oauth_client_secret', tenantClientSecret.trim());
+      localStorage.setItem('clientId', tenantClientId.trim());
+      localStorage.setItem('clientSecret', tenantClientSecret.trim());
 
       const response = await apiClient.post('/settings/oauth-credentials', {
         clientId: tenantClientId.trim(),
         clientSecret: tenantClientSecret.trim()
       });
       if (response.data?.success) {
+        if (response.data.customerCode) {
+          localStorage.setItem('customerCode', response.data.customerCode);
+        }
+        if (response.data.oauthStatus) {
+          localStorage.setItem('wa_oauth_status', JSON.stringify(response.data.oauthStatus));
+        }
         setSnackbar({ open: true, message: 'OAuth credentials saved successfully.', severity: 'success' });
         if (typeof refreshScreens === 'function') refreshScreens();
       }
