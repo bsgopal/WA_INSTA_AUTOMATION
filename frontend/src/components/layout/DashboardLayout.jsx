@@ -256,7 +256,8 @@ export default function DashboardLayout() {
     isLicenseLocked,
     isOauthLocked,
     licenseActive,
-    licenseRequired
+    licenseRequired,
+    loading: tenantLoading
   } = useTenant();
 
   // Fetch license status once on mount for expiry warnings
@@ -1290,6 +1291,17 @@ export default function DashboardLayout() {
             });
             const effectivePermissions = tenantScreenPermissions || licenseStatus?.screenPermissions || licenseStatus?.featurePermissions || {};
             const isCurrentScreenAllowed = currentItem ? canAccess(currentItem, user?.role, effectivePermissions) : true;
+
+            if (tenantLoading && !licenseStatus) {
+              return (
+                <Box sx={{ width: '100%', py: 4, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                  <LinearProgress sx={{ width: '80%', height: 4, borderRadius: 2, bgcolor: 'rgba(132, 204, 22, 0.1)', '& .MuiLinearProgress-bar': { bgcolor: '#84cc16' } }} />
+                  <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>
+                    Connecting to workspace...
+                  </Typography>
+                </Box>
+              );
+            }
 
             if (isLicenseLocked && location.pathname !== '/settings') {
               return <ScreenLocked isLicenseLock={true} />;

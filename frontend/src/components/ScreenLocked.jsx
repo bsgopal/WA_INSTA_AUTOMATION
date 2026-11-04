@@ -39,6 +39,43 @@ export default function ScreenLocked({ isOauthLock = false, isLicenseLock = fals
     }
   }, [oauthStatus?.clientId, oauthStatus?.clientSecret]);
 
+  const handleAutoRecover = async () => {
+    try {
+      setVerifying(true);
+      setErrorMsg('');
+      const targetCode = customerCode || localStorage.getItem('customerCode') || 'apx-wa01';
+      const res = await apiClient.post('/settings/auto-recover', {
+        customerCode: targetCode
+      });
+      if (res.data?.success) {
+        setSuccessMsg(res.data.message || 'Workspace auto-recovered successfully! Unlocking...');
+        if (res.data.oauthStatus?.clientId) {
+          setInputClientId(res.data.oauthStatus.clientId);
+          localStorage.setItem('wa_oauth_client_id', res.data.oauthStatus.clientId);
+        }
+        if (res.data.oauthStatus?.clientSecret) {
+          setInputClientSecret(res.data.oauthStatus.clientSecret);
+          localStorage.setItem('wa_oauth_client_secret', res.data.oauthStatus.clientSecret);
+        }
+        setTimeout(async () => {
+          if (typeof refreshScreens === 'function') {
+            await refreshScreens();
+          }
+        }, 500);
+        return true;
+      }
+    } catch (err) {
+      // background silent
+    } finally {
+      setVerifying(false);
+    }
+    return false;
+  };
+
+  React.useEffect(() => {
+    handleAutoRecover();
+  }, []);
+
   const handleQuickUnlock = async (e) => {
     if (e) e.preventDefault();
     if (!inputClientId.trim() || !inputClientSecret.trim()) {
@@ -61,6 +98,14 @@ export default function ScreenLocked({ isOauthLock = false, isLicenseLock = fals
 
       if (res.data?.success) {
         setSuccessMsg(res.data.message || 'Workspace credentials verified successfully! Unlocking...');
+        if (res.data.clientId) {
+          setInputClientId(res.data.clientId);
+          localStorage.setItem('wa_oauth_client_id', res.data.clientId);
+        }
+        if (res.data.clientSecret) {
+          setInputClientSecret(res.data.clientSecret);
+          localStorage.setItem('wa_oauth_client_secret', res.data.clientSecret);
+        }
         setTimeout(async () => {
           if (typeof refreshScreens === 'function') {
             await refreshScreens();
@@ -172,6 +217,27 @@ export default function ScreenLocked({ isOauthLock = false, isLicenseLock = fals
           ) : (
             'Verify & Unlock Workspace'
           )}
+        </Button>
+
+        <Button
+          type="button"
+          variant="outlined"
+          fullWidth
+          onClick={handleAutoRecover}
+          disabled={verifying}
+          sx={{
+            borderColor: '#84cc16',
+            color: '#3f6212',
+            py: 0.9,
+            fontWeight: 800,
+            fontSize: '0.82rem',
+            textTransform: 'none',
+            borderRadius: 2,
+            bgcolor: '#f7fee7',
+            '&:hover': { bgcolor: '#ecfccb', borderColor: '#65a30d' }
+          }}
+        >
+          ⚡ Auto-Recover &amp; Sync with Renic Soft
         </Button>
       </Stack>
     </Box>

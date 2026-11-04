@@ -59,10 +59,10 @@ export const TenantProvider = ({ children }) => {
   });
 
   const [licenseActive, setLicenseActive] = useState(() => localStorage.getItem('wa_license_active') !== 'false');
-  const [licenseRequired, setLicenseRequired] = useState(() => localStorage.getItem('wa_license_required') === 'true');
+  const [licenseRequired, setLicenseRequired] = useState(false);
   const [isLocked, setIsLocked] = useState(() => localStorage.getItem('wa_is_locked') === 'true');
   const [allowWithoutBalance, setAllowWithoutBalance] = useState(() => localStorage.getItem('wa_allow_without_balance') === 'true');
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const fetchingRef = useRef(false);
 
@@ -242,8 +242,8 @@ export const TenantProvider = ({ children }) => {
     };
   }, [fetchScreens]);
 
-  const isOauthLocked = Boolean(oauthEnforced && (!oauthStatus?.verified || !oauthStatus?.configured));
-  const isLicenseLocked = Boolean(!licenseActive || licenseRequired || isLocked);
+  const isOauthLocked = Boolean(!loading && oauthEnforced && (!oauthStatus?.verified || !oauthStatus?.configured));
+  const isLicenseLocked = Boolean(!loading && (!licenseActive || licenseRequired || isLocked));
 
   return (
     <TenantContext.Provider value={{
