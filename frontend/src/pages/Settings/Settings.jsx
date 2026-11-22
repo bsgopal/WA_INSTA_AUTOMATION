@@ -86,7 +86,7 @@ export default function Settings() {
   // Tab 1: WAHA Server Connection State
   const [wahaConfig, setWahaConfig] = useState({
     wahaApiUrl: '',
-    wahaApiKey: '6968d9f6a8c0471587939565fea81e5e',
+    wahaApiKey: '',
     wahaSessionName: 'default'
   });
   const [showWahaKey, setShowWahaKey] = useState(false);
