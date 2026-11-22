@@ -61,11 +61,11 @@ echo.
 
 where cloudflared >nul 2>&1
 if not errorlevel 1 (
-    cloudflared tunnel --url http://127.0.0.1:3000
+    cloudflared tunnel --config NUL --url http://127.0.0.1:3000
 ) else if exist "%ProgramFiles(x86)%\cloudflared\cloudflared.exe" (
-    "%ProgramFiles(x86)%\cloudflared\cloudflared.exe" tunnel --url http://127.0.0.1:3000
+    "%ProgramFiles(x86)%\cloudflared\cloudflared.exe" tunnel --config NUL --url http://127.0.0.1:3000
 ) else if exist "%~dp0..\..\cloudflared.exe" (
-    "%~dp0..\..\cloudflared.exe" tunnel --url http://127.0.0.1:3000
+    "%~dp0..\..\cloudflared.exe" tunnel --config NUL --url http://127.0.0.1:3000
 ) else (
     echo [ERROR] cloudflared.exe was not found.
     pause
