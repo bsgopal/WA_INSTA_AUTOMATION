@@ -168,7 +168,7 @@ export default function Messages() {
                 <TableRow key={message._id} hover sx={{ '&:hover': { bgcolor: '#f8fafc' } }}>
                   <TableCell>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Avatar sx={{ width: 32, height: 32, bgcolor: '#0f172a', color: '#84cc16', fontWeight: 700, fontSize: '0.8rem' }}>
+                      <Avatar sx={{ width: 32, height: 32, bgcolor: '#0f172a', color: '#4f46e5', fontWeight: 700, fontSize: '0.8rem' }}>
                         {message.customer?.firstName?.[0] || 'C'}
                       </Avatar>
                       <Box>
@@ -225,7 +225,7 @@ export default function Messages() {
                         size="small"
                         onClick={() => handleAIReply(message)}
                         title="AI Reply Suggestions"
-                        sx={{ color: '#0f172a', bgcolor: '#f1f5f9', '&:hover': { bgcolor: '#84cc16', color: '#0f172a' } }}
+                        sx={{ color: '#0f172a', bgcolor: '#f1f5f9', '&:hover': { bgcolor: '#4f46e5', color: '#0f172a' } }}
                       >
                         <AutoAwesomeIcon fontSize="small" />
                       </IconButton>
@@ -279,7 +279,7 @@ export default function Messages() {
                 width: 36,
                 height: 36,
                 borderRadius: '8px',
-                bgcolor: '#84cc16',
+                bgcolor: '#4f46e5',
                 color: '#0f172a',
                 display: 'flex',
                 alignItems: 'center',
@@ -334,7 +334,7 @@ export default function Messages() {
                   bgcolor: '#ffffff',
                   cursor: 'pointer',
                   transition: 'all 0.15s',
-                  '&:hover': { borderColor: '#84cc16', bgcolor: 'rgba(132,204,22,0.03)' }
+                  '&:hover': { borderColor: '#4f46e5', bgcolor: 'rgba(79, 70, 229, 0.04)' }
                 }}
                 onClick={() => {
                   navigator.clipboard.writeText(reply.text);
@@ -350,7 +350,7 @@ export default function Messages() {
                       fontSize: '0.65rem',
                       fontWeight: 800,
                       bgcolor: '#0f172a',
-                      color: '#84cc16'
+                      color: '#4f46e5'
                     }}
                   />
                   <Typography variant="caption" sx={{ color: '#16a34a', fontWeight: 700 }}>

@@ -528,8 +528,8 @@ export default function Templates() {
                 label="Two-Column Mode"
                 size="small"
                 sx={{
-                  bgcolor: 'rgba(132, 204, 22, 0.15)',
-                  color: '#4d7c0f',
+                  bgcolor: 'rgba(79, 70, 229, 0.12)',
+                  color: '#4338ca',
                   fontWeight: 700,
                   fontSize: '0.68rem',
                   height: 20
@@ -589,16 +589,15 @@ export default function Templates() {
             onClick={handleOpenAddDialog}
             size="small"
             sx={{
-              bgcolor: '#84cc16',
-              color: '#0f172a',
+              bgcolor: '#4f46e5', color: '#ffffff',
               fontWeight: 800,
               fontSize: '0.825rem',
               px: 2,
               height: '34px',
               borderRadius: '8px',
               textTransform: 'none',
-              boxShadow: '0 2px 8px rgba(132, 204, 22, 0.3)',
-              '&:hover': { bgcolor: '#65a30d', color: '#ffffff' }
+              boxShadow: '0 2px 8px rgba(79, 70, 229, 0.25)',
+              '&:hover': { bgcolor: '#4338ca', color: '#ffffff' }
             }}
           >
             New Template
@@ -677,7 +676,7 @@ export default function Templates() {
                 variant="contained"
                 startIcon={<AddIcon />}
                 onClick={handleOpenAddDialog}
-                sx={{ bgcolor: '#84cc16', color: '#0f172a', fontWeight: 800, borderRadius: '8px', px: 2.5 }}
+                sx={{ bgcolor: '#4f46e5', color: '#ffffff', fontWeight: 800, borderRadius: '8px', px: 2.5 }}
               >
                 Create Template
               </Button>
@@ -693,18 +692,18 @@ export default function Templates() {
                       onClick={() => handleEditDbTemplate(template)}
                       sx={{
                         borderRadius: '12px',
-                        border: isSelected ? '2px solid #84cc16' : '1px solid #e2e8f0',
-                        bgcolor: isSelected ? 'rgba(132, 204, 22, 0.05)' : '#ffffff',
+                        border: isSelected ? '2px solid #4f46e5' : '1px solid #e2e8f0',
+                        bgcolor: isSelected ? 'rgba(79, 70, 229, 0.04)' : '#ffffff',
                         cursor: 'pointer',
                         transition: 'all 0.2s ease',
-                        '&:hover': { transform: 'translateY(-2px)', borderColor: '#84cc16' }
+                        '&:hover': { transform: 'translateY(-2px)', borderColor: '#4f46e5' }
                       }}
                     >
                       <Box sx={{ p: 1.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9' }}>
                         <Chip
                           label={template.category || 'CUSTOM'}
                           size="small"
-                          sx={{ bgcolor: 'rgba(132, 204, 22, 0.15)', color: '#3f6212', fontWeight: 800, fontSize: '0.65rem', height: 20 }}
+                          sx={{ bgcolor: 'rgba(79, 70, 229, 0.12)', color: '#4338ca', fontWeight: 800, fontSize: '0.65rem', height: 20 }}
                         />
                         <Chip label={template.type || 'TEXT'} size="small" variant="outlined" sx={{ fontWeight: 700, fontSize: '0.65rem', height: 20 }} />
                       </Box>
@@ -742,8 +741,8 @@ export default function Templates() {
                         onClick={() => handleEditDbTemplate(template)}
                         sx={{
                           cursor: 'pointer',
-                          backgroundColor: isSelected ? 'rgba(132, 204, 22, 0.12)' : (idx % 2 === 0 ? '#ffffff' : '#f8fafc'),
-                          borderLeft: isSelected ? '4px solid #84cc16' : 'none'
+                          backgroundColor: isSelected ? 'rgba(79, 70, 229, 0.08)' : (idx % 2 === 0 ? '#ffffff' : '#f8fafc'),
+                          borderLeft: isSelected ? '4px solid #4f46e5' : 'none'
                         }}
                       >
                         <TableCell sx={{ py: 1.5 }}>
@@ -758,7 +757,7 @@ export default function Templates() {
                           <Chip
                             label={template.category || 'CUSTOM'}
                             size="small"
-                            sx={{ bgcolor: 'rgba(132, 204, 22, 0.15)', color: '#3f6212', fontWeight: 800, fontSize: '0.68rem', height: 20 }}
+                            sx={{ bgcolor: 'rgba(79, 70, 229, 0.12)', color: '#4338ca', fontWeight: 800, fontSize: '0.68rem', height: 20 }}
                           />
                         </TableCell>
                         {!openDialog && (
@@ -832,8 +831,7 @@ export default function Templates() {
                     width: 36,
                     height: 36,
                     borderRadius: '10px',
-                    bgcolor: '#84cc16',
-                    color: '#0f172a',
+                    bgcolor: '#4f46e5', color: '#ffffff',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -850,7 +848,7 @@ export default function Templates() {
                     <Chip
                       label={formData.category || 'CUSTOM'}
                       size="small"
-                      sx={{ bgcolor: 'rgba(132, 204, 22, 0.2)', color: '#84cc16', fontWeight: 800, height: 20, fontSize: '0.68rem' }}
+                      sx={{ bgcolor: 'rgba(79, 70, 229, 0.2)', color: '#4f46e5', fontWeight: 800, height: 20, fontSize: '0.68rem' }}
                     />
                   </Box>
                   <Typography variant="caption" sx={{ color: '#94a3b8' }}>
@@ -878,14 +876,13 @@ export default function Templates() {
                   disabled={submitting}
                   size="small"
                   sx={{
-                    backgroundColor: '#84cc16',
-                    color: '#0f172a',
+                    backgroundColor: '#4f46e5', color: '#ffffff',
                     textTransform: 'none',
                     fontWeight: 800,
                     borderRadius: '8px',
                     px: 2,
                     height: 32,
-                    '&:hover': { backgroundColor: '#65a30d', color: '#ffffff' }
+                    '&:hover': { backgroundColor: '#4338ca', color: '#ffffff' }
                   }}
                 >
                   {submitting ? 'Saving...' : editingId ? 'Update' : 'Save'}
@@ -918,7 +915,7 @@ export default function Templates() {
                       py: 0.5,
                       borderRadius: '8px',
                       bgcolor: isActive ? '#0f172a' : '#ffffff',
-                      color: isActive ? '#84cc16' : '#64748b',
+                      color: isActive ? '#4f46e5' : '#64748b',
                       border: isActive ? '1px solid #0f172a' : '1px solid #e2e8f0',
                       whiteSpace: 'nowrap'
                     }}
@@ -1045,7 +1042,7 @@ export default function Templates() {
                             py: 0.4,
                             borderRadius: '6px',
                             bgcolor: isSelected ? '#0f172a' : hasTranslation ? 'rgba(34, 197, 94, 0.08)' : 'transparent',
-                            color: isSelected ? '#84cc16' : hasTranslation ? '#16a34a' : '#64748b',
+                            color: isSelected ? '#4f46e5' : hasTranslation ? '#16a34a' : '#64748b',
                             border: isSelected ? '1px solid #0f172a' : hasTranslation ? '1px solid rgba(34, 197, 94, 0.3)' : '1px solid #e2e8f0',
                             whiteSpace: 'nowrap'
                           }}
@@ -1127,7 +1124,7 @@ export default function Templates() {
                           <Typography variant="caption" sx={{ fontWeight: 800, color: '#075e54', fontSize: '0.72rem' }}>
                             📱 WhatsApp Live Chat Output
                           </Typography>
-                          <Chip label="LIVE PREVIEW" size="small" sx={{ height: 16, fontSize: '0.55rem', fontWeight: 800, bgcolor: '#84cc16', color: '#0f172a' }} />
+                          <Chip label="LIVE PREVIEW" size="small" sx={{ height: 16, fontSize: '0.55rem', fontWeight: 800, bgcolor: '#4f46e5', color: '#ffffff' }} />
                         </Box>
 
                         <Box sx={{ bgcolor: '#ffffff', p: 1.5, borderRadius: '8px', borderTopLeftRadius: 0, boxShadow: '0 1px 2px rgba(0,0,0,0.1)' }}>
@@ -1261,14 +1258,13 @@ export default function Templates() {
                   onClick={handleSaveTemplate}
                   disabled={submitting}
                   sx={{
-                    backgroundColor: '#84cc16',
-                    color: '#0f172a',
+                    backgroundColor: '#4f46e5', color: '#ffffff',
                     textTransform: 'none',
                     fontWeight: 800,
                     fontSize: '0.8rem',
                     borderRadius: '8px',
                     px: 3,
-                    '&:hover': { backgroundColor: '#65a30d', color: '#ffffff' }
+                    '&:hover': { backgroundColor: '#4338ca', color: '#ffffff' }
                   }}
                 >
                   {submitting ? 'Saving...' : editingId ? 'Update Template' : 'Save Template'}
@@ -1366,7 +1362,7 @@ export default function Templates() {
           <Typography variant="body2" sx={{ color: '#475569', mb: 2, mt: 1 }}>
             Upload a CSV file containing columns: <code>name, keywords, content, category</code>.
           </Typography>
-          <Button variant="contained" component="label" startIcon={<UploadIcon />} disabled={csvLoading} fullWidth sx={{ bgcolor: '#84cc16', color: '#0f172a', fontWeight: 800 }}>
+          <Button variant="contained" component="label" startIcon={<UploadIcon />} disabled={csvLoading} fullWidth sx={{ bgcolor: '#4f46e5', color: '#ffffff', fontWeight: 800 }}>
             {csvLoading ? 'Processing...' : 'Choose CSV File'}
             <input hidden type="file" accept=".csv" onChange={handleCSVUpload} />
           </Button>
@@ -1393,7 +1389,7 @@ export default function Templates() {
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
           <Button onClick={() => setOpenCSVPreviewDialog(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleCreateFromCSVPreview} disabled={creatingFromCSV} sx={{ bgcolor: '#84cc16', color: '#0f172a', fontWeight: 800 }}>
+          <Button variant="contained" onClick={handleCreateFromCSVPreview} disabled={creatingFromCSV} sx={{ bgcolor: '#4f46e5', color: '#ffffff', fontWeight: 800 }}>
             {creatingFromCSV ? 'Creating...' : `Create All ${formData.csvTemplates?.length || 0}`}
           </Button>
         </DialogActions>

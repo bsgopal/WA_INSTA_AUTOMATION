@@ -48,7 +48,7 @@ export default function QuickReplies() {
   const scrollRef = useRef(null);
 
   const categories = [
-    { value: 'GREETING', label: '👋 Greeting', color: '#84cc16' },
+    { value: 'GREETING', label: '👋 Greeting', color: '#4f46e5' },
     { value: 'INQUIRY', label: '❓ Inquiry', color: '#2563eb' },
     { value: 'PAYMENT', label: '💳 Payment', color: '#16a34a' },
     { value: 'DELIVERY', label: '🚚 Delivery', color: '#ea580c' },
@@ -252,7 +252,7 @@ export default function QuickReplies() {
               width: 38,
               height: 38,
               borderRadius: '10px',
-              bgcolor: 'rgba(132, 204, 22, 0.15)',
+              bgcolor: 'rgba(79, 70, 229, 0.12)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -270,7 +270,7 @@ export default function QuickReplies() {
                 label="Two-Column Mode"
                 size="small"
                 sx={{
-                  bgcolor: 'rgba(132, 204, 22, 0.15)',
+                  bgcolor: 'rgba(79, 70, 229, 0.12)',
                   color: '#4d7c0f',
                   fontWeight: 700,
                   fontSize: '0.68rem',
@@ -309,16 +309,15 @@ export default function QuickReplies() {
           onClick={() => handleOpenDialog()}
           size="small"
           sx={{
-            backgroundColor: '#84cc16',
-            color: '#0f172a',
+            backgroundColor: '#4f46e5', color: '#ffffff',
             textTransform: 'none',
             fontWeight: 800,
             fontSize: '0.825rem',
             borderRadius: '8px',
             px: 2,
             height: '34px',
-            boxShadow: '0 2px 8px rgba(132, 204, 22, 0.3)',
-            '&:hover': { backgroundColor: '#65a30d', color: '#ffffff' }
+            boxShadow: '0 2px 8px rgba(79, 70, 229, 0.25)',
+            '&:hover': { backgroundColor: '#4338ca', color: '#ffffff' }
           }}
         >
           New Quick Reply
@@ -383,11 +382,11 @@ export default function QuickReplies() {
         >
           {loading ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-              <CircularProgress sx={{ color: '#84cc16' }} />
+              <CircularProgress sx={{ color: '#4f46e5' }} />
             </Box>
           ) : filteredReplies.length === 0 ? (
             <Paper sx={{ p: 6, textAlign: 'center', borderRadius: '16px', border: '1px dashed #cbd5e1', bgcolor: '#ffffff' }}>
-              <AutoAwesomeIcon sx={{ fontSize: 60, color: '#84cc16', mb: 2 }} />
+              <AutoAwesomeIcon sx={{ fontSize: 60, color: '#4f46e5', mb: 2 }} />
               <Typography variant="h6" gutterBottom sx={{ fontWeight: 800, color: '#0f172a' }}>
                 No quick replies found
               </Typography>
@@ -399,13 +398,12 @@ export default function QuickReplies() {
                 startIcon={<AddIcon />}
                 onClick={() => handleOpenDialog()}
                 sx={{
-                  backgroundColor: '#84cc16',
-                  color: '#0f172a',
+                  backgroundColor: '#4f46e5', color: '#ffffff',
                   textTransform: 'none',
                   fontWeight: 800,
                   borderRadius: '8px',
                   px: 3,
-                  '&:hover': { backgroundColor: '#65a30d' }
+                  '&:hover': { backgroundColor: '#4338ca' }
                 }}
               >
                 Create Quick Reply
@@ -434,8 +432,8 @@ export default function QuickReplies() {
                         onClick={() => handleOpenDialog(reply)}
                         sx={{
                           cursor: 'pointer',
-                          backgroundColor: isSelected ? 'rgba(132, 204, 22, 0.12)' : (idx % 2 === 0 ? '#ffffff' : '#f8fafc'),
-                          borderLeft: isSelected ? '4px solid #84cc16' : 'none',
+                          backgroundColor: isSelected ? 'rgba(79, 70, 229, 0.08)' : (idx % 2 === 0 ? '#ffffff' : '#f8fafc'),
+                          borderLeft: isSelected ? '4px solid #4f46e5' : 'none',
                           transition: 'background-color 0.15s ease'
                         }}
                       >
@@ -450,7 +448,7 @@ export default function QuickReplies() {
                                 size="small"
                                 sx={{
                                   bgcolor: '#0f172a',
-                                  color: '#84cc16',
+                                  color: '#4f46e5',
                                   fontWeight: 800,
                                   fontFamily: 'monospace',
                                   fontSize: '0.68rem',
@@ -597,8 +595,7 @@ export default function QuickReplies() {
                     width: 36,
                     height: 36,
                     borderRadius: '10px',
-                    bgcolor: '#84cc16',
-                    color: '#0f172a',
+                    bgcolor: '#4f46e5', color: '#ffffff',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -616,7 +613,7 @@ export default function QuickReplies() {
                       <Chip
                         label={formData.shortcut}
                         size="small"
-                        sx={{ bgcolor: 'rgba(132, 204, 22, 0.2)', color: '#84cc16', fontWeight: 800, height: 20, fontSize: '0.7rem' }}
+                        sx={{ bgcolor: 'rgba(79, 70, 229, 0.2)', color: '#4f46e5', fontWeight: 800, height: 20, fontSize: '0.7rem' }}
                       />
                     )}
                   </Box>
@@ -643,14 +640,13 @@ export default function QuickReplies() {
                   onClick={handleSaveReply}
                   size="small"
                   sx={{
-                    backgroundColor: '#84cc16',
-                    color: '#0f172a',
+                    backgroundColor: '#4f46e5', color: '#ffffff',
                     textTransform: 'none',
                     fontWeight: 800,
                     borderRadius: '8px',
                     px: 2,
                     height: 32,
-                    '&:hover': { backgroundColor: '#65a30d', color: '#ffffff' }
+                    '&:hover': { backgroundColor: '#4338ca', color: '#ffffff' }
                   }}
                 >
                   {editingId ? 'Update' : 'Save'}
@@ -686,7 +682,7 @@ export default function QuickReplies() {
                             fontSize: '0.78rem',
                             bgcolor: '#ffffff',
                             border: '1px solid #cbd5e1',
-                            '&:hover': { bgcolor: '#84cc16', color: '#0f172a', borderColor: '#84cc16' }
+                            '&:hover': { bgcolor: '#4f46e5', color: '#ffffff', borderColor: '#4f46e5' }
                           }}
                         />
                       ))}
@@ -763,7 +759,7 @@ export default function QuickReplies() {
                                       });
                                     }
                                   }}
-                                  sx={{ '&.Mui-checked': { color: '#84cc16' } }}
+                                  sx={{ '&.Mui-checked': { color: '#4f46e5' } }}
                                 />
                               }
                               label={<Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem' }}>{platform.charAt(0) + platform.slice(1).toLowerCase()}</Typography>}
@@ -829,7 +825,7 @@ export default function QuickReplies() {
                         <Chip
                           label="SIMULATOR"
                           size="small"
-                          sx={{ bgcolor: '#84cc16', color: '#0f172a', fontWeight: 800, fontSize: '0.625rem', height: 18 }}
+                          sx={{ bgcolor: '#4f46e5', color: '#ffffff', fontWeight: 800, fontSize: '0.625rem', height: 18 }}
                         />
                       </Box>
 
@@ -845,7 +841,7 @@ export default function QuickReplies() {
                       >
                         {/* WhatsApp Top Bar */}
                         <Box sx={{ bgcolor: '#075e54', p: 1, display: 'flex', alignItems: 'center', gap: 1, color: '#ffffff' }}>
-                          <Avatar sx={{ width: 26, height: 26, bgcolor: '#84cc16', color: '#0f172a', fontWeight: 800, fontSize: '0.7rem' }}>
+                          <Avatar sx={{ width: 26, height: 26, bgcolor: '#4f46e5', color: '#ffffff', fontWeight: 800, fontSize: '0.7rem' }}>
                             R
                           </Avatar>
                           <Box sx={{ flexGrow: 1 }}>
@@ -927,14 +923,13 @@ export default function QuickReplies() {
                   onClick={handleSaveReply}
                   disabled={submitting}
                   sx={{
-                    backgroundColor: '#84cc16',
-                    color: '#0f172a',
+                    backgroundColor: '#4f46e5', color: '#ffffff',
                     textTransform: 'none',
                     fontWeight: 800,
                     fontSize: '0.8rem',
                     borderRadius: '8px',
                     px: 3,
-                    '&:hover': { backgroundColor: '#65a30d', color: '#ffffff' }
+                    '&:hover': { backgroundColor: '#4338ca', color: '#ffffff' }
                   }}
                 >
                   {submitting ? 'Saving...' : editingId ? 'Update Quick Reply' : 'Save & Publish'}

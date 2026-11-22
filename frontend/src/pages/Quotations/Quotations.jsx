@@ -359,7 +359,7 @@ export default function Quotations() {
       signatoryName: cfg.signatoryName || 'Renic Team',
       signatoryTitle: cfg.signatoryTitle || 'Authorized Signature',
       signatoryCompany: cfg.companyName || 'RENIC TECHNOLOGY',
-      themeColor: cfg.themeColor || '#84CC16',
+      themeColor: cfg.themeColor || '#4F46E5',
       notes: ''
     });
   };
@@ -396,7 +396,7 @@ export default function Quotations() {
       signatoryName: quotation.signatoryName || 'Renic Team',
       signatoryTitle: quotation.signatoryTitle || 'Authorized Signature',
       signatoryCompany: quotation.signatoryCompany || 'RENIC TECHNOLOGY',
-      themeColor: quotation.themeColor || '#84CC16',
+      themeColor: quotation.themeColor || '#4F46E5',
       notes: quotation.notes || ''
     });
   };
@@ -579,7 +579,7 @@ export default function Quotations() {
           ======================================================== */}
       <Box sx={{ px: 2.5, py: 1.2, bgcolor: '#FFFFFF', borderBottom: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1.5, zIndex: 10 }}>
         <Stack direction="row" spacing={1.5} alignItems="center">
-          <Box sx={{ width: 34, height: 34, borderRadius: '8px', bgcolor: '#FFF1F2', border: '1px solid #FECDD3', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#84CC16', fontSize: '1.2rem' }}>
+          <Box sx={{ width: 34, height: 34, borderRadius: '8px', bgcolor: '#FFF1F2', border: '1px solid #FECDD3', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4F46E5', fontSize: '1.2rem' }}>
             📄
           </Box>
           <Box>
@@ -672,10 +672,10 @@ export default function Quotations() {
               fontSize: '0.82rem',
               height: 34,
               borderRadius: '7px',
-              bgcolor: '#84CC16',
+              bgcolor: '#4F46E5',
               color: '#FFFFFF',
-              boxShadow: '0 2px 4px rgba(132,204,22,0.25)',
-              '&:hover': { bgcolor: '#65A30D' }
+              boxShadow: '0 2px 4px rgba(79, 70, 229, 0.25)',
+              '&:hover': { bgcolor: '#4338CA' }
             }}
           >
             Create Quotation
@@ -708,7 +708,7 @@ export default function Quotations() {
       {/* Loading Bar */}
       {loading && (
         <Box sx={{ height: 3, bgcolor: '#E2E8F0', overflow: 'hidden' }}>
-          <Box sx={{ height: '100%', width: '30%', bgcolor: '#84CC16', animation: 'barLoad 1s linear infinite', '@keyframes barLoad': { from: { marginLeft: '-30%' }, to: { marginLeft: '100%' } } }} />
+          <Box sx={{ height: '100%', width: '30%', bgcolor: '#4F46E5', animation: 'barLoad 1s linear infinite', '@keyframes barLoad': { from: { marginLeft: '-30%' }, to: { marginLeft: '100%' } } }} />
         </Box>
       )}
 
@@ -779,9 +779,9 @@ export default function Quotations() {
                         onClick={() => handleSelectQuotation(quo)}
                         sx={{
                           cursor: 'pointer',
-                          bgcolor: isRowSelected ? 'rgba(132,204,22,0.12) !important' : 'inherit',
-                          borderLeft: isRowSelected ? '4px solid #84CC16' : '4px solid transparent',
-                          '&:hover': { bgcolor: isRowSelected ? 'rgba(132,204,22,0.18) !important' : '#F8FAFC' }
+                          bgcolor: isRowSelected ? 'rgba(79, 70, 229, 0.08) !important' : 'inherit',
+                          borderLeft: isRowSelected ? '4px solid #4F46E5' : '4px solid transparent',
+                          '&:hover': { bgcolor: isRowSelected ? 'rgba(79, 70, 229, 0.14) !important' : '#F8FAFC' }
                         }}
                       >
                         <TableCell sx={{ py: 1.2 }}>
@@ -984,10 +984,10 @@ export default function Quotations() {
                     onChange={(e, val) => val && setRightViewMode(val)}
                     sx={{ bgcolor: 'rgba(255,255,255,0.08)', borderRadius: '6px', height: 28 }}
                   >
-                    <ToggleButton value="PREVIEW" sx={{ color: '#94A3B8', fontSize: '0.7rem', fontWeight: 700, px: 1, '&.Mui-selected': { bgcolor: '#84CC16', color: '#FFF' } }}>
+                    <ToggleButton value="PREVIEW" sx={{ color: '#94A3B8', fontSize: '0.7rem', fontWeight: 700, px: 1, '&.Mui-selected': { bgcolor: '#4F46E5', color: '#FFF' } }}>
                       Visual Document
                     </ToggleButton>
-                    <ToggleButton value="EDIT" sx={{ color: '#94A3B8', fontSize: '0.7rem', fontWeight: 700, px: 1, '&.Mui-selected': { bgcolor: '#84CC16', color: '#FFF' } }}>
+                    <ToggleButton value="EDIT" sx={{ color: '#94A3B8', fontSize: '0.7rem', fontWeight: 700, px: 1, '&.Mui-selected': { bgcolor: '#4F46E5', color: '#FFF' } }}>
                       Edit Proposal
                     </ToggleButton>
                   </ToggleButtonGroup>
@@ -1048,7 +1048,7 @@ export default function Quotations() {
                       startIcon={saving ? <CircularProgress size={14} color="inherit" /> : <SaveIcon sx={{ fontSize: 14 }} />}
                       disabled={saving}
                       onClick={handleSaveQuotation}
-                      sx={{ bgcolor: '#84CC16', color: '#FFF', textTransform: 'none', fontWeight: 800, fontSize: '0.75rem', px: 2, '&:hover': { bgcolor: '#65A30D' } }}
+                      sx={{ bgcolor: '#4F46E5', color: '#FFF', textTransform: 'none', fontWeight: 800, fontSize: '0.75rem', px: 2, '&:hover': { bgcolor: '#4338CA' } }}
                     >
                       {saving ? 'Saving...' : 'Save Quotation'}
                     </Button>
@@ -1067,7 +1067,7 @@ export default function Quotations() {
                     color: '#F8FAFC',
                     borderColor: '#475569',
                     bgcolor: 'rgba(255, 255, 255, 0.08)',
-                    '&:hover': { borderColor: '#84CC16', bgcolor: '#1E293B' },
+                    '&:hover': { borderColor: '#4F46E5', bgcolor: '#1E293B' },
                     textTransform: 'none',
                     fontWeight: 700,
                     fontSize: '0.75rem',
@@ -1111,9 +1111,9 @@ export default function Quotations() {
                       fontWeight: 700,
                       fontSize: '0.8rem',
                       color: '#64748B',
-                      '&.Mui-selected': { color: '#84CC16' }
+                      '&.Mui-selected': { color: '#4F46E5' }
                     },
-                    '& .MuiTabs-indicator': { bgcolor: '#84CC16', height: 3 }
+                    '& .MuiTabs-indicator': { bgcolor: '#4F46E5', height: 3 }
                   }}
                 >
                   <Tab label="1. Customer / Target" onClick={() => handleScrollToSection(0, 'sec-customer')} />
@@ -1148,7 +1148,7 @@ export default function Quotations() {
                   <Paper id="sec-customer" elevation={0} sx={{ p: 2.5, borderRadius: '10px', border: '1px solid #E2E8F0', bgcolor: '#FFFFFF' }}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                       <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <PeopleIcon sx={{ color: '#84CC16', fontSize: 18 }} /> 1. Customer / Target Audience
+                        <PeopleIcon sx={{ color: '#4F46E5', fontSize: 18 }} /> 1. Customer / Target Audience
                       </Typography>
 
                       <ToggleButtonGroup
@@ -1224,7 +1224,7 @@ export default function Quotations() {
                   {/* 2. Proposal Title & Dates */}
                   <Paper id="sec-validity" elevation={0} sx={{ p: 2.5, borderRadius: '10px', border: '1px solid #E2E8F0', bgcolor: '#FFFFFF' }}>
                     <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                      <EventIcon sx={{ color: '#84CC16', fontSize: 18 }} /> 2. Proposal Title & Validity
+                      <EventIcon sx={{ color: '#4F46E5', fontSize: 18 }} /> 2. Proposal Title & Validity
                     </Typography>
 
                     <Grid container spacing={2}>
@@ -1247,9 +1247,9 @@ export default function Quotations() {
                   <Paper id="sec-items" elevation={0} sx={{ p: 2.5, borderRadius: '10px', border: '1px solid #E2E8F0', bgcolor: '#FFFFFF' }}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                       <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <ListAltIcon sx={{ color: '#84CC16', fontSize: 18 }} /> 3. Project / Service Line Items
+                        <ListAltIcon sx={{ color: '#4F46E5', fontSize: 18 }} /> 3. Project / Service Line Items
                       </Typography>
-                      <Button size="small" startIcon={<AddIcon />} onClick={handleAddItem} sx={{ textTransform: 'none', fontWeight: 700, color: '#84CC16' }}>
+                      <Button size="small" startIcon={<AddIcon />} onClick={handleAddItem} sx={{ textTransform: 'none', fontWeight: 700, color: '#4F46E5' }}>
                         + Add Line Item
                       </Button>
                     </Box>
@@ -1317,7 +1317,7 @@ export default function Quotations() {
                           </Typography>
                         </Grid>
                         <Grid item xs={12} sm={6} sx={{ textAlign: { sm: 'right' } }}>
-                          <Typography variant="h6" sx={{ fontWeight: 900, color: '#84CC16' }}>
+                          <Typography variant="h6" sx={{ fontWeight: 900, color: '#4F46E5' }}>
                             Grand Total: ₹{formData.totalAmount.toLocaleString('en-IN')}
                           </Typography>
                         </Grid>
@@ -1328,7 +1328,7 @@ export default function Quotations() {
                   {/* 4. Terms & Conditions */}
                   <Paper id="sec-terms" elevation={0} sx={{ p: 2.5, borderRadius: '10px', border: '1px solid #E2E8F0', bgcolor: '#FFFFFF' }}>
                     <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                      <DrawIcon sx={{ color: '#84CC16', fontSize: 18 }} /> 4. Terms & Conditions
+                      <DrawIcon sx={{ color: '#4F46E5', fontSize: 18 }} /> 4. Terms & Conditions
                     </Typography>
 
                     <Stack spacing={1} sx={{ mb: 2 }}>
@@ -1376,7 +1376,7 @@ export default function Quotations() {
                   {/* 5. Signatory & Theme */}
                   <Paper id="sec-signatory" elevation={0} sx={{ p: 2.5, borderRadius: '10px', border: '1px solid #E2E8F0', bgcolor: '#FFFFFF' }}>
                     <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                      <PaletteIcon sx={{ color: '#84CC16', fontSize: 18 }} /> 5. Signatory & Visual Theme
+                      <PaletteIcon sx={{ color: '#4F46E5', fontSize: 18 }} /> 5. Signatory & Visual Theme
                     </Typography>
 
                     <Grid container spacing={2}>
@@ -1429,7 +1429,7 @@ export default function Quotations() {
                   {/* 6. Internal Notes & Metadata */}
                   <Paper id="sec-notes" elevation={0} sx={{ p: 2.5, borderRadius: '10px', border: '1px solid #E2E8F0', bgcolor: '#FFFFFF' }}>
                     <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                      <ArticleIcon sx={{ color: '#84CC16', fontSize: 18 }} /> 6. Internal Reference Notes
+                      <ArticleIcon sx={{ color: '#4F46E5', fontSize: 18 }} /> 6. Internal Reference Notes
                     </Typography>
 
                     <TextField
@@ -1484,7 +1484,7 @@ export default function Quotations() {
                     startIcon={submitting ? <CircularProgress size={14} color="inherit" /> : <SaveIcon sx={{ fontSize: 15 }} />}
                     disabled={submitting}
                     onClick={handleSaveQuotation}
-                    sx={{ bgcolor: '#84CC16', color: '#FFF', textTransform: 'none', fontWeight: 800, fontSize: '0.8rem', px: 2.5, '&:hover': { bgcolor: '#9E0A22' } }}
+                    sx={{ bgcolor: '#4F46E5', color: '#FFF', textTransform: 'none', fontWeight: 800, fontSize: '0.8rem', px: 2.5, '&:hover': { bgcolor: '#9E0A22' } }}
                   >
                     {submitting ? 'Saving...' : isCreateMode ? 'Create Quotation' : 'Save Quotation'}
                   </Button>

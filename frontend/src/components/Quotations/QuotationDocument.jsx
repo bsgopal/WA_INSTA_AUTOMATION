@@ -53,7 +53,7 @@ const QuotationDocument = forwardRef(function QuotationDocument(
     ],
     signatoryName = 'Renic Team',
     signatoryCompany = 'RENIC TECH',
-    themeColor = '#84CC16' // Exact Renic Tech Logo Lime Green
+    themeColor = '#4F46E5' // Exact Renic Tech Logo Lime Green
   } = quotation;
 
   // Split Title into primary and accent words
@@ -81,7 +81,7 @@ const QuotationDocument = forwardRef(function QuotationDocument(
     logoUrl: companyDetails.logoUrl || defaultLogo
   };
 
-  const brandColor = themeColor || '#84CC16';
+  const brandColor = themeColor || '#4F46E5';
   const bgSoft = getAlphaColor(brandColor, '12');
   const borderSoft = getAlphaColor(brandColor, '30');
   const ribbonGradient = `linear-gradient(135deg, ${getAlphaColor(brandColor, '12')} 0%, ${getAlphaColor(brandColor, '25')} 50%, ${getAlphaColor(brandColor, '40')} 100%)`;

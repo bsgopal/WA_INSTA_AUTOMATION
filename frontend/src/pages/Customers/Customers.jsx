@@ -47,7 +47,7 @@ import { useBackgroundMessaging } from '../../context/BackgroundMessagingContext
 
 const SEGMENT_COLORS = {
   VIP: { bg: '#FEF2F2', color: '#DC2626', border: '#FECACA' },
-  LOYAL: { bg: '#F0FDF4', color: '#16A34A', border: '#BBF7D0' },
+  LOYAL: { bg: '#EEF2FF', color: '#16A34A', border: '#BBF7D0' },
   REGULAR: { bg: '#EFF6FF', color: '#2563EB', border: '#BFDBFE' },
   NEW: { bg: '#FAF5FF', color: '#7C3AED', border: '#E9D5FF' },
   AT_RISK: { bg: '#FFFBEB', color: '#D97706', border: '#FDE68A' },
@@ -719,7 +719,7 @@ export default function Customers() {
           ======================================================== */}
       <Box sx={{ px: 2.5, py: 1.2, bgcolor: '#FFFFFF', borderBottom: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1.5, zIndex: 10 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <Box sx={{ width: 34, height: 34, borderRadius: '8px', bgcolor: '#F0FDF4', border: '1px solid #BBF7D0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16A34A', fontSize: '1.2rem' }}>
+          <Box sx={{ width: 34, height: 34, borderRadius: '8px', bgcolor: '#EEF2FF', border: '1px solid #BBF7D0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16A34A', fontSize: '1.2rem' }}>
             👥
           </Box>
           <Box>
@@ -919,7 +919,7 @@ export default function Customers() {
                         onClick={() => handleSelectCustomerRow(cust)}
                         sx={{
                           cursor: 'pointer',
-                          bgcolor: isRowSelected ? '#F0FDF4 !important' : isChecked ? '#F8FAFC' : 'inherit',
+                          bgcolor: isRowSelected ? '#EEF2FF !important' : isChecked ? '#F8FAFC' : 'inherit',
                           borderLeft: isRowSelected ? '4px solid #16A34A' : '4px solid transparent',
                           transition: 'background-color 0.15s ease',
                           '&:hover': { bgcolor: isRowSelected ? '#DCFCE7 !important' : '#F1F5F9' }
@@ -1957,7 +1957,7 @@ export default function Customers() {
       >
         <DialogTitle sx={{ bgcolor: '#0F172A', color: '#FFFFFF', py: 2, px: 3, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <UploadIcon sx={{ color: '#84cc16' }} />
+            <UploadIcon sx={{ color: '#4f46e5' }} />
             <Typography variant="h6" sx={{ fontWeight: 800, fontSize: '1.05rem' }}>
               Import Customers from Excel / CSV
             </Typography>
@@ -1975,7 +1975,7 @@ export default function Customers() {
                 fontWeight: 700,
                 fontSize: '0.75rem',
                 borderRadius: '8px',
-                '&:hover': { borderColor: '#84cc16', color: '#84cc16', bgcolor: 'rgba(132,204,22,0.1)' }
+                '&:hover': { borderColor: '#4f46e5', color: '#4f46e5', bgcolor: 'rgba(79, 70, 229, 0.08)' }
               }}
             >
               Download Template (.xlsx)
@@ -1998,7 +1998,7 @@ export default function Customers() {
                 bgcolor: '#FFFFFF',
                 cursor: 'pointer',
                 transition: 'all 0.2s',
-                '&:hover': { borderColor: '#84cc16', bgcolor: '#F0FDF4' }
+                '&:hover': { borderColor: '#4f46e5', bgcolor: '#EEF2FF' }
               }}
             >
               <input

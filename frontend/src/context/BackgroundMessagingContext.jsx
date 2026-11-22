@@ -405,14 +405,14 @@ export const BackgroundMessagingProvider = ({ children }) => {
                   variant="outlined"
                   onClick={topToast.onAction}
                   sx={{
-                    color: '#84cc16',
-                    borderColor: '#84cc16',
+                    color: '#4f46e5',
+                    borderColor: '#4f46e5',
                     fontSize: '0.72rem',
                     fontWeight: 700,
                     textTransform: 'none',
                     py: 0.2,
                     px: 1,
-                    '&:hover': { bgcolor: 'rgba(132, 204, 22, 0.1)', borderColor: '#a3e635' }
+                    '&:hover': { bgcolor: 'rgba(79, 70, 229, 0.1)', borderColor: '#818cf8' }
                   }}
                 >
                   {topToast.actionLabel}
@@ -461,8 +461,8 @@ export const BackgroundMessagingProvider = ({ children }) => {
                       width: 8,
                       height: 8,
                       borderRadius: '50%',
-                      bgcolor: '#84cc16',
-                      boxShadow: '0 0 8px #84cc16'
+                      bgcolor: '#4f46e5',
+                      boxShadow: '0 0 8px #4f46e5'
                     }}
                   />
                   <Typography variant="subtitle2" sx={{ fontWeight: 800, fontSize: '0.8rem', color: '#ffffff' }}>
@@ -471,7 +471,7 @@ export const BackgroundMessagingProvider = ({ children }) => {
                 </Box>
                 <Stack direction="row" spacing={0.5}>
                   <Tooltip title="Expand sending details">
-                    <IconButton size="small" onClick={() => restoreJob(job.id)} sx={{ color: '#94a3b8', '&:hover': { color: '#84cc16' } }}>
+                    <IconButton size="small" onClick={() => restoreJob(job.id)} sx={{ color: '#94a3b8', '&:hover': { color: '#4f46e5' } }}>
                       <OpenInFullIcon sx={{ fontSize: 16 }} />
                     </IconButton>
                   </Tooltip>
@@ -487,7 +487,7 @@ export const BackgroundMessagingProvider = ({ children }) => {
                 <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.72rem' }}>
                   {job.detail}
                 </Typography>
-                <Typography variant="caption" sx={{ fontWeight: 800, color: '#84cc16', fontSize: '0.75rem' }}>
+                <Typography variant="caption" sx={{ fontWeight: 800, color: '#4f46e5', fontSize: '0.75rem' }}>
                   {job.progress}%
                 </Typography>
               </Box>
@@ -500,7 +500,7 @@ export const BackgroundMessagingProvider = ({ children }) => {
                   borderRadius: 3,
                   bgcolor: 'rgba(255,255,255,0.1)',
                   '& .MuiLinearProgress-bar': {
-                    bgcolor: '#84cc16',
+                    bgcolor: '#4f46e5',
                     borderRadius: 3
                   }
                 }}

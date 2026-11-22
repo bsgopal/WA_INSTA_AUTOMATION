@@ -95,14 +95,14 @@ class ErrorBoundary extends React.Component {
                 startIcon={<RefreshIcon />}
                 onClick={this.handleReload}
                 sx={{
-                  bgcolor: '#84cc16',
+                  bgcolor: '#4f46e5',
                   color: '#0f172a',
                   fontWeight: 800,
                   textTransform: 'none',
                   borderRadius: '8px',
                   boxShadow: 'none',
                   '&:hover': {
-                    bgcolor: '#65a30d',
+                    bgcolor: '#4338ca',
                     color: '#ffffff'
                   }
                 }}

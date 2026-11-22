@@ -218,15 +218,15 @@ export default function ScreenLocked({ isOauthLock = false, isLicenseLock = fals
           fullWidth
           disabled={verifying || !inputClientId.trim() || !inputClientSecret.trim()}
           sx={{
-            bgcolor: '#84cc16',
+            bgcolor: '#4f46e5',
             color: '#0f172a',
             py: 1.1,
             fontWeight: 800,
             fontSize: '0.85rem',
             textTransform: 'none',
             borderRadius: 2,
-            boxShadow: '0 4px 12px rgba(132, 204, 22, 0.3)',
-            '&:hover': { bgcolor: '#65a30d' }
+            boxShadow: '0 4px 12px rgba(79, 70, 229, 0.25)',
+            '&:hover': { bgcolor: '#4338ca' }
           }}
         >
           {verifying ? (
@@ -246,7 +246,7 @@ export default function ScreenLocked({ isOauthLock = false, isLicenseLock = fals
           onClick={handleAutoRecover}
           disabled={verifying}
           sx={{
-            borderColor: '#84cc16',
+            borderColor: '#4f46e5',
             color: '#3f6212',
             py: 0.9,
             fontWeight: 800,
@@ -254,7 +254,7 @@ export default function ScreenLocked({ isOauthLock = false, isLicenseLock = fals
             textTransform: 'none',
             borderRadius: 2,
             bgcolor: '#f7fee7',
-            '&:hover': { bgcolor: '#ecfccb', borderColor: '#65a30d' }
+            '&:hover': { bgcolor: '#eef2ff', borderColor: '#4338ca' }
           }}
         >
           ⚡ Auto-Recover &amp; Sync with Renic Soft
@@ -464,22 +464,22 @@ export default function ScreenLocked({ isOauthLock = false, isLicenseLock = fals
         width: '100%',
         textAlign: 'center',
         borderRadius: 4,
-        border: '2px solid #84cc16',
+        border: '2px solid #4f46e5',
         bgcolor: '#ffffff',
-        boxShadow: '0 20px 40px rgba(132, 204, 22, 0.12)'
+        boxShadow: '0 20px 40px rgba(79, 70, 229, 0.12)'
       }}>
         <Box sx={{
           width: 68,
           height: 68,
           borderRadius: '50%',
-          bgcolor: 'rgba(132, 204, 22, 0.15)',
-          color: '#4d7c0f',
+          bgcolor: 'rgba(79, 70, 229, 0.12)',
+          color: '#3730a3',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           mx: 'auto',
           mb: 2,
-          border: '2px solid #84cc16'
+          border: '2px solid #4f46e5'
         }}>
           <ShieldIcon sx={{ fontSize: 38 }} />
         </Box>
@@ -487,7 +487,7 @@ export default function ScreenLocked({ isOauthLock = false, isLicenseLock = fals
         <Chip
           label="AUTHENTICATION REQUIRED"
           size="small"
-          sx={{ bgcolor: '#ecfccb', color: '#3f6212', fontWeight: 800, fontSize: '0.68rem', mb: 1.5 }}
+          sx={{ bgcolor: '#eef2ff', color: '#3f6212', fontWeight: 800, fontSize: '0.68rem', mb: 1.5 }}
         />
 
         <Typography variant="h5" sx={{ fontWeight: 800, color: '#0f172a', mb: 1 }}>

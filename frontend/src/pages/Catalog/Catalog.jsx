@@ -579,8 +579,7 @@ export default function Catalog() {
                 startIcon={<AddIcon />}
                 onClick={() => handleOpenEditor()}
                 sx={{
-                  bgcolor: '#84cc16',
-                  color: '#0f172a',
+                  bgcolor: '#4f46e5', color: '#ffffff',
                   fontWeight: 800,
                   textTransform: 'none',
                   borderRadius: 2,
@@ -802,7 +801,7 @@ export default function Catalog() {
               p: 2,
               bgcolor: '#0f172a',
               color: '#ffffff',
-              borderBottom: '2px solid #84cc16',
+              borderBottom: '2px solid #4f46e5',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
@@ -816,8 +815,7 @@ export default function Catalog() {
                   width: 36,
                   height: 36,
                   borderRadius: 2,
-                  bgcolor: '#84cc16',
-                  color: '#0f172a',
+                  bgcolor: '#4f46e5', color: '#ffffff',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -835,7 +833,7 @@ export default function Catalog() {
                   <Chip
                     label="PRODUCT STUDIO"
                     size="small"
-                    sx={{ height: 18, fontSize: '0.625rem', fontWeight: 800, bgcolor: '#84cc16', color: '#0f172a' }}
+                    sx={{ height: 18, fontSize: '0.625rem', fontWeight: 800, bgcolor: '#4f46e5', color: '#ffffff' }}
                   />
                 </Box>
                 <Typography variant="caption" sx={{ color: '#94a3b8', display: 'block' }} noWrap>
@@ -854,7 +852,7 @@ export default function Catalog() {
                   color: '#ffffff',
                   borderColor: '#475569',
                   bgcolor: 'rgba(255, 255, 255, 0.08)',
-                  '&:hover': { borderColor: '#84cc16', bgcolor: '#1e293b' },
+                  '&:hover': { borderColor: '#4f46e5', bgcolor: '#1e293b' },
                   textTransform: 'none',
                   fontWeight: 700,
                   fontSize: '0.75rem',
@@ -1195,8 +1193,7 @@ export default function Catalog() {
                 startIcon={<SaveIcon />}
                 onClick={handleSaveItem}
                 sx={{
-                  bgcolor: '#84cc16',
-                  color: '#0f172a',
+                  bgcolor: '#4f46e5', color: '#ffffff',
                   fontWeight: 800,
                   textTransform: 'none',
                   borderRadius: 1.5,
