@@ -85,7 +85,7 @@ export default function Settings() {
 
   // Tab 1: WAHA Server Connection State
   const [wahaConfig, setWahaConfig] = useState({
-    wahaApiUrl: 'https://devlikeaprowaha-production-661c.up.railway.app',
+    wahaApiUrl: '',
     wahaApiKey: '6968d9f6a8c0471587939565fea81e5e',
     wahaSessionName: 'default'
   });
@@ -1167,6 +1167,99 @@ export default function Settings() {
                         </Button>
                       )}
                     </Box>
+                  </Card>
+
+                  {/* WAHA Gateway / Cloudflare Tunnel Configuration */}
+                  <Card elevation={0} sx={{ borderRadius: '8px', border: '1px solid #e2e8f0', bgcolor: '#ffffff', p: 2 }}>
+                    <Stack spacing={1.5}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <DnsIcon sx={{ color: '#0284c7', fontSize: 20 }} />
+                          <Box>
+                            <Typography sx={{ fontWeight: 800, color: '#0f172a', fontSize: '0.85rem' }}>
+                              WAHA Gateway / Cloudflare Tunnel Settings
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+                              When running on Vercel or cloud, enter your public Cloudflare Tunnel URL below so it can reach your local Docker container.
+                            </Typography>
+                          </Box>
+                        </Box>
+                      </Box>
+
+                      <Grid container spacing={1.5}>
+                        <Grid item xs={12} sm={7}>
+                          <TextField
+                            fullWidth
+                            size="small"
+                            label="Gateway API URL"
+                            placeholder="http://localhost:3000 or https://xxxx.trycloudflare.com"
+                            value={wahaConfig.wahaApiUrl}
+                            onChange={(e) => setWahaConfig(p => ({ ...p, wahaApiUrl: e.target.value }))}
+                            slotProps={{ input: { sx: { borderRadius: '6px', fontSize: '0.8rem' } } }}
+                          />
+                        </Grid>
+                        <Grid item xs={12} sm={5}>
+                          <TextField
+                            fullWidth
+                            size="small"
+                            label="WAHA API Key"
+                            type={showWahaKey ? 'text' : 'password'}
+                            value={wahaConfig.wahaApiKey}
+                            onChange={(e) => setWahaConfig(p => ({ ...p, wahaApiKey: e.target.value }))}
+                            slotProps={{
+                              input: {
+                                sx: { borderRadius: '6px', fontSize: '0.8rem' },
+                                endAdornment: (
+                                  <InputAdornment position="end">
+                                    <IconButton size="small" onClick={() => setShowWahaKey(!showWahaKey)} edge="end">
+                                      {showWahaKey ? <VisibilityOff sx={{ fontSize: 16 }} /> : <Visibility sx={{ fontSize: 16 }} />}
+                                    </IconButton>
+                                  </InputAdornment>
+                                )
+                              }
+                            }}
+                          />
+                        </Grid>
+                      </Grid>
+
+                      {wahaTestResult && (
+                        <Alert severity={wahaTestResult.success ? 'success' : 'error'} sx={{ py: 0.5, fontSize: '0.75rem' }}>
+                          {wahaTestResult.message}
+                        </Alert>
+                      )}
+
+                      <Stack direction="row" spacing={1.5} justifyContent="flex-end">
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          startIcon={testingWaha ? <CircularProgress size={14} /> : <RefreshIcon sx={{ fontSize: 15 }} />}
+                          onClick={handleTestWaha}
+                          disabled={testingWaha}
+                          sx={{ borderRadius: '6px', fontWeight: 700, fontSize: '0.75rem', textTransform: 'none', px: 2 }}
+                        >
+                          {testingWaha ? 'Testing...' : 'Test Connection'}
+                        </Button>
+                        <Button
+                          variant="contained"
+                          size="small"
+                          startIcon={savingWahaConfig ? <CircularProgress size={14} sx={{ color: '#fff' }} /> : <SaveIcon sx={{ fontSize: 15 }} />}
+                          onClick={handleSaveWahaConfig}
+                          disabled={savingWahaConfig}
+                          sx={{
+                            borderRadius: '6px',
+                            fontWeight: 800,
+                            fontSize: '0.75rem',
+                            textTransform: 'none',
+                            px: 2.5,
+                            bgcolor: '#0f172a',
+                            color: '#ffffff',
+                            '&:hover': { bgcolor: '#1e293b' }
+                          }}
+                        >
+                          {savingWahaConfig ? 'Saving...' : 'Save Gateway URL'}
+                        </Button>
+                      </Stack>
+                    </Stack>
                   </Card>
 
                   {/* Connected View */}
