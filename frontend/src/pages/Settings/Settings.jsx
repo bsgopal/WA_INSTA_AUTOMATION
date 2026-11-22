@@ -675,80 +675,108 @@ export default function Settings() {
         </Alert>
       )}
 
-      {/* Top Tabs */}
-      <Paper 
-        elevation={0} 
-        sx={{ 
-          p: 0.4, 
-          bgcolor: '#f1f5f9', 
-          borderRadius: '8px', 
-          border: '1px solid #e2e8f0' 
-        }}
-      >
-        <Tabs
-          value={isSettingsLocked ? 2 : activeTab}
-          onChange={(_, val) => {
-            if (isSettingsLocked && val !== 2) {
-              setSnackbar({
-                open: true,
-                message: '🔒 Workspace locked. Please enter and verify your OAuth 2.0 Client Credentials first to unlock the other tabs.',
-                severity: 'warning'
-              });
-              return;
-            }
-            setActiveTab(val);
-          }}
-          variant="fullWidth"
-          sx={{
-            minHeight: 36,
-            '& .MuiTabs-indicator': {
-              display: 'none'
-            },
-            '& .MuiTab-root': {
-              minHeight: 36,
-              py: 0.5,
-              fontWeight: 700,
-              fontSize: '0.8rem',
-              textTransform: 'none',
-              borderRadius: '6px',
-              color: '#64748b',
-              transition: 'all 0.18s ease',
-              gap: 1,
-              '&.Mui-selected': {
-                color: '#ffffff',
-                bgcolor: '#0f172a',
-                boxShadow: '0 2px 6px rgba(15, 23, 42, 0.25)',
-                fontWeight: 800
-              },
-              '&:hover:not(.Mui-selected)': {
-                bgcolor: 'rgba(255,255,255,0.6)',
-                color: '#0f172a'
-              }
-            }
+      {/* Top Header Row with Tabs and Top-Right Action Anchoring */}
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, flexWrap: 'wrap', gap: 1.5 }}>
+        <Paper 
+          elevation={0} 
+          sx={{ 
+            p: 0.4, 
+            bgcolor: '#f1f5f9', 
+            borderRadius: '10px', 
+            border: '1px solid #e2e8f0',
+            flexGrow: { xs: 1, md: 0 },
+            minWidth: { md: 580 }
           }}
         >
-          <Tab 
-            disabled={isSettingsLocked}
-            icon={isSettingsLocked ? <LockOutlinedIcon sx={{ fontSize: 16, color: '#94a3b8' }} /> : <StorefrontIcon sx={{ fontSize: 16 }} />} 
-            iconPosition="start" 
-            label={isSettingsLocked ? "Store Details 🔒 (Locked)" : "Store Details & Branding"} 
-            sx={{ opacity: isSettingsLocked ? 0.45 : 1, cursor: isSettingsLocked ? 'not-allowed !important' : 'pointer' }}
-          />
-          <Tab 
-            disabled={isSettingsLocked}
-            icon={isSettingsLocked ? <LockOutlinedIcon sx={{ fontSize: 16, color: '#94a3b8' }} /> : <ChatIcon sx={{ fontSize: 16 }} />} 
-            iconPosition="start" 
-            label={isSettingsLocked ? "WhatsApp Engine 🔒 (Locked)" : "WhatsApp Engine & Connection"} 
-            sx={{ opacity: isSettingsLocked ? 0.45 : 1, cursor: isSettingsLocked ? 'not-allowed !important' : 'pointer' }}
-          />
-          <Tab 
-            icon={<KeyIcon sx={{ fontSize: 16 }} />} 
-            iconPosition="start" 
-            label={isSettingsLocked ? "🔑 API & OAuth 2.0 (Required)" : "API & OAuth 2.0"} 
-            sx={{ ...(isSettingsLocked && { bgcolor: 'rgba(217, 119, 6, 0.12)', color: '#b45309 !important', fontWeight: 900 }) }}
-          />
-        </Tabs>
-      </Paper>
+          <Tabs
+            value={isSettingsLocked ? 2 : activeTab}
+            onChange={(_, val) => {
+              if (isSettingsLocked && val !== 2) {
+                setSnackbar({
+                  open: true,
+                  message: '🔒 Workspace locked. Please enter and verify your OAuth 2.0 Client Credentials first to unlock the other tabs.',
+                  severity: 'warning'
+                });
+                return;
+              }
+              setActiveTab(val);
+            }}
+            variant="fullWidth"
+            sx={{
+              minHeight: 36,
+              '& .MuiTabs-indicator': {
+                display: 'none'
+              },
+              '& .MuiTab-root': {
+                minHeight: 36,
+                py: 0.5,
+                fontWeight: 700,
+                fontSize: '0.8rem',
+                textTransform: 'none',
+                borderRadius: '8px',
+                color: '#64748b',
+                transition: 'all 0.18s ease',
+                gap: 1,
+                '&.Mui-selected': {
+                  color: '#ffffff',
+                  bgcolor: '#0f172a',
+                  boxShadow: '0 2px 6px rgba(15, 23, 42, 0.25)',
+                  fontWeight: 800
+                },
+                '&:hover:not(.Mui-selected)': {
+                  bgcolor: 'rgba(255,255,255,0.6)',
+                  color: '#0f172a'
+                }
+              }
+            }}
+          >
+            <Tab 
+              disabled={isSettingsLocked}
+              icon={isSettingsLocked ? <LockOutlinedIcon sx={{ fontSize: 16, color: '#94a3b8' }} /> : <StorefrontIcon sx={{ fontSize: 16 }} />} 
+              iconPosition="start" 
+              label={isSettingsLocked ? "Store Details 🔒 (Locked)" : "Store Details & Branding"} 
+              sx={{ opacity: isSettingsLocked ? 0.45 : 1, cursor: isSettingsLocked ? 'not-allowed !important' : 'pointer' }}
+            />
+            <Tab 
+              disabled={isSettingsLocked}
+              icon={isSettingsLocked ? <LockOutlinedIcon sx={{ fontSize: 16, color: '#94a3b8' }} /> : <ChatIcon sx={{ fontSize: 16 }} />} 
+              iconPosition="start" 
+              label={isSettingsLocked ? "WhatsApp Engine 🔒 (Locked)" : "WhatsApp Engine & Connection"} 
+              sx={{ opacity: isSettingsLocked ? 0.45 : 1, cursor: isSettingsLocked ? 'not-allowed !important' : 'pointer' }}
+            />
+            <Tab 
+              icon={<KeyIcon sx={{ fontSize: 16 }} />} 
+              iconPosition="start" 
+              label={isSettingsLocked ? "🔑 API & OAuth 2.0 (Required)" : "API & OAuth 2.0"} 
+              sx={{ ...(isSettingsLocked && { bgcolor: 'rgba(217, 119, 6, 0.12)', color: '#b45309 !important', fontWeight: 900 }) }}
+            />
+          </Tabs>
+        </Paper>
+
+        {activeTab === 0 && !isSettingsLocked && (
+          <Button
+            variant="contained"
+            size="small"
+            startIcon={<SaveIcon sx={{ fontSize: 16 }} />}
+            onClick={() => handleSaveShopConfig()}
+            disabled={savingConfig}
+            sx={{
+              borderRadius: '8px',
+              fontWeight: 800,
+              px: 3,
+              py: 0.9,
+              fontSize: '0.8rem',
+              textTransform: 'none',
+              bgcolor: '#0f172a',
+              color: '#ffffff',
+              boxShadow: '0 2px 8px rgba(15, 23, 42, 0.25)',
+              '&:hover': { bgcolor: '#1e293b' }
+            }}
+          >
+            {savingConfig ? 'Saving Settings...' : 'Save Settings'}
+          </Button>
+        )}
+      </Box>
 
       {/* Tab Panels */}
       {loadingConfig ? (
@@ -986,31 +1014,37 @@ export default function Settings() {
                       </Grid>
 
                       {/* Default Quotation Terms */}
-                      <Box sx={{ pt: 0.5 }}>
-                        <Typography variant="caption" sx={{ fontWeight: 800, color: '#0f172a', mb: 0.5, display: 'block' }}>
-                          Proposal Terms &amp; Conditions ({shopConfig.defaultQuotationTerms?.length || 0})
-                        </Typography>
-                        <Stack spacing={0.6} sx={{ mb: 1, maxHeight: 110, overflowY: 'auto' }}>
+                      <Box sx={{ pt: 1 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                          <Typography variant="caption" sx={{ fontWeight: 800, color: '#0f172a', fontSize: '0.78rem' }}>
+                            Proposal Terms &amp; Conditions ({shopConfig.defaultQuotationTerms?.length || 0})
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.68rem' }}>
+                            Appears on PDF quotes &amp; proposals
+                          </Typography>
+                        </Box>
+                        
+                        <Stack spacing={1} sx={{ mb: 1.5, maxHeight: 180, overflowY: 'auto', pr: 0.5 }}>
                           {(shopConfig.defaultQuotationTerms || []).map((term, tIdx) => (
-                            <Box key={tIdx} sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
-                              <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748b', minWidth: 16, fontSize: '0.7rem' }}>
-                                {tIdx + 1}.
-                              </Typography>
+                            <Box key={tIdx} sx={{ display: 'flex', alignItems: 'center', gap: 1, bgcolor: '#f8fafc', p: 0.8, borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                              <Box sx={{ width: 22, height: 22, borderRadius: '6px', bgcolor: '#e2e8f0', color: '#334155', fontWeight: 800, fontSize: '0.7rem', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                {tIdx + 1}
+                              </Box>
                               <TextField
                                 size="small"
                                 fullWidth
                                 value={term}
                                 onChange={(e) => handleUpdateTerm(tIdx, e.target.value)}
-                                slotProps={{ input: { sx: { borderRadius: '4px', fontSize: '0.75rem', py: 0.2 } } }}
+                                slotProps={{ input: { sx: { bgcolor: '#ffffff', borderRadius: '6px', fontSize: '0.78rem' } } }}
                               />
-                              <IconButton size="small" color="error" onClick={() => handleRemoveTerm(tIdx)} sx={{ p: 0.3 }}>
-                                <DeleteIcon sx={{ fontSize: 15 }} />
+                              <IconButton size="small" color="error" onClick={() => handleRemoveTerm(tIdx)} sx={{ p: 0.5, '&:hover': { bgcolor: '#fee2e2' } }}>
+                                <DeleteIcon sx={{ fontSize: 16 }} />
                               </IconButton>
                             </Box>
                           ))}
                         </Stack>
 
-                        <Box sx={{ display: 'flex', gap: 0.8 }}>
+                        <Box sx={{ display: 'flex', gap: 1 }}>
                           <TextField
                             size="small"
                             fullWidth
@@ -1018,14 +1052,14 @@ export default function Settings() {
                             value={newTermInput}
                             onChange={(e) => setNewTermInput(e.target.value)}
                             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddTerm(); } }}
-                            slotProps={{ input: { sx: { borderRadius: '6px', fontSize: '0.75rem' } } }}
+                            slotProps={{ input: { sx: { borderRadius: '8px', fontSize: '0.78rem' } } }}
                           />
                           <Button 
-                            variant="outlined" 
+                            variant="contained" 
                             size="small" 
                             startIcon={<AddIcon sx={{ fontSize: 14 }} />} 
                             onClick={handleAddTerm}
-                            sx={{ textTransform: 'none', borderRadius: '6px', minWidth: 70, fontSize: '0.75rem', borderColor: '#4f46e5', color: '#4f46e5', '&:hover': { borderColor: '#4338ca', bgcolor: 'rgba(79, 70, 229, 0.08)' } }}
+                            sx={{ textTransform: 'none', borderRadius: '8px', px: 2, fontWeight: 800, fontSize: '0.75rem', bgcolor: '#0f172a', color: '#ffffff', '&:hover': { bgcolor: '#1e293b' } }}
                           >
                             Add
                           </Button>

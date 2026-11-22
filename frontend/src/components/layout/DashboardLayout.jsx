@@ -593,20 +593,20 @@ export default function DashboardLayout() {
 
       {/* Active Subscription & In-App Renewal Card */}
       {!sidebarCollapsed && (
-        <Box sx={{ p: 1.5, m: 1.5, borderRadius: '10px', bgcolor: 'rgba(15, 23, 42, 0.04)', border: '1px solid #e2e8f0' }}>
+        <Box sx={{ p: 1.5, m: 1.5, borderRadius: '12px', bgcolor: 'rgba(15, 23, 42, 0.04)', border: '1px solid #e2e8f0' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
             <Typography sx={{ fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', color: '#0f172a' }}>
               {licenseStatus?.planTier || 'PRO'} PLAN
             </Typography>
             <Chip
-              label={licenseStatus?.daysLeft !== undefined ? `${licenseStatus.daysLeft}d left` : 'Active'}
+              label={licenseStatus?.daysLeft != null ? `${licenseStatus.daysLeft}d left` : 'Active'}
               size="small"
               sx={{
                 height: 18,
                 fontSize: '0.65rem',
-                fontWeight: 700,
-                bgcolor: (licenseStatus?.daysLeft <= 7) ? '#fef3c7' : '#dcfce7',
-                color: (licenseStatus?.daysLeft <= 7) ? '#92400e' : '#166534'
+                fontWeight: 800,
+                bgcolor: (licenseStatus?.daysLeft != null && licenseStatus.daysLeft <= 7) ? '#fef3c7' : '#dcfce7',
+                color: (licenseStatus?.daysLeft != null && licenseStatus.daysLeft <= 7) ? '#92400e' : '#166534'
               }}
             />
           </Box>
@@ -621,12 +621,12 @@ export default function DashboardLayout() {
             sx={{
               bgcolor: '#0f172a',
               color: '#ffffff',
-              fontWeight: 700,
+              fontWeight: 800,
               fontSize: '0.72rem',
               py: 0.65,
-              borderRadius: '6px',
-              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
-              border: '1px solid #334155',
+              borderRadius: '8px',
+              boxShadow: '0 1px 3px rgba(15, 23, 42, 0.15)',
+              border: '1px solid #1e293b',
               '&:hover': { bgcolor: '#1e293b' }
             }}
           >
