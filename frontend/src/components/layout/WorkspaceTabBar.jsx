@@ -278,15 +278,15 @@ export default function WorkspaceTabBar() {
                 py: 0.5,
                 borderRadius: '8px',
                 cursor: 'pointer',
-                bgcolor: isActive ? 'rgba(16, 185, 129, 0.16)' : 'rgba(255, 255, 255, 0.04)',
-                border: `1px solid ${isActive ? 'rgba(16, 185, 129, 0.4)' : 'rgba(255, 255, 255, 0.08)'}`,
-                color: isActive ? '#34d399' : '#94a3b8',
+                bgcolor: isActive ? 'rgba(79, 70, 229, 0.2)' : 'rgba(255, 255, 255, 0.04)',
+                border: `1px solid ${isActive ? 'rgba(129, 140, 248, 0.5)' : 'rgba(255, 255, 255, 0.08)'}`,
+                color: isActive ? '#a5b4fc' : '#94a3b8',
                 fontSize: '0.75rem',
-                fontWeight: isActive ? 750 : 600,
-                transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
+                fontWeight: isActive ? 700 : 500,
+                transition: 'all 0.15s cubic-bezier(0.16, 1, 0.3, 1)',
                 '&:hover': {
-                  bgcolor: isActive ? 'rgba(16, 185, 129, 0.22)' : 'rgba(255, 255, 255, 0.08)',
-                  color: isActive ? '#34d399' : '#e2e8f0',
+                  bgcolor: isActive ? 'rgba(79, 70, 229, 0.28)' : 'rgba(255, 255, 255, 0.08)',
+                  color: isActive ? '#c7d2fe' : '#e2e8f0',
                   transform: 'translateY(-1px)'
                 }
               }}

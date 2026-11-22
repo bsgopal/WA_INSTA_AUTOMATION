@@ -54,7 +54,7 @@ export default function Settings() {
     gstin: '',
     currency: 'INR',
     currencySymbol: '₹',
-    themeColor: '#84CC16',
+    themeColor: '#4F46E5',
     signatoryName: 'Renic Team',
     signatoryTitle: 'Authorized Signature',
     signatoryCompany: 'RENIC TECHNOLOGY',
@@ -715,9 +715,9 @@ export default function Settings() {
               transition: 'all 0.18s ease',
               gap: 1,
               '&.Mui-selected': {
-                color: '#0f172a',
-                bgcolor: '#84cc16',
-                boxShadow: '0 2px 6px rgba(132, 204, 22, 0.3)',
+                color: '#ffffff',
+                bgcolor: '#0f172a',
+                boxShadow: '0 2px 6px rgba(15, 23, 42, 0.25)',
                 fontWeight: 800
               },
               '&:hover:not(.Mui-selected)': {
@@ -753,7 +753,7 @@ export default function Settings() {
       {/* Tab Panels */}
       {loadingConfig ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-          <CircularProgress size={32} sx={{ color: '#84cc16' }} />
+          <CircularProgress size={32} sx={{ color: '#4f46e5' }} />
         </Box>
       ) : (
         <Box sx={{ width: '100%', flexGrow: 1 }}>
@@ -955,7 +955,7 @@ export default function Settings() {
                             label="Theme Accent"
                             size="small"
                             fullWidth
-                            value={shopConfig.themeColor || '#84CC16'}
+                            value={shopConfig.themeColor || '#4F46E5'}
                             onChange={(e) => handleConfigChange('themeColor', e.target.value)}
                             slotProps={{ input: { sx: { borderRadius: '6px', fontSize: '0.8rem' } } }}
                           />
@@ -1025,7 +1025,7 @@ export default function Settings() {
                             size="small" 
                             startIcon={<AddIcon sx={{ fontSize: 14 }} />} 
                             onClick={handleAddTerm}
-                            sx={{ textTransform: 'none', borderRadius: '6px', minWidth: 70, fontSize: '0.75rem', borderColor: '#84cc16', color: '#0f172a', '&:hover': { borderColor: '#65a30d', bgcolor: 'rgba(132, 204, 22, 0.08)' } }}
+                            sx={{ textTransform: 'none', borderRadius: '6px', minWidth: 70, fontSize: '0.75rem', borderColor: '#4f46e5', color: '#4f46e5', '&:hover': { borderColor: '#4338ca', bgcolor: 'rgba(79, 70, 229, 0.08)' } }}
                           >
                             Add
                           </Button>
@@ -1052,10 +1052,10 @@ export default function Settings() {
                       py: 0.8, 
                       fontSize: '0.8rem',
                       textTransform: 'none',
-                      bgcolor: '#84cc16',
-                      color: '#0f172a',
-                      boxShadow: '0 2px 8px rgba(132, 204, 22, 0.35)',
-                      '&:hover': { bgcolor: '#65a30d' }
+                      bgcolor: '#0f172a',
+                      color: '#ffffff',
+                      boxShadow: '0 2px 8px rgba(15, 23, 42, 0.25)',
+                      '&:hover': { bgcolor: '#1e293b' }
                     }}
                   >
                     {savingConfig ? 'Saving Settings...' : 'Save Settings'}
@@ -1091,7 +1091,7 @@ export default function Settings() {
                 border: '1px solid rgba(255, 255, 255, 0.12)'
               }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
-                  <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: '#84cc16', boxShadow: '0 0 8px #84cc16' }} />
+                  <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: '#10b981', boxShadow: '0 0 8px rgba(16, 185, 129, 0.5)' }} />
                   <Box>
                     <Typography sx={{ fontWeight: 800, color: '#f8fafc', fontSize: '0.88rem' }}>
                       Assigned Integration: {senderMode === 'DOCKER' ? '📱 WhatsApp Web (Direct Linking)' : '⚡ Official Meta WhatsApp Cloud API'}
@@ -1104,7 +1104,7 @@ export default function Settings() {
                 <Chip
                   label="🔒 CENTRALLY ASSIGNED"
                   size="small"
-                  sx={{ height: 20, bgcolor: 'rgba(132, 204, 22, 0.18)', color: '#a3e635', fontWeight: 800, fontSize: '0.65rem', border: '1px solid rgba(132, 204, 22, 0.4)' }}
+                  sx={{ height: 20, bgcolor: 'rgba(79, 70, 229, 0.12)', color: '#4f46e5', fontWeight: 800, fontSize: '0.65rem', border: '1px solid rgba(79, 70, 229, 0.3)' }}
                 />
               </Box>
 
@@ -1130,8 +1130,8 @@ export default function Settings() {
                             width: 10, 
                             height: 10, 
                             borderRadius: '50%', 
-                            bgcolor: whatsappStatus.authenticated ? '#84cc16' : '#f59e0b',
-                            boxShadow: whatsappStatus.authenticated ? '0 0 10px #84cc16' : '0 0 10px #f59e0b',
+                            bgcolor: whatsappStatus.authenticated ? '#10b981' : '#f59e0b',
+                            boxShadow: whatsappStatus.authenticated ? '0 0 10px rgba(16, 185, 129, 0.4)' : '0 0 10px rgba(245, 158, 11, 0.4)',
                             display: 'inline-block'
                           }} />
                           {whatsappStatus.authenticated ? 'WhatsApp Active & Connected' : 'WhatsApp Connection Required'}
@@ -1225,15 +1225,15 @@ export default function Settings() {
                             onClick={handleSaveDockerThrottle}
                             disabled={savingEngine}
                             sx={{
-                              bgcolor: '#84cc16',
-                              color: '#0f172a',
+                              bgcolor: '#0f172a',
+                              color: '#ffffff',
                               fontWeight: 800,
                               fontSize: '0.75rem',
                               borderRadius: '6px',
                               textTransform: 'none',
                               px: 2.5,
                               py: 0.8,
-                              '&:hover': { bgcolor: '#65a30d' }
+                              '&:hover': { bgcolor: '#1e293b' }
                             }}
                           >
                             Save Interval
@@ -1254,13 +1254,13 @@ export default function Settings() {
                                 width: 38, 
                                 height: 38, 
                                 borderRadius: '8px', 
-                                bgcolor: 'rgba(132, 204, 22, 0.15)', 
+                                bgcolor: 'rgba(79, 70, 229, 0.12)', 
                                 display: 'flex', 
-                                justifyContent: 'center', 
+                                justifyCenter: 'center', 
                                 alignItems: 'center',
                                 mb: 1
                               }}>
-                                <ChatIcon sx={{ fontSize: 20, color: '#4d7c0f' }} />
+                                <ChatIcon sx={{ fontSize: 20, color: '#4f46e5' }} />
                               </Box>
                               
                               <Typography sx={{ fontWeight: 800, mb: 0.3, color: '#0f172a', fontSize: '0.88rem' }}>
@@ -1283,7 +1283,7 @@ export default function Settings() {
                                 mb: 1.5
                               }}>
                                 {loadingQr ? (
-                                  <CircularProgress size={28} sx={{ color: '#84cc16' }} />
+                                  <CircularProgress size={28} sx={{ color: '#4f46e5' }} />
                                 ) : whatsappQr ? (
                                   <img src={whatsappQr} alt="WhatsApp QR Code" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                                 ) : qrError ? (
@@ -1373,9 +1373,9 @@ export default function Settings() {
                                   fontSize: '0.75rem',
                                   py: 0.8, 
                                   textTransform: 'none',
-                                  bgcolor: '#84cc16',
-                                  color: '#0f172a',
-                                  '&:hover': { bgcolor: '#65a30d' }
+                                  bgcolor: '#0f172a',
+                                  color: '#ffffff',
+                                  '&:hover': { bgcolor: '#1e293b' }
                                 }}
                               >
                                 {requestingCode ? 'Requesting Code...' : 'Get Pairing Code'}
@@ -1536,9 +1536,9 @@ export default function Settings() {
                               textTransform: 'none',
                               px: 2.5,
                               py: 0.6,
-                              bgcolor: '#84cc16',
-                              color: '#0f172a',
-                              '&:hover': { bgcolor: '#65a30d' }
+                              bgcolor: '#0f172a',
+                              color: '#ffffff',
+                              '&:hover': { bgcolor: '#1e293b' }
                             }}
                           >
                             {savingConfig ? 'Saving...' : 'Save Meta Config'}
@@ -1556,9 +1556,9 @@ export default function Settings() {
                               textTransform: 'none',
                               px: 2.5,
                               py: 0.6,
-                              borderColor: '#84cc16',
-                              color: '#0f172a',
-                              '&:hover': { borderColor: '#65a30d', bgcolor: 'rgba(132, 204, 22, 0.08)' }
+                              borderColor: '#4f46e5',
+                              color: '#4f46e5',
+                              '&:hover': { borderColor: '#4338ca', bgcolor: 'rgba(79, 70, 229, 0.08)' }
                             }}
                           >
                             {metaTesting ? 'Testing...' : 'Test Connection'}
@@ -1683,16 +1683,16 @@ export default function Settings() {
                         disabled={verifyingOauth || !tenantClientId.trim() || !tenantClientSecret.trim()}
                         onClick={handleVerifyOauth}
                         sx={{
-                          bgcolor: '#84cc16',
-                          color: '#0f172a',
+                          bgcolor: '#0f172a',
+                          color: '#ffffff',
                           fontWeight: 800,
                           fontSize: '0.82rem',
                           textTransform: 'none',
                           px: 3,
                           py: 0.8,
                           borderRadius: '6px',
-                          boxShadow: '0 2px 8px rgba(132, 204, 22, 0.3)',
-                          '&:hover': { bgcolor: '#65a30d' }
+                          boxShadow: '0 2px 8px rgba(15, 23, 42, 0.25)',
+                          '&:hover': { bgcolor: '#1e293b' }
                         }}
                       >
                         {verifyingOauth ? 'Verifying with HQ...' : 'Verify Credentials'}

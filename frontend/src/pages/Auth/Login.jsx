@@ -176,8 +176,8 @@ export default function Login() {
                   label="TECH"
                   size="small"
                   sx={{
-                    bgcolor: '#84cc16',
-                    color: '#0f172a',
+                    bgcolor: '#4f46e5',
+                    color: '#ffffff',
                     fontWeight: 900,
                     fontSize: '0.65rem',
                     height: 20
@@ -193,7 +193,7 @@ export default function Login() {
           <Box sx={{ my: { xs: 3, md: 4 } }}>
             <Typography variant="h4" sx={{ fontWeight: 800, color: '#ffffff', mb: 1.5, lineHeight: 1.25 }}>
               WhatsApp &amp; Instagram <br />
-              <Box component="span" sx={{ color: '#84cc16' }}>Automation CRM Hub</Box>
+              <Box component="span" sx={{ color: '#818cf8' }}>Automation CRM Hub</Box>
             </Typography>
             <Typography variant="body1" sx={{ color: '#94a3b8', fontSize: '0.95rem', lineHeight: 1.6, maxWidth: 500 }}>
               Omnichannel Campaigns, AI Chatbot Triggers, Multi-Engine Dispatch &amp; Real-time Unified Team Inbox.
@@ -203,7 +203,7 @@ export default function Login() {
           {/* Feature Highlights */}
           <Stack spacing={2.2} sx={{ my: 3 }}>
             <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
-              <Box sx={{ bgcolor: 'rgba(132, 204, 22, 0.15)', p: 1, borderRadius: '10px', color: '#84cc16' }}>
+              <Box sx={{ bgcolor: 'rgba(79, 70, 229, 0.15)', p: 1, borderRadius: '10px', color: '#818cf8' }}>
                 <HubIcon sx={{ fontSize: '1.25rem' }} />
               </Box>
               <Box>
@@ -217,7 +217,7 @@ export default function Login() {
             </Box>
 
             <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
-              <Box sx={{ bgcolor: 'rgba(132, 204, 22, 0.15)', p: 1, borderRadius: '10px', color: '#84cc16' }}>
+              <Box sx={{ bgcolor: 'rgba(79, 70, 229, 0.15)', p: 1, borderRadius: '10px', color: '#818cf8' }}>
                 <SmartToyIcon sx={{ fontSize: '1.25rem' }} />
               </Box>
               <Box>
@@ -231,7 +231,7 @@ export default function Login() {
             </Box>
 
             <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
-              <Box sx={{ bgcolor: 'rgba(132, 204, 22, 0.15)', p: 1, borderRadius: '10px', color: '#84cc16' }}>
+              <Box sx={{ bgcolor: 'rgba(79, 70, 229, 0.15)', p: 1, borderRadius: '10px', color: '#818cf8' }}>
                 <SpeedIcon sx={{ fontSize: '1.25rem' }} />
               </Box>
               <Box>
@@ -250,15 +250,15 @@ export default function Login() {
         <Box sx={{ pt: 4, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
           <Stack spacing={1} sx={{ mb: 2 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, color: '#94a3b8' }}>
-              <LocationOnIcon sx={{ fontSize: '1rem', color: '#84cc16' }} />
+              <LocationOnIcon sx={{ fontSize: '1rem', color: '#818cf8' }} />
               <Typography variant="caption">123, Main Road, Gobichettipalayam, Erode - 638452, TN, India</Typography>
             </Box>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, color: '#94a3b8' }}>
-              <EmailIcon sx={{ fontSize: '1rem', color: '#84cc16' }} />
+              <EmailIcon sx={{ fontSize: '1rem', color: '#818cf8' }} />
               <Typography variant="caption">info@renictechnology.com · +91 88070 25752</Typography>
             </Box>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, color: '#94a3b8' }}>
-              <LanguageIcon sx={{ fontSize: '1rem', color: '#84cc16' }} />
+              <LanguageIcon sx={{ fontSize: '1rem', color: '#818cf8' }} />
               <Typography variant="caption">www.renictechnology.com · GSTIN: 33AAAAA0000A1Z5</Typography>
             </Box>
           </Stack>
@@ -320,7 +320,7 @@ export default function Login() {
               onChange={(_, v) => setTab(v)}
               sx={{
                 flexGrow: 1,
-                '& .MuiTabs-indicator': { backgroundColor: '#84cc16', height: 3 },
+                '& .MuiTabs-indicator': { backgroundColor: '#4f46e5', height: 3 },
                 '& .MuiTab-root': { fontWeight: 700, textTransform: 'none', fontSize: '0.88rem', minWidth: 'auto', px: 1.5, '&.Mui-selected': { color: '#0f172a' } }
               }}
             >
@@ -355,7 +355,7 @@ export default function Login() {
                       borderRadius: '12px',
                       backgroundColor: '#f8fafc',
                       '&.Mui-focused': { backgroundColor: '#ffffff' },
-                      '&.Mui-focused fieldset': { borderColor: '#84cc16', borderWidth: '2px' }
+                      '&.Mui-focused fieldset': { borderColor: '#4f46e5', borderWidth: '2px' }
                     }
                   }}
                 />
@@ -388,7 +388,7 @@ export default function Login() {
                       borderRadius: '12px',
                       backgroundColor: '#f8fafc',
                       '&.Mui-focused': { backgroundColor: '#ffffff' },
-                      '&.Mui-focused fieldset': { borderColor: '#84cc16', borderWidth: '2px' }
+                      '&.Mui-focused fieldset': { borderColor: '#4f46e5', borderWidth: '2px' }
                     }
                   }}
                 />
@@ -401,18 +401,18 @@ export default function Login() {
                 type="submit"
                 disabled={loading}
                 sx={{
-                  backgroundColor: '#84cc16',
-                  color: '#0f172a',
-                  '&:hover': { backgroundColor: '#65a30d' },
+                  backgroundColor: '#0f172a',
+                  color: '#ffffff',
+                  '&:hover': { backgroundColor: '#1e293b' },
                   fontWeight: 800,
                   py: 1.5,
                   textTransform: 'none',
                   fontSize: '0.98rem',
                   borderRadius: '12px',
-                  boxShadow: '0 6px 20px rgba(132, 204, 22, 0.35)'
+                  boxShadow: '0 6px 20px rgba(15, 23, 42, 0.25)'
                 }}
               >
-                {loading ? <CircularProgress size={24} sx={{ color: '#0f172a' }} /> : 'Sign In to Workspace'}
+                {loading ? <CircularProgress size={24} sx={{ color: '#ffffff' }} /> : 'Sign In to Workspace'}
               </Button>
             </form>
           </TabPanel>
@@ -434,7 +434,7 @@ export default function Login() {
                 required
                 disabled={forgotLoading}
                 placeholder="e.g. admin@renic.ai or 9047647093 or APX-WA01"
-                sx={{ mb: 2.5, '& .MuiOutlinedInput-root': { borderRadius: '12px', '&.Mui-focused fieldset': { borderColor: '#84cc16' } } }}
+                sx={{ mb: 2.5, '& .MuiOutlinedInput-root': { borderRadius: '12px', '&.Mui-focused fieldset': { borderColor: '#4f46e5' } } }}
               />
               <Button
                 fullWidth
@@ -442,16 +442,16 @@ export default function Login() {
                 type="submit"
                 disabled={forgotLoading}
                 sx={{
-                  backgroundColor: '#84cc16',
-                  color: '#0f172a',
-                  '&:hover': { backgroundColor: '#65a30d' },
+                  backgroundColor: '#0f172a',
+                  color: '#ffffff',
+                  '&:hover': { backgroundColor: '#1e293b' },
                   textTransform: 'none',
                   py: 1.3,
                   fontWeight: 800,
                   borderRadius: '12px'
                 }}
               >
-                {forgotLoading ? <CircularProgress size={20} sx={{ color: '#0f172a' }} /> : 'Send Recovery Link'}
+                {forgotLoading ? <CircularProgress size={20} sx={{ color: '#ffffff' }} /> : 'Send Recovery Link'}
               </Button>
             </form>
           </TabPanel>
@@ -488,7 +488,7 @@ export default function Login() {
             variant="contained"
             onClick={() => handleVerifyLoginOtp(loginOtpEmail)}
             disabled={loginOtpLoading}
-            sx={{ bgcolor: '#84cc16', color: '#0f172a', fontWeight: 800, '&:hover': { bgcolor: '#65a30d' } }}
+            sx={{ bgcolor: '#0f172a', color: '#ffffff', fontWeight: 800, '&:hover': { bgcolor: '#1e293b' } }}
           >
             {loginOtpLoading ? 'Verifying...' : 'Verify & Login'}
           </Button>

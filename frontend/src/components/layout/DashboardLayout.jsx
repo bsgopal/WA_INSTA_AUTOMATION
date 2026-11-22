@@ -461,14 +461,14 @@ export default function DashboardLayout() {
         <Box sx={{ 
           px: 2, 
           py: 1, 
-          bgcolor: 'rgba(132, 204, 22, 0.08)', 
+          bgcolor: 'rgba(79, 70, 229, 0.08)', 
           borderBottom: '1px solid #e2e8f0',
           display: 'flex',
           alignItems: 'center',
           gap: 1
         }}>
-          <StarIcon sx={{ color: '#84cc16', fontSize: 16 }} />
-          <Typography variant="caption" sx={{ fontWeight: 800, color: '#4d7c0f', fontSize: '0.72rem', letterSpacing: '0.4px' }}>
+          <StarIcon sx={{ color: '#4f46e5', fontSize: 16 }} />
+          <Typography variant="caption" sx={{ fontWeight: 800, color: '#4338ca', fontSize: '0.72rem', letterSpacing: '0.4px' }}>
             {(user?.role === 'PLATFORM_OWNER' || user?.role === 'ADMIN') ? 'RENIC FULL ACCESS ADMIN' : 'USER'}
           </Typography>
         </Box>
@@ -529,12 +529,12 @@ export default function DashboardLayout() {
                         justifyContent: sidebarCollapsed ? 'center' : 'initial',
                         minHeight: 42,
                         opacity: isItemLocked ? 0.65 : 1,
-                        borderLeft: isActive ? '4px solid #84cc16' : '4px solid transparent',
-                        bgcolor: isActive ? 'rgba(132, 204, 22, 0.12)' : 'transparent',
-                        transition: 'all 0.18s cubic-bezier(0.4, 0, 0.2, 1)',
+                        borderLeft: isActive ? '3px solid #4f46e5' : '3px solid transparent',
+                        bgcolor: isActive ? 'rgba(79, 70, 229, 0.08)' : 'transparent',
+                        transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
                         '&:hover': {
-                          bgcolor: isActive ? 'rgba(132, 204, 22, 0.2)' : 'rgba(132, 204, 22, 0.08)',
-                          transform: sidebarCollapsed ? 'none' : 'translateX(3px)',
+                          bgcolor: isActive ? 'rgba(79, 70, 229, 0.14)' : '#f8fafc',
+                          transform: sidebarCollapsed ? 'none' : 'translateX(2px)',
                         }
                       }}
                     >
@@ -542,8 +542,8 @@ export default function DashboardLayout() {
                         minWidth: sidebarCollapsed ? 0 : 34,
                         mr: sidebarCollapsed ? 0 : 'auto',
                         justifyContent: 'center',
-                        color: isItemLocked ? '#94a3b8' : (isActive ? '#65a30d' : '#64748b'),
-                        transition: 'color 0.18s ease'
+                        color: isItemLocked ? '#94a3b8' : (isActive ? '#4f46e5' : '#64748b'),
+                        transition: 'color 0.15s ease'
                       }}>
                         {item.icon}
                       </ListItemIcon>
@@ -619,13 +619,15 @@ export default function DashboardLayout() {
             variant="contained"
             onClick={() => setOpenRenewDialog(true)}
             sx={{
-              bgcolor: '#84cc16',
-              color: '#0f172a',
-              fontWeight: 800,
+              bgcolor: '#0f172a',
+              color: '#ffffff',
+              fontWeight: 700,
               fontSize: '0.72rem',
-              py: 0.6,
-              boxShadow: 'none',
-              '&:hover': { bgcolor: '#65a30d' }
+              py: 0.65,
+              borderRadius: '6px',
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
+              border: '1px solid #334155',
+              '&:hover': { bgcolor: '#1e293b' }
             }}
           >
             Renew / Upgrade ⚡
@@ -710,7 +712,7 @@ export default function DashboardLayout() {
                 bgcolor: 'rgba(255, 255, 255, 0.06)',
                 border: '1px solid rgba(255, 255, 255, 0.1)',
                 transition: 'all 0.2s ease',
-                '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.14)', borderColor: '#84cc16' }
+                '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.14)', borderColor: '#4f46e5' }
               }}
             >
               <Box
@@ -731,7 +733,7 @@ export default function DashboardLayout() {
                 <Typography sx={{ fontWeight: 800, fontSize: '0.88rem', color: '#ffffff', letterSpacing: '0.4px', lineHeight: 1 }}>
                   {clientName ? clientName.toUpperCase() : (licenseStatus?.companyName ? licenseStatus.companyName.toUpperCase() : 'RENIC')}
                 </Typography>
-                <Typography sx={{ fontSize: '0.58rem', fontWeight: 800, color: '#0f172a', bgcolor: '#84cc16', px: 0.5, py: 0.1, borderRadius: '3px', lineHeight: 1 }}>
+                <Typography sx={{ fontSize: '0.58rem', fontWeight: 800, color: '#ffffff', bgcolor: '#4f46e5', px: 0.5, py: 0.1, borderRadius: '3px', lineHeight: 1 }}>
                   {licenseStatus?.planTier ? licenseStatus.planTier.toUpperCase() : 'APP'}
                 </Typography>
               </Box>
@@ -763,7 +765,7 @@ export default function DashboardLayout() {
               fullWidth 
               sx={{ fontSize: '0.85rem', color: '#ffffff', '& input::placeholder': { color: '#94a3b8', opacity: 1 } }}
             />
-            <SearchIcon sx={{ color: '#84cc16', fontSize: 20, cursor: 'pointer' }} />
+            <SearchIcon sx={{ color: '#94a3b8', fontSize: 20, cursor: 'pointer', '&:hover': { color: '#ffffff' } }} />
           </Box>
 
           <Box sx={{ flexGrow: { xs: 1, md: 0 } }} />
@@ -829,7 +831,7 @@ export default function DashboardLayout() {
           <Box sx={{ mr: 1.5, display: { xs: 'none', sm: 'flex' }, alignItems: 'center' }}>
             <Tooltip title="WhatsApp Wallet • Click to View & Add Money">
               <Chip
-                icon={<AccountBalanceWalletIcon sx={{ fontSize: '16px !important', color: '#84cc16 !important' }} />}
+                icon={<AccountBalanceWalletIcon sx={{ fontSize: '16px !important', color: '#10b981 !important' }} />}
                 label={
                   walletStatus?.allowWithoutBalance 
                     ? `Wallet: Free Bypass Active`
@@ -839,16 +841,16 @@ export default function DashboardLayout() {
                 clickable
                 onClick={() => navigate('/wallet')}
                 sx={{
-                  bgcolor: 'rgba(132, 204, 22, 0.16)',
+                  bgcolor: 'rgba(16, 185, 129, 0.12)',
                   color: '#ffffff',
-                  border: '1px solid rgba(132, 204, 22, 0.45)',
+                  border: '1px solid rgba(16, 185, 129, 0.35)',
                   fontWeight: 700,
                   fontSize: '0.74rem',
                   cursor: 'pointer',
                   transition: 'all 0.2s ease',
                   '&:hover': {
-                    bgcolor: 'rgba(132, 204, 22, 0.3)',
-                    borderColor: '#84cc16'
+                    bgcolor: 'rgba(16, 185, 129, 0.22)',
+                    borderColor: '#10b981'
                   }
                 }}
               />
@@ -860,13 +862,13 @@ export default function DashboardLayout() {
             {(user?.role === 'PLATFORM_OWNER' || user?.role === 'ADMIN') && (
               <Tooltip title={`Logged in as ${user?.role === 'PLATFORM_OWNER' ? 'Platform Admin' : 'Admin'} with full platform access`}>
                 <Chip
-                  icon={<StarIcon sx={{ color: '#84cc16 !important', fontSize: 16 }} />}
+                  icon={<StarIcon sx={{ color: '#fbbf24 !important', fontSize: 16 }} />}
                   label={`✦ ${user?.role === 'PLATFORM_OWNER' ? 'Platform Admin' : 'Admin'} Full Access`}
                   size="small"
                   sx={{
-                    bgcolor: 'rgba(132, 204, 22, 0.15)',
-                    color: '#84cc16',
-                    border: '1px solid rgba(132, 204, 22, 0.35)',
+                    bgcolor: 'rgba(251, 191, 36, 0.12)',
+                    color: '#fbbf24',
+                    border: '1px solid rgba(251, 191, 36, 0.35)',
                     fontWeight: 800,
                     fontSize: '0.72rem',
                     letterSpacing: '0.2px',
@@ -889,17 +891,17 @@ export default function DashboardLayout() {
                 }}
                 sx={{
                   color: '#94a3b8',
-                  bgcolor: runningJobs?.length > 0 ? 'rgba(132, 204, 22, 0.15)' : 'rgba(255,255,255,0.05)',
-                  border: runningJobs?.length > 0 ? '1px solid #84cc16' : '1px solid rgba(255,255,255,0.1)',
+                  bgcolor: runningJobs?.length > 0 ? 'rgba(79, 70, 229, 0.15)' : 'rgba(255,255,255,0.05)',
+                  border: runningJobs?.length > 0 ? '1px solid #4f46e5' : '1px solid rgba(255,255,255,0.1)',
                   p: 0.8,
                   position: 'relative',
                   '&:hover': {
-                    bgcolor: 'rgba(132, 204, 22, 0.2)',
-                    color: '#84cc16'
+                    bgcolor: 'rgba(79, 70, 229, 0.2)',
+                    color: '#818cf8'
                   }
                 }}
               >
-                <MessageIcon sx={{ fontSize: 20, color: runningJobs?.length > 0 ? '#84cc16' : 'inherit' }} />
+                <MessageIcon sx={{ fontSize: 20, color: runningJobs?.length > 0 ? '#818cf8' : 'inherit' }} />
               </IconButton>
             </Tooltip>
 
@@ -943,7 +945,7 @@ export default function DashboardLayout() {
                 <Stack direction="row" spacing={0.5}>
                   {unreadCount > 0 && (
                     <Tooltip title="Mark all read">
-                      <IconButton size="small" onClick={markAllAsRead} sx={{ color: '#94a3b8', '&:hover': { color: '#84cc16' } }}>
+                      <IconButton size="small" onClick={markAllAsRead} sx={{ color: '#94a3b8', '&:hover': { color: '#818cf8' } }}>
                         <DoneAllIcon sx={{ fontSize: 18 }} />
                       </IconButton>
                     </Tooltip>
@@ -960,8 +962,8 @@ export default function DashboardLayout() {
 
               {/* Active Background Dispatching Jobs */}
               {activeJobs?.filter(j => j.status === 'RUNNING').length > 0 && (
-                <Box sx={{ p: 1.5, bgcolor: 'rgba(132, 204, 22, 0.08)', borderBottom: '1px solid rgba(132, 204, 22, 0.2)' }}>
-                  <Typography variant="caption" sx={{ fontWeight: 800, color: '#84cc16', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', mb: 1 }}>
+                <Box sx={{ p: 1.5, bgcolor: 'rgba(79, 70, 229, 0.08)', borderBottom: '1px solid rgba(79, 70, 229, 0.2)' }}>
+                  <Typography variant="caption" sx={{ fontWeight: 800, color: '#818cf8', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', mb: 1 }}>
                     ⚡ Active Background Sending
                   </Typography>
                   <Stack spacing={1}>
@@ -971,7 +973,7 @@ export default function DashboardLayout() {
                           <Typography variant="caption" sx={{ fontWeight: 700, color: '#ffffff' }}>
                             {job.title}
                           </Typography>
-                          <Typography variant="caption" sx={{ color: '#84cc16', fontWeight: 800 }}>
+                          <Typography variant="caption" sx={{ color: '#818cf8', fontWeight: 800 }}>
                             {job.progress}%
                           </Typography>
                         </Box>
@@ -982,7 +984,7 @@ export default function DashboardLayout() {
                             height: 5,
                             borderRadius: 3,
                             bgcolor: 'rgba(255,255,255,0.1)',
-                            '& .MuiLinearProgress-bar': { bgcolor: '#84cc16' },
+                            '& .MuiLinearProgress-bar': { bgcolor: '#4f46e5' },
                             mb: 0.5
                           }}
                         />
@@ -1082,13 +1084,13 @@ export default function DashboardLayout() {
                   variant="outlined"
                   onClick={() => { setAnchorElNotif(null); navigate('/conversations'); }}
                   sx={{
-                    color: '#84cc16',
-                    borderColor: 'rgba(132, 204, 22, 0.4)',
+                    color: '#818cf8',
+                    borderColor: 'rgba(79, 70, 229, 0.4)',
                     fontSize: '0.72rem',
                     fontWeight: 700,
                     textTransform: 'none',
                     py: 0.4,
-                    '&:hover': { bgcolor: 'rgba(132, 204, 22, 0.1)', borderColor: '#84cc16' }
+                    '&:hover': { bgcolor: 'rgba(79, 70, 229, 0.1)', borderColor: '#818cf8' }
                   }}
                 >
                   Live Conversations
@@ -1099,13 +1101,13 @@ export default function DashboardLayout() {
                   variant="contained"
                   onClick={() => { setAnchorElNotif(null); navigate('/campaigns'); }}
                   sx={{
-                    bgcolor: '#84cc16',
-                    color: '#0f172a',
+                    bgcolor: '#4f46e5',
+                    color: '#ffffff',
                     fontSize: '0.72rem',
                     fontWeight: 800,
                     textTransform: 'none',
                     py: 0.4,
-                    '&:hover': { bgcolor: '#65a30d' }
+                    '&:hover': { bgcolor: '#4338ca' }
                   }}
                 >
                   Broadcasts
@@ -1117,8 +1119,8 @@ export default function DashboardLayout() {
           {/* User Account Menu */}
           <Box sx={{ flexGrow: 0 }}>
             <Tooltip title="Account Settings & Profile">
-              <IconButton onClick={handleOpenUserMenu} sx={{ p: 0.5, border: '2px solid rgba(132, 204, 22, 0.5)' }}>
-                <Avatar sx={{ bgcolor: '#84cc16', color: '#0f172a', width: 32, height: 32, fontWeight: 800, fontSize: '0.875rem' }}>
+              <IconButton onClick={handleOpenUserMenu} sx={{ p: 0.5, border: '2px solid rgba(79, 70, 229, 0.5)' }}>
+                <Avatar sx={{ bgcolor: '#4f46e5', color: '#ffffff', width: 32, height: 32, fontWeight: 800, fontSize: '0.875rem' }}>
                   {user?.firstName?.[0] || 'A'}
                 </Avatar>
               </IconButton>
@@ -1295,7 +1297,7 @@ export default function DashboardLayout() {
             if (tenantLoading && !licenseStatus) {
               return (
                 <Box sx={{ width: '100%', py: 4, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                  <LinearProgress sx={{ width: '80%', height: 4, borderRadius: 2, bgcolor: 'rgba(132, 204, 22, 0.1)', '& .MuiLinearProgress-bar': { bgcolor: '#84cc16' } }} />
+                  <LinearProgress sx={{ width: '80%', height: 4, borderRadius: 2, bgcolor: 'rgba(79, 70, 229, 0.1)', '& .MuiLinearProgress-bar': { bgcolor: '#4f46e5' } }} />
                   <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>
                     Connecting to workspace...
                   </Typography>
@@ -1359,7 +1361,7 @@ export default function DashboardLayout() {
           borderBottom: '1px solid rgba(255,255,255,0.08)'
         }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Avatar sx={{ bgcolor: '#84cc16', color: '#0f172a', width: 52, height: 52, fontSize: '1.3rem', fontWeight: 800 }}>
+            <Avatar sx={{ bgcolor: '#4f46e5', color: '#ffffff', width: 52, height: 52, fontSize: '1.3rem', fontWeight: 800 }}>
               {(user?.firstName?.[0] || 'A') + (user?.lastName?.[0] || '')}
             </Avatar>
             <Box>
@@ -1371,7 +1373,7 @@ export default function DashboardLayout() {
               </Typography>
             </Box>
           </Box>
-          <Chip label="Full Access Admin" size="small" sx={{ bgcolor: '#84cc16', color: '#0f172a', fontWeight: 800 }} />
+          <Chip label="Full Access Admin" size="small" sx={{ bgcolor: 'rgba(79, 70, 229, 0.15)', color: '#4f46e5', border: '1px solid rgba(79, 70, 229, 0.35)', fontWeight: 800 }} />
         </Box>
 
         <form onSubmit={handleSaveProfile}>
@@ -1457,11 +1459,11 @@ export default function DashboardLayout() {
               variant="contained" 
               disabled={profileLoading}
               sx={{ 
-                bgcolor: '#84cc16', 
-                color: '#0f172a', 
+                bgcolor: '#0f172a', 
+                color: '#ffffff', 
                 fontWeight: 800, 
-                boxShadow: '0 2px 8px rgba(132, 204, 22, 0.3)',
-                '&:hover': { bgcolor: '#65a30d' } 
+                boxShadow: '0 2px 8px rgba(15, 23, 42, 0.25)',
+                '&:hover': { bgcolor: '#1e293b' } 
               }}
             >
               {profileLoading ? 'Saving...' : 'Save Changes'}
@@ -1501,8 +1503,8 @@ export default function DashboardLayout() {
                       p: 2,
                       borderRadius: '8px',
                       cursor: 'pointer',
-                      border: isSelected ? '2px solid #84cc16' : '1px solid #e2e8f0',
-                      bgcolor: isSelected ? 'rgba(132, 204, 22, 0.08)' : '#ffffff',
+                      border: isSelected ? '2px solid #4f46e5' : '1px solid #e2e8f0',
+                      bgcolor: isSelected ? 'rgba(79, 70, 229, 0.08)' : '#ffffff',
                       transition: 'all 0.15s ease'
                     }}
                   >
@@ -1539,11 +1541,11 @@ export default function DashboardLayout() {
             onClick={handleRenewPlan}
             disabled={renewalLoading}
             sx={{
-              bgcolor: '#84cc16',
-              color: '#0f172a',
+              bgcolor: '#0f172a',
+              color: '#ffffff',
               fontWeight: 800,
               px: 3,
-              '&:hover': { bgcolor: '#65a30d' }
+              '&:hover': { bgcolor: '#1e293b' }
             }}
           >
             {renewalLoading ? 'Processing Renewal...' : `Pay ₹${selectedDuration.amount.toLocaleString()} & Stack Days`}
