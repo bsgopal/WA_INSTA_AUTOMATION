@@ -413,6 +413,7 @@ app.get('/api/tenant/screens', async (req, res) => {
           if (client && client.licenseStatus === 'active') {
             const { getModel } = require('./middlewares/tenantContext');
             const TenantLicense = getModel('License');
+            const isClientExpired = Boolean(client.licenseEnd && new Date(client.licenseEnd) <= new Date()) || client.licenseStatus !== 'active';
             license = await TenantLicense.create({
               key: client.licenseKey || `RENIC-${code.toUpperCase()}`,
               email: client.contactEmail || 'admin@renic.store',
@@ -423,7 +424,8 @@ app.get('/api/tenant/screens', async (req, res) => {
               customerCode: client.customerCode || code,
               password: 'ACTIVE',
               licenseStart: client.licenseStart || new Date(),
-              licenseEnd: client.licenseEnd || new Date(Date.now() + 365 * 24 * 3600 * 1000),
+              licenseEnd: client.licenseEnd || new Date(0), // Strictly no auto-renewal fallback
+              licenseStatus: isClientExpired ? 'expired' : 'active',
               planTier: client.planTier || 'pro',
               featurePermissions: client.screenPermissions || {},
               isUsed: true
@@ -664,13 +666,17 @@ app.post('/api/settings/verify-oauth', async (req, res) => {
           customerCode: clientInfo?.customerCode || customerCode,
           password: 'ACTIVE',
           licenseStart: clientInfo?.licenseStart || new Date(),
-          licenseEnd: clientInfo?.licenseEnd || new Date(Date.now() + 365 * 24 * 3600 * 1000),
+          licenseEnd: clientInfo?.licenseEnd || new Date(0), // Strictly no auto-renewal fallback
+          licenseStatus: (clientInfo?.licenseEnd && new Date(clientInfo.licenseEnd) <= new Date()) ? 'expired' : (clientInfo?.licenseStatus || 'active'),
           planTier: clientInfo?.planTier || 'pro',
           featurePermissions: clientInfo?.screenPermissions || config.screenPermissions || {},
           isUsed: true
         });
       } else {
-        tLicense.licenseEnd = clientInfo?.licenseEnd || new Date(Date.now() + 365 * 24 * 3600 * 1000);
+        tLicense.licenseEnd = clientInfo?.licenseEnd || tLicense.licenseEnd || new Date(0);
+        if (tLicense.licenseEnd && new Date(tLicense.licenseEnd) <= new Date()) {
+          tLicense.licenseStatus = 'expired';
+        }
         tLicense.isUsed = true;
         await tLicense.save();
       }

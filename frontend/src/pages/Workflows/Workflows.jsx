@@ -1696,7 +1696,11 @@ export default function Workflows() {
         fullWidth
         PaperProps={{
           sx: {
-            borderRadius: '20px',
+            height: '90vh',
+            maxHeight: '800px',
+            display: 'flex',
+            flexDirection: 'column',
+            borderRadius: '16px',
             overflow: 'hidden',
             boxShadow: '0 25px 60px -15px rgba(15,23,42,0.4)',
             bgcolor: '#ffffff'
@@ -1711,7 +1715,7 @@ export default function Workflows() {
             alignItems: 'center',
             bgcolor: '#0f172a',
             color: '#ffffff',
-            py: 2,
+            py: 1.8,
             px: 3,
             borderBottom: '1px solid rgba(255,255,255,0.08)'
           }}
@@ -1719,11 +1723,11 @@ export default function Workflows() {
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
             <Box
               sx={{
-                width: 40,
-                height: 40,
-                borderRadius: '12px',
-                bgcolor: 'rgba(79, 70, 229, 0.12)',
-                color: '#4f46e5',
+                width: 38,
+                height: 38,
+                borderRadius: '10px',
+                bgcolor: 'rgba(79, 70, 229, 0.15)',
+                color: '#818cf8',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center'
@@ -1732,38 +1736,21 @@ export default function Workflows() {
               <FlashOnIcon />
             </Box>
             <Box>
-              <Typography variant="h6" sx={{ fontWeight: 800, color: '#ffffff', lineHeight: 1.2, fontSize: '1.1rem' }}>
+              <Typography variant="h6" sx={{ fontWeight: 800, color: '#ffffff', lineHeight: 1.2, fontSize: '1.05rem' }}>
                 {editingId ? 'Edit Enterprise Automation Flow' : 'Enterprise Workflow Builder'}
               </Typography>
-              <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.75rem' }}>
-                Design conversational customer journeys with smart triggers, dynamic variables, and interactive quick replies
+              <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.72rem' }}>
+                Step {wizardStep + 1} of 3: {wizardStep === 0 ? 'Choose Blueprint Template' : wizardStep === 1 ? 'Configure Flow Trigger ("When...")' : 'Automated WhatsApp Reply & Buttons ("Do this...")'}
               </Typography>
             </Box>
           </Box>
-          <Stack direction="row" spacing={1.5} alignItems="center">
-            <Button
-              onClick={() => setOpenDialog(false)}
-              sx={{ color: '#94a3b8', textTransform: 'none', fontWeight: 600, '&:hover': { color: '#ffffff' } }}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="contained"
-              startIcon={<SaveIcon />}
-              onClick={handleSaveWorkflow}
-              sx={{
-                backgroundColor: '#4f46e5', color: '#ffffff',
-                textTransform: 'none',
-                fontWeight: 800,
-                borderRadius: '10px',
-                px: 2.5,
-                boxShadow: '0 2px 10px rgba(79, 70, 229, 0.25)',
-                '&:hover': { backgroundColor: '#4338ca', color: '#ffffff' }
-              }}
-            >
-              {editingId ? 'Update Workflow' : 'Deploy & Activate'}
-            </Button>
-          </Stack>
+          <IconButton
+            onClick={() => setOpenDialog(false)}
+            sx={{ color: '#94a3b8', '&:hover': { color: '#ffffff', bgcolor: 'rgba(255,255,255,0.08)' } }}
+            size="small"
+          >
+            <CloseIcon fontSize="small" />
+          </IconButton>
         </DialogTitle>
 
         {/* 3-Step Breadcrumb Stepper Navigation */}
@@ -2266,34 +2253,6 @@ export default function Workflows() {
                           </Grid>
                         )}
                       </Paper>
-
-                      {/* Step 1 Navigation Buttons */}
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pt: 1 }}>
-                        <Button
-                          variant="outlined"
-                          startIcon={<ArrowBackIcon />}
-                          onClick={() => setWizardStep(0)}
-                          sx={{ textTransform: 'none', fontWeight: 700, borderRadius: '8px', color: '#475569', borderColor: '#cbd5e1' }}
-                        >
-                          Back to Blueprints
-                        </Button>
-                        <Button
-                          variant="contained"
-                          endIcon={<ArrowForwardIcon />}
-                          onClick={() => setWizardStep(2)}
-                          sx={{
-                            backgroundColor: '#0f172a',
-                            color: '#ffffff',
-                            textTransform: 'none',
-                            fontWeight: 800,
-                            borderRadius: '8px',
-                            px: 3,
-                            '&:hover': { backgroundColor: '#4f46e5', color: '#ffffff' }
-                          }}
-                        >
-                          Next: Configure WhatsApp Reply ➔
-                        </Button>
-                      </Box>
                     </>
                   )}
 
@@ -2452,34 +2411,6 @@ export default function Workflows() {
                           ))}
                         </Stack>
                       </Paper>
-
-                      {/* Step 2 Navigation Buttons */}
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pt: 1 }}>
-                        <Button
-                          variant="outlined"
-                          startIcon={<ArrowBackIcon />}
-                          onClick={() => setWizardStep(1)}
-                          sx={{ textTransform: 'none', fontWeight: 700, borderRadius: '8px', color: '#475569', borderColor: '#cbd5e1' }}
-                        >
-                          Back to Triggers
-                        </Button>
-                        <Button
-                          variant="contained"
-                          startIcon={<SaveIcon />}
-                          onClick={handleSaveWorkflow}
-                          sx={{
-                            backgroundColor: '#4f46e5', color: '#ffffff',
-                            textTransform: 'none',
-                            fontWeight: 800,
-                            borderRadius: '8px',
-                            px: 3,
-                            boxShadow: '0 2px 10px rgba(79, 70, 229, 0.25)',
-                            '&:hover': { backgroundColor: '#4338ca', color: '#ffffff' }
-                          }}
-                        >
-                          {editingId ? 'Update Workflow' : 'Deploy & Activate Flow 🚀'}
-                        </Button>
-                      </Box>
                     </>
                   )}
                 </Stack>
@@ -2518,7 +2449,7 @@ export default function Workflows() {
                         backgroundImage: 'url("https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png")',
                         backgroundSize: 'cover',
                         boxShadow: '0 15px 30px rgba(0,0,0,0.15)',
-                        height: '440px',
+                        height: '380px',
                         display: 'flex',
                         flexDirection: 'column'
                       }}
@@ -2642,6 +2573,109 @@ export default function Workflows() {
           )}
 
         </DialogContent>
+
+        {/* Fixed Enterprise Action Bar Footer */}
+        <DialogActions
+          sx={{
+            px: 3,
+            py: 1.8,
+            bgcolor: '#ffffff',
+            borderTop: '1px solid #e2e8f0',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            boxShadow: '0 -4px 12px rgba(0,0,0,0.03)'
+          }}
+        >
+          <Box>
+            {wizardStep > 0 ? (
+              <Button
+                variant="outlined"
+                startIcon={<ArrowBackIcon />}
+                onClick={() => setWizardStep(prev => prev - 1)}
+                sx={{
+                  color: '#475569',
+                  borderColor: '#cbd5e1',
+                  textTransform: 'none',
+                  fontWeight: 700,
+                  borderRadius: '10px',
+                  px: 2.2,
+                  '&:hover': { bgcolor: '#f8fafc', borderColor: '#94a3b8' }
+                }}
+              >
+                Back to {wizardStep === 2 ? 'Trigger Conditions' : 'Blueprints'}
+              </Button>
+            ) : (
+              <Button
+                onClick={() => setOpenDialog(false)}
+                sx={{ color: '#64748b', textTransform: 'none', fontWeight: 600 }}
+              >
+                Cancel
+              </Button>
+            )}
+          </Box>
+
+          <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+            {wizardStep === 0 && (
+              <Button
+                variant="contained"
+                endIcon={<ArrowForwardIcon />}
+                onClick={() => setWizardStep(1)}
+                sx={{
+                  bgcolor: '#0f172a',
+                  color: '#ffffff',
+                  textTransform: 'none',
+                  fontWeight: 800,
+                  borderRadius: '10px',
+                  px: 3,
+                  '&:hover': { bgcolor: '#1e293b' }
+                }}
+              >
+                Proceed to Triggers →
+              </Button>
+            )}
+
+            {wizardStep === 1 && (
+              <Button
+                variant="contained"
+                endIcon={<ArrowForwardIcon />}
+                onClick={() => setWizardStep(2)}
+                sx={{
+                  bgcolor: '#0f172a',
+                  color: '#ffffff',
+                  textTransform: 'none',
+                  fontWeight: 800,
+                  borderRadius: '10px',
+                  px: 3,
+                  boxShadow: '0 2px 8px rgba(15,23,42,0.15)',
+                  '&:hover': { bgcolor: '#1e293b' }
+                }}
+              >
+                Next: Configure WhatsApp Reply & Buttons →
+              </Button>
+            )}
+
+            {wizardStep === 2 && (
+              <Button
+                variant="contained"
+                startIcon={<FlashOnIcon />}
+                onClick={handleSaveWorkflow}
+                sx={{
+                  bgcolor: '#4f46e5',
+                  color: '#ffffff',
+                  textTransform: 'none',
+                  fontWeight: 800,
+                  borderRadius: '10px',
+                  px: 3.5,
+                  boxShadow: '0 4px 14px rgba(79, 70, 229, 0.35)',
+                  '&:hover': { bgcolor: '#4338ca' }
+                }}
+              >
+                {editingId ? 'Update & Deploy Flow 🚀' : 'Deploy & Activate Workflow 🚀'}
+              </Button>
+            )}
+          </Box>
+        </DialogActions>
       </Dialog>
 
       {/* CREATE CATEGORY DIALOG */}

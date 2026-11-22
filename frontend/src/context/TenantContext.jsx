@@ -58,9 +58,10 @@ export const TenantProvider = ({ children }) => {
     }
   });
 
-  const [licenseActive, setLicenseActive] = useState(() => localStorage.getItem('wa_license_active') !== 'false');
-  const [licenseRequired, setLicenseRequired] = useState(false);
-  const [isLocked, setIsLocked] = useState(() => localStorage.getItem('wa_is_locked') === 'true');
+  // Strict Zero-Fallback Security: Default to locked until verified by backend
+  const [licenseActive, setLicenseActive] = useState(() => localStorage.getItem('wa_license_active') === 'true');
+  const [licenseRequired, setLicenseRequired] = useState(() => localStorage.getItem('wa_license_required') === 'true');
+  const [isLocked, setIsLocked] = useState(() => localStorage.getItem('wa_is_locked') !== 'false');
   const [allowWithoutBalance, setAllowWithoutBalance] = useState(() => localStorage.getItem('wa_allow_without_balance') === 'true');
   const [walletBalance, setWalletBalance] = useState(() => {
     const cached = localStorage.getItem('wa_wallet_balance');
@@ -171,9 +172,20 @@ export const TenantProvider = ({ children }) => {
           setAvailableCredits(Number(res.data.availableCredits));
           setItemIfChanged('wa_available_credits', String(res.data.availableCredits));
         }
+      } else {
+        // Strict Zero-Fallback: Non-JSON or unsuccessful response fails secure
+        setLicenseActive(false);
+        setIsLocked(true);
+        setItemIfChanged('wa_license_active', 'false');
+        setItemIfChanged('wa_is_locked', 'true');
       }
     } catch (err) {
       console.warn('[TenantContext] Error fetching tenant screens:', err?.message);
+      // Strict Zero-Fallback: Network or parse error fails secure
+      setLicenseActive(false);
+      setIsLocked(true);
+      setItemIfChanged('wa_license_active', 'false');
+      setItemIfChanged('wa_is_locked', 'true');
     } finally {
       setLoading(false);
       initialLoadRef.current = false;
