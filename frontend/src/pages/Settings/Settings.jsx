@@ -911,6 +911,29 @@ export default function Settings() {
                     </Stack>
 
                     <Stack spacing={1.2}>
+                      {/* 1-Click Profile Sync Switch */}
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 1, bgcolor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                        <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: '#334155' }}>
+                          Inherit Store Profile automatically
+                        </Typography>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={() => {
+                            setShopConfig(prev => ({
+                              ...prev,
+                              companyName: prev.shopName || prev.companyName,
+                              email: prev.supportEmail || prev.email,
+                              tagline: prev.tagline || 'IDEAS | SOLUTIONS | GROWTH'
+                            }));
+                            setSnackbar({ open: true, message: '✓ Store details copied to Billing Profile!', severity: 'info' });
+                          }}
+                          sx={{ textTransform: 'none', fontSize: '0.68rem', fontWeight: 800, py: 0.2, px: 1, borderColor: '#cbd5e1', color: '#475569', '&:hover': { bgcolor: '#ffffff', borderColor: '#4f46e5', color: '#4f46e5' } }}
+                        >
+                          Copy Store Profile
+                        </Button>
+                      </Box>
+
                       <Grid container spacing={1.2}>
                         <Grid item xs={7}>
                           <TextField
@@ -958,7 +981,7 @@ export default function Settings() {
                       </Grid>
 
                       <Grid container spacing={1.2}>
-                        <Grid item xs={4}>
+                        <Grid item xs={3}>
                           <TextField
                             label="Currency"
                             size="small"
@@ -968,7 +991,7 @@ export default function Settings() {
                             slotProps={{ input: { sx: { borderRadius: '6px', fontSize: '0.8rem' } } }}
                           />
                         </Grid>
-                        <Grid item xs={4}>
+                        <Grid item xs={3}>
                           <TextField
                             label="Symbol"
                             size="small"
@@ -978,15 +1001,41 @@ export default function Settings() {
                             slotProps={{ input: { sx: { borderRadius: '6px', fontSize: '0.8rem' } } }}
                           />
                         </Grid>
-                        <Grid item xs={4}>
-                          <TextField
-                            label="Theme Accent"
-                            size="small"
-                            fullWidth
-                            value={shopConfig.themeColor || '#4F46E5'}
-                            onChange={(e) => handleConfigChange('themeColor', e.target.value)}
-                            slotProps={{ input: { sx: { borderRadius: '6px', fontSize: '0.8rem' } } }}
-                          />
+                        <Grid item xs={6}>
+                          {/* Interactive Theme Color Swatch Palette */}
+                          <Box sx={{ p: 0.8, borderRadius: '6px', border: '1px solid #cbd5e1', bgcolor: '#ffffff', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
+                              <Typography variant="caption" sx={{ fontSize: '0.68rem', fontWeight: 800, color: '#475569' }}>
+                                THEME ACCENT
+                              </Typography>
+                              <Typography variant="caption" sx={{ fontFamily: 'monospace', fontSize: '0.68rem', fontWeight: 800, color: shopConfig.themeColor || '#4F46E5' }}>
+                                {shopConfig.themeColor || '#4F46E5'}
+                              </Typography>
+                            </Box>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
+                              {['#4F46E5', '#0F172A', '#10B981', '#DC2626', '#7C3AED', '#D97706'].map((swatchColor) => {
+                                const isSelected = (shopConfig.themeColor || '#4F46E5').toUpperCase() === swatchColor.toUpperCase();
+                                return (
+                                  <Box
+                                    key={swatchColor}
+                                    onClick={() => handleConfigChange('themeColor', swatchColor)}
+                                    sx={{
+                                      width: 18,
+                                      height: 18,
+                                      borderRadius: '50%',
+                                      bgcolor: swatchColor,
+                                      cursor: 'pointer',
+                                      transition: 'all 0.15s ease',
+                                      border: isSelected ? '2px solid #ffffff' : '1px solid rgba(0,0,0,0.1)',
+                                      boxShadow: isSelected ? `0 0 0 2px ${swatchColor}` : 'none',
+                                      transform: isSelected ? 'scale(1.15)' : 'scale(1)',
+                                      '&:hover': { transform: 'scale(1.2)' }
+                                    }}
+                                  />
+                                );
+                              })}
+                            </Box>
+                          </Box>
                         </Grid>
                       </Grid>
 

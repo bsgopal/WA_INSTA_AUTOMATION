@@ -228,8 +228,9 @@ export default function WorkspaceTabBar() {
   return (
     <Box
       sx={{
-        px: 2.5,
-        py: 0.75,
+        px: { xs: 1.5, sm: 2.5 },
+        py: 0.4,
+        minHeight: 34,
         bgcolor: '#090d16',
         borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
         display: 'flex',
@@ -237,7 +238,7 @@ export default function WorkspaceTabBar() {
         justifyContent: 'space-between',
         flexShrink: 0,
         overflowX: 'auto',
-        '&::-webkit-scrollbar': { height: 4 },
+        '&::-webkit-scrollbar': { height: 3 },
         '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(255,255,255,0.15)', borderRadius: 2 }
       }}
     >
@@ -407,18 +408,32 @@ export default function WorkspaceTabBar() {
           />
         ) : (
           <Tooltip title="Real-time multi-tab state sync is active across all open tabs via BroadcastChannel">
-            <Chip
-              label="🟢 Multi-Tab Sync"
-              size="small"
+            <Box
               sx={{
-                height: 19,
-                fontSize: '0.62rem',
-                fontWeight: 700,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 0.8,
+                px: 1,
+                py: 0.25,
+                borderRadius: '6px',
                 bgcolor: 'rgba(255, 255, 255, 0.05)',
-                color: '#94a3b8',
-                border: '1px solid rgba(255, 255, 255, 0.1)'
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                cursor: 'default'
               }}
-            />
+            >
+              <Box
+                sx={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: '50%',
+                  bgcolor: '#10b981',
+                  boxShadow: '0 0 6px rgba(16, 185, 129, 0.6)'
+                }}
+              />
+              <Typography sx={{ fontSize: '0.65rem', fontWeight: 700, color: '#94a3b8' }}>
+                Multi-Tab Sync
+              </Typography>
+            </Box>
           </Tooltip>
         )}
       </Box>

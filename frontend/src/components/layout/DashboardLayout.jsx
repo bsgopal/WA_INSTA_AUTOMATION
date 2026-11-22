@@ -26,7 +26,8 @@ import {
   EventAvailable as EventAvailableIcon, MedicalServices as ServiceIcon,
   Badge as StaffIcon, EventNote as CalendarIcon,
   Lock as LockIcon,
-  AccountBalanceWallet as AccountBalanceWalletIcon
+  AccountBalanceWallet as AccountBalanceWalletIcon,
+  KeyboardArrowDown as KeyboardArrowDownIcon
 } from '@mui/icons-material';
 import apiClient from '../../api/client';
 import useAuthStore from '../../store/authStore';
@@ -207,6 +208,7 @@ export default function DashboardLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [anchorElUser, setAnchorElUser] = useState(null);
   const [anchorElNotif, setAnchorElNotif] = useState(null);
+  const [anchorElStatus, setAnchorElStatus] = useState(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const currentDrawerWidth = sidebarCollapsed ? 68 : 256;
 
@@ -651,7 +653,7 @@ export default function DashboardLayout() {
           transition: 'width 0.25s cubic-bezier(0.4, 0, 0.2, 1), margin 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
         }}
       >
-        <Toolbar sx={{ minHeight: '56px !important', px: { xs: 1.5, sm: 2 } }}>
+        <Toolbar sx={{ minHeight: '50px !important', px: { xs: 1.5, sm: 2 } }}>
           <IconButton
             color="inherit"
             aria-label="open drawer"
@@ -707,7 +709,7 @@ export default function DashboardLayout() {
                 cursor: 'pointer',
                 mr: 1.5,
                 px: 1,
-                py: 0.5,
+                py: 0.4,
                 borderRadius: '8px',
                 bgcolor: 'rgba(255, 255, 255, 0.06)',
                 border: '1px solid rgba(255, 255, 255, 0.1)',
@@ -720,8 +722,8 @@ export default function DashboardLayout() {
                 src={renicIcon}
                 alt="Renic Tech Logo"
                 sx={{
-                  width: 24,
-                  height: 24,
+                  width: 22,
+                  height: 22,
                   bgcolor: '#ffffff',
                   p: 0.25,
                   borderRadius: '5px',
@@ -730,7 +732,7 @@ export default function DashboardLayout() {
                 }}
               />
               <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', gap: 0.5 }}>
-                <Typography sx={{ fontWeight: 800, fontSize: '0.88rem', color: '#ffffff', letterSpacing: '0.4px', lineHeight: 1 }}>
+                <Typography sx={{ fontWeight: 800, fontSize: '0.85rem', color: '#ffffff', letterSpacing: '0.4px', lineHeight: 1 }}>
                   {clientName ? clientName.toUpperCase() : (licenseStatus?.companyName ? licenseStatus.companyName.toUpperCase() : 'RENIC')}
                 </Typography>
                 <Typography sx={{ fontSize: '0.58rem', fontWeight: 800, color: '#ffffff', bgcolor: '#4f46e5', px: 0.5, py: 0.1, borderRadius: '3px', lineHeight: 1 }}>
@@ -740,143 +742,197 @@ export default function DashboardLayout() {
             </Box>
           </Tooltip>
 
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Typography variant="subtitle1" noWrap component="div" sx={{ fontWeight: 700, color: '#ffffff', fontSize: '1rem' }}>
+          {/* Active Screen Title */}
+          <Box sx={{ display: { xs: 'none', sm: 'flex' }, alignItems: 'center', mr: 1.5 }}>
+            <Typography variant="subtitle1" noWrap component="div" sx={{ fontWeight: 800, color: '#f8fafc', fontSize: '0.92rem' }}>
               {menuGroups.flatMap((g) => g.items).find(item => item.path === location.pathname)?.text || 'Dashboard'}
             </Typography>
           </Box>
 
-          {/* Global Search Bar in Header */}
+          {/* Prominent Global Command Search Bar (Ctrl+K) */}
           <Box sx={{ 
             display: { xs: 'none', md: 'flex' }, 
             alignItems: 'center', 
             bgcolor: 'rgba(255, 255, 255, 0.08)', 
-            borderRadius: '6px', 
+            borderRadius: '8px', 
             border: '1px solid rgba(255, 255, 255, 0.12)',
             px: 1.5, 
-            py: 0.5, 
-            mx: 3, 
+            py: 0.45, 
+            mx: { md: 1.5, lg: 2.5 }, 
             flexGrow: 1, 
-            maxWidth: 460,
-            boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.2)'
+            maxWidth: 520,
+            boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.2)',
+            transition: 'all 0.18s ease',
+            '&:focus-within': {
+              bgcolor: 'rgba(255, 255, 255, 0.12)',
+              borderColor: '#4f46e5',
+              boxShadow: '0 0 0 2px rgba(79, 70, 229, 0.25)'
+            }
           }}>
+            <SearchIcon sx={{ color: '#94a3b8', fontSize: 18, mr: 1 }} />
             <InputBase 
               placeholder="Search conversations, customers, campaigns, catalog..." 
               fullWidth 
-              sx={{ fontSize: '0.85rem', color: '#ffffff', '& input::placeholder': { color: '#94a3b8', opacity: 1 } }}
+              sx={{ fontSize: '0.82rem', color: '#ffffff', '& input::placeholder': { color: '#94a3b8', opacity: 1 } }}
             />
-            <SearchIcon sx={{ color: '#94a3b8', fontSize: 20, cursor: 'pointer', '&:hover': { color: '#ffffff' } }} />
+            <Box sx={{ 
+              px: 0.7, 
+              py: 0.15, 
+              borderRadius: '4px', 
+              bgcolor: 'rgba(255,255,255,0.08)', 
+              border: '1px solid rgba(255,255,255,0.15)', 
+              color: '#94a3b8', 
+              fontSize: '0.62rem', 
+              fontWeight: 800,
+              fontFamily: 'monospace',
+              letterSpacing: '0.05em',
+              flexShrink: 0
+            }}>
+              Ctrl+K
+            </Box>
           </Box>
 
           <Box sx={{ flexGrow: { xs: 1, md: 0 } }} />
 
-          {/* WhatsApp Health Status Pill */}
-          <Box sx={{ display: { xs: 'none', sm: 'flex' }, alignItems: 'center', gap: 1, mr: 1.5 }}>
-            {/* Tenant Badge */}
-            {licenseStatus?.customerCode && (
-              <Chip
-                label={`🏢 ${licenseStatus.companyName || licenseStatus.customerCode}`}
-                size="small"
-                sx={{
-                  bgcolor: 'rgba(255, 255, 255, 0.08)',
-                  color: '#e2e8f0',
-                  border: '1px solid rgba(255,255,255,0.12)',
-                  fontWeight: 700,
-                  fontSize: '0.72rem',
-                  fontFamily: 'monospace',
-                  display: { xs: 'none', md: 'inline-flex' }
-                }}
-              />
-            )}
-            {/* WA Connection Pill */}
-            <Chip
-              label={
-                waHealth.status === 'CONNECTED' ? `🟢 ${waHealth.label}` :
-                waHealth.status === 'QR_READY' ? `🟡 ${waHealth.label}` :
-                waHealth.status === 'CHECKING' ? `⚪ ${waHealth.label}` :
-                `🔴 ${waHealth.label}`
-              }
-              size="small"
-              onClick={() => navigate('/settings')}
-              sx={{
-                cursor: 'pointer',
-                bgcolor: waHealth.status === 'CONNECTED'
-                  ? 'rgba(16, 185, 129, 0.2)'
-                  : waHealth.status === 'QR_READY'
-                  ? 'rgba(234, 179, 8, 0.2)'
-                  : waHealth.status === 'CHECKING'
-                  ? 'rgba(255,255,255,0.08)'
-                  : 'rgba(239, 68, 68, 0.2)',
-                color: waHealth.status === 'CONNECTED'
-                  ? '#34d399'
-                  : waHealth.status === 'QR_READY'
-                  ? '#fbbf24'
-                  : waHealth.status === 'CHECKING'
-                  ? '#94a3b8'
-                  : '#f87171',
-                border: waHealth.status === 'CONNECTED'
-                  ? '1px solid rgba(16,185,129,0.4)'
-                  : waHealth.status === 'QR_READY'
-                  ? '1px solid rgba(234,179,8,0.4)'
-                  : waHealth.status === 'CHECKING'
-                  ? '1px solid rgba(255,255,255,0.1)'
-                  : '1px solid rgba(239,68,68,0.4)',
-                fontWeight: 700,
-                fontSize: '0.72rem'
-              }}
-            />
-          </Box>
-
-          {/* Live WhatsApp Wallet Pill */}
+          {/* Consolidated Workspace Status Command Center Pill */}
           <Box sx={{ mr: 1.5, display: { xs: 'none', sm: 'flex' }, alignItems: 'center' }}>
-            <Tooltip title="WhatsApp Wallet • Click to View & Add Money">
-              <Chip
-                icon={<AccountBalanceWalletIcon sx={{ fontSize: '16px !important', color: '#10b981 !important' }} />}
-                label={
-                  walletStatus?.allowWithoutBalance 
-                    ? `Wallet: Free Bypass Active`
-                    : `₹${Number(walletStatus?.walletBalance || 0).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} (${Number(walletStatus?.availableCredits || 0).toLocaleString('en-IN')} msgs)`
-                }
-                size="small"
-                clickable
-                onClick={() => navigate('/wallet')}
+            <Tooltip title="Workspace Status · Click for Full Diagnostic Metrics">
+              <Box
+                onClick={(e) => setAnchorElStatus(e.currentTarget)}
                 sx={{
-                  bgcolor: 'rgba(16, 185, 129, 0.12)',
-                  color: '#ffffff',
-                  border: '1px solid rgba(16, 185, 129, 0.35)',
-                  fontWeight: 700,
-                  fontSize: '0.74rem',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 1,
+                  px: 1.2,
+                  py: 0.45,
+                  borderRadius: '8px',
+                  bgcolor: 'rgba(255, 255, 255, 0.06)',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
                   cursor: 'pointer',
-                  transition: 'all 0.2s ease',
+                  transition: 'all 0.18s ease',
                   '&:hover': {
-                    bgcolor: 'rgba(16, 185, 129, 0.22)',
-                    borderColor: '#10b981'
+                    bgcolor: 'rgba(255, 255, 255, 0.12)',
+                    borderColor: '#4f46e5'
                   }
                 }}
-              />
-            </Tooltip>
-          </Box>
-
-          {/* Plus / Super Admin Badge */}
-          <Box sx={{ mr: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-            {(user?.role === 'PLATFORM_OWNER' || user?.role === 'ADMIN') && (
-              <Tooltip title={`Logged in as ${user?.role === 'PLATFORM_OWNER' ? 'Platform Admin' : 'Admin'} with full platform access`}>
-                <Chip
-                  icon={<StarIcon sx={{ color: '#fbbf24 !important', fontSize: 16 }} />}
-                  label={`✦ ${user?.role === 'PLATFORM_OWNER' ? 'Platform Admin' : 'Admin'} Full Access`}
-                  size="small"
+              >
+                {/* Live Pulse Dot */}
+                <Box
                   sx={{
-                    bgcolor: 'rgba(251, 191, 36, 0.12)',
-                    color: '#fbbf24',
-                    border: '1px solid rgba(251, 191, 36, 0.35)',
-                    fontWeight: 800,
-                    fontSize: '0.72rem',
-                    letterSpacing: '0.2px',
-                    display: { xs: 'none', sm: 'inline-flex' }
+                    width: 7,
+                    height: 7,
+                    borderRadius: '50%',
+                    bgcolor: waHealth.status === 'CONNECTED' ? '#10b981' : waHealth.status === 'QR_READY' ? '#f59e0b' : '#ef4444',
+                    boxShadow: waHealth.status === 'CONNECTED' ? '0 0 8px #10b981' : waHealth.status === 'QR_READY' ? '0 0 8px #f59e0b' : '0 0 8px #ef4444'
                   }}
                 />
-              </Tooltip>
-            )}
+                <Typography sx={{ fontSize: '0.74rem', fontWeight: 800, color: '#f8fafc', fontFamily: 'monospace' }}>
+                  {licenseStatus?.customerCode || 'apx-wa01'}
+                </Typography>
+                <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748b' }}>
+                  ·
+                </Typography>
+                <Typography sx={{ fontSize: '0.74rem', fontWeight: 800, color: '#34d399' }}>
+                  ₹{Number(walletStatus?.walletBalance || 0).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                </Typography>
+                <KeyboardArrowDownIcon sx={{ fontSize: 16, color: '#94a3b8' }} />
+              </Box>
+            </Tooltip>
+
+            {/* Diagnostics Popover Menu */}
+            <Menu
+              anchorEl={anchorElStatus}
+              open={Boolean(anchorElStatus)}
+              onClose={() => setAnchorElStatus(null)}
+              slotProps={{
+                paper: {
+                  sx: {
+                    width: 320,
+                    borderRadius: '12px',
+                    border: '1px solid #334155',
+                    bgcolor: '#0f172a',
+                    color: '#ffffff',
+                    p: 1.5,
+                    boxShadow: '0 12px 36px rgba(0,0,0,0.5)'
+                  }
+                }
+              }}
+            >
+              {/* Popover Header */}
+              <Box sx={{ pb: 1.2, mb: 1.2, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                <Typography sx={{ fontSize: '0.68rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  WORKSPACE &amp; TENANT PROFILE
+                </Typography>
+                <Typography sx={{ fontSize: '0.9rem', fontWeight: 800, color: '#ffffff', mt: 0.3 }}>
+                  {clientName ? clientName.toUpperCase() : (licenseStatus?.companyName ? licenseStatus.companyName.toUpperCase() : 'APEX MEDIX')}
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#818cf8', fontWeight: 700, display: 'block' }}>
+                  {licenseStatus?.planTier || 'BASIC'} PLAN · {licenseStatus?.daysLeft != null ? `${licenseStatus.daysLeft} days remaining` : 'Active'}
+                </Typography>
+              </Box>
+
+              {/* WA Engine Health */}
+              <Box sx={{ p: 1.2, mb: 1, borderRadius: '8px', bgcolor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
+                  <Typography sx={{ fontSize: '0.72rem', fontWeight: 800, color: '#ffffff' }}>
+                    WhatsApp Engine
+                  </Typography>
+                  <Chip
+                    size="small"
+                    label={waHealth.label || 'Ready'}
+                    sx={{
+                      height: 18,
+                      fontSize: '0.62rem',
+                      fontWeight: 800,
+                      bgcolor: waHealth.status === 'CONNECTED' ? 'rgba(16,185,129,0.2)' : 'rgba(245,158,11,0.2)',
+                      color: waHealth.status === 'CONNECTED' ? '#34d399' : '#fbbf24'
+                    }}
+                  />
+                </Box>
+                <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.68rem', display: 'block' }}>
+                  Session: <span style={{ color: '#ffffff', fontFamily: 'monospace' }}>{licenseStatus?.customerCode || 'default'}</span>
+                </Typography>
+                <Button
+                  size="small"
+                  onClick={() => { setAnchorElStatus(null); navigate('/settings'); }}
+                  sx={{ mt: 0.8, textTransform: 'none', fontSize: '0.68rem', fontWeight: 700, p: 0, color: '#818cf8', '&:hover': { color: '#a5b4fc' } }}
+                >
+                  Manage Engine Connection &rarr;
+                </Button>
+              </Box>
+
+              {/* WhatsApp Wallet */}
+              <Box sx={{ p: 1.2, mb: 1, borderRadius: '8px', bgcolor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.3 }}>
+                  <Typography sx={{ fontSize: '0.72rem', fontWeight: 800, color: '#ffffff' }}>
+                    WhatsApp Wallet
+                  </Typography>
+                  <Typography sx={{ fontSize: '0.78rem', fontWeight: 800, color: '#34d399' }}>
+                    ₹{Number(walletStatus?.walletBalance || 0).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                  </Typography>
+                </Box>
+                <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.68rem', display: 'block' }}>
+                  Available Credits: {Number(walletStatus?.availableCredits || 0).toLocaleString('en-IN')} messages
+                </Typography>
+                <Button
+                  size="small"
+                  onClick={() => { setAnchorElStatus(null); navigate('/wallet'); }}
+                  sx={{ mt: 0.8, textTransform: 'none', fontSize: '0.68rem', fontWeight: 700, p: 0, color: '#818cf8', '&:hover': { color: '#a5b4fc' } }}
+                >
+                  Open Wallet &amp; Add Money &rarr;
+                </Button>
+              </Box>
+
+              {/* Platform Access Role */}
+              {(user?.role === 'PLATFORM_OWNER' || user?.role === 'ADMIN') && (
+                <Box sx={{ p: 1, borderRadius: '8px', bgcolor: 'rgba(251, 191, 36, 0.08)', border: '1px solid rgba(251, 191, 36, 0.25)', display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <StarIcon sx={{ color: '#fbbf24', fontSize: 16 }} />
+                  <Typography sx={{ fontSize: '0.7rem', fontWeight: 800, color: '#fbbf24' }}>
+                    {user?.role === 'PLATFORM_OWNER' ? 'Platform Admin' : 'Admin'} Full Access Active
+                  </Typography>
+                </Box>
+              )}
+            </Menu>
           </Box>
 
           {/* Message Center & Background Notifications Icon */}
