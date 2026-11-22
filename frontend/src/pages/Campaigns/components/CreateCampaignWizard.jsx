@@ -156,9 +156,9 @@ const MobilePreview = ({ data }) => {
             <Typography variant="body2" noWrap sx={{ fontWeight: 800, color: '#ffffff', fontSize: '10.5px', lineHeight: 1.1 }}>
               RENIC TECH Business
             </Typography>
-            <CheckCircleIcon sx={{ fontSize: 11, color: '#84cc16' }} />
+            <CheckCircleIcon sx={{ fontSize: 11, color: '#10b981' }} />
           </Stack>
-          <Typography variant="caption" sx={{ color: '#84cc16', fontSize: '8px', display: 'block', lineHeight: 1, fontWeight: 700 }}>
+          <Typography variant="caption" sx={{ color: '#10b981', fontSize: '8px', display: 'block', lineHeight: 1, fontWeight: 700 }}>
             online • official business account
           </Typography>
         </Box>
@@ -433,8 +433,8 @@ export default function CreateCampaignWizard({
                 label="Two-Column Mode"
                 size="small"
                 sx={{
-                  bgcolor: 'rgba(132, 204, 22, 0.15)',
-                  color: '#84cc16',
+                  bgcolor: 'rgba(79, 70, 229, 0.12)',
+                  color: '#4f46e5',
                   fontWeight: 800,
                   fontSize: '0.65rem',
                   height: 20
@@ -467,14 +467,14 @@ export default function CreateCampaignWizard({
             disabled={loading}
             size="small"
             sx={{
-              bgcolor: '#84cc16',
-              color: '#0f172a',
+              bgcolor: '#0f172a',
+              color: '#ffffff',
               fontWeight: 800,
               fontSize: '0.8rem',
               borderRadius: '8px',
               px: 2,
               height: 32,
-              '&:hover': { bgcolor: '#65a30d', color: '#ffffff' }
+              '&:hover': { bgcolor: '#1e293b' }
             }}
           >
             {loading ? 'Creating...' : 'Save Draft'}
@@ -516,7 +516,7 @@ export default function CreateCampaignWizard({
                 fontSize: '0.72rem',
                 fontWeight: 700,
                 height: 24,
-                '&:hover': { bgcolor: '#84cc16', color: '#0f172a', borderColor: '#84cc16' }
+                '&:hover': { bgcolor: '#4f46e5', color: '#ffffff', borderColor: '#4f46e5' }
               }}
             />
           ))}
@@ -573,7 +573,7 @@ export default function CreateCampaignWizard({
                       fontSize: '0.78rem',
                       borderRadius: '8px',
                       bgcolor: formData.messageType === 'TEXT' ? '#0f172a' : 'transparent',
-                      color: formData.messageType === 'TEXT' ? '#84cc16' : '#64748b',
+                      color: formData.messageType === 'TEXT' ? '#818cf8' : '#64748b',
                       borderColor: '#cbd5e1'
                     }}
                   >
@@ -589,7 +589,7 @@ export default function CreateCampaignWizard({
                       fontSize: '0.78rem',
                       borderRadius: '8px',
                       bgcolor: formData.messageType === 'MEDIA' ? '#0f172a' : 'transparent',
-                      color: formData.messageType === 'MEDIA' ? '#84cc16' : '#64748b',
+                      color: formData.messageType === 'MEDIA' ? '#818cf8' : '#64748b',
                       borderColor: '#cbd5e1'
                     }}
                   >
@@ -674,7 +674,7 @@ export default function CreateCampaignWizard({
                 <Typography variant="caption" sx={{ fontWeight: 800, color: '#0f172a', textTransform: 'uppercase' }}>
                   📱 Real-Time WhatsApp Simulator
                 </Typography>
-                <Chip label="LIVE PREVIEW" size="small" sx={{ height: 18, fontSize: '0.6rem', fontWeight: 800, bgcolor: '#84cc16', color: '#0f172a' }} />
+                <Chip label="LIVE PREVIEW" size="small" sx={{ height: 18, fontSize: '0.6rem', fontWeight: 800, bgcolor: '#4f46e5', color: '#ffffff' }} />
               </Box>
 
               <MobilePreview data={formData} />
@@ -695,13 +695,13 @@ export default function CreateCampaignWizard({
           onClick={handleSubmit}
           disabled={loading}
           sx={{
-            bgcolor: '#84cc16',
-            color: '#0f172a',
+            bgcolor: '#4f46e5',
+            color: '#ffffff',
             fontWeight: 800,
             fontSize: '0.85rem',
             borderRadius: '8px',
             px: 3,
-            '&:hover': { bgcolor: '#65a30d', color: '#ffffff' }
+            '&:hover': { bgcolor: '#4338ca', color: '#ffffff' }
           }}
         >
           {loading ? 'Creating...' : 'Save & Launch Broadcast'}

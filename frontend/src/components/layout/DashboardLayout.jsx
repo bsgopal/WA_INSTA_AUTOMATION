@@ -1156,7 +1156,7 @@ export default function DashboardLayout() {
                 <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#0f172a' }}>
                   {user?.firstName} {user?.lastName}
                 </Typography>
-                <Typography variant="caption" sx={{ color: '#65a30d', fontWeight: 700, display: 'block' }}>
+                <Typography variant="caption" sx={{ color: '#4f46e5', fontWeight: 700, display: 'block' }}>
                   {(user?.role === 'PLATFORM_OWNER' || user?.role === 'ADMIN') ? '✦ Full Access Admin' : user?.role}
                 </Typography>
                 <Typography variant="caption" sx={{ display: 'block', color: '#64748b', fontSize: '0.7rem' }}>
@@ -1164,11 +1164,11 @@ export default function DashboardLayout() {
                 </Typography>
               </Box>
               <MenuItem onClick={handleOpenProfile} sx={{ py: 1, gap: 1 }}>
-                <PersonIcon fontSize="small" sx={{ color: '#65a30d' }} />
+                <PersonIcon fontSize="small" sx={{ color: '#4f46e5' }} />
                 <Typography variant="body2">My Profile</Typography>
               </MenuItem>
               <MenuItem onClick={() => { handleCloseUserMenu(); navigate('/settings'); }} sx={{ py: 1, gap: 1 }}>
-                <SecurityIcon fontSize="small" sx={{ color: '#65a30d' }} />
+                <SecurityIcon fontSize="small" sx={{ color: '#4f46e5' }} />
                 <Typography variant="body2">Platform Settings</Typography>
               </MenuItem>
               <MenuItem onClick={handleLogout} sx={{ py: 1, gap: 1 }}>

@@ -128,10 +128,10 @@ const CampaignList = React.memo(({
                   fontWeight: 800,
                   fontSize: '0.78rem',
                   py: 1.5,
-                  borderBottom: '2px solid #84cc16'
+                  borderBottom: '2px solid #4f46e5'
                 }
               }}>
-                <TableCell sx={{ width: 48, color: '#84cc16' }}>#</TableCell>
+                <TableCell sx={{ width: 48, color: '#818cf8' }}>#</TableCell>
                 <TableCell>CAMPAIGN NAME & TOPIC</TableCell>
                 <TableCell>TYPE</TableCell>
                 <TableCell>TARGET AUDIENCE</TableCell>
@@ -206,7 +206,7 @@ const CampaignList = React.memo(({
                             height: 6,
                             borderRadius: 3,
                             bgcolor: '#e2e8f0',
-                            '& .MuiLinearProgress-bar': { bgcolor: pct === 100 ? '#10b981' : '#84cc16' }
+                            '& .MuiLinearProgress-bar': { bgcolor: pct === 100 ? '#10b981' : '#4f46e5' }
                           }}
                         />
                       </Box>

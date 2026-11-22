@@ -1027,8 +1027,8 @@ export default function ResponseRules() {
       sublabel: 'All Triggers Configured',
       value: rules.length,
       gradient: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
-      accent: '#84cc16',
-      iconColor: '#84cc16'
+      accent: '#4f46e5',
+      iconColor: '#4f46e5'
     },
     {
       icon: CheckCircleIcon,
@@ -1089,11 +1089,11 @@ export default function ResponseRules() {
                 width: 38,
                 height: 38,
                 borderRadius: '10px',
-                bgcolor: 'rgba(132, 204, 22, 0.15)',
+                bgcolor: 'rgba(79, 70, 229, 0.12)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#4d7c0f'
+                color: '#3730a3'
               }}
             >
               <FlashOnIcon sx={{ fontSize: 22 }} />
@@ -1107,8 +1107,8 @@ export default function ResponseRules() {
                   label="24/7 Automation"
                   size="small"
                   sx={{
-                    bgcolor: 'rgba(132, 204, 22, 0.15)',
-                    color: '#4d7c0f',
+                    bgcolor: 'rgba(79, 70, 229, 0.12)',
+                    color: '#3730a3',
                     fontWeight: 700,
                     fontSize: '0.68rem',
                     height: 20
@@ -1161,7 +1161,7 @@ export default function ResponseRules() {
             </Button>
             <Button
               variant="outlined"
-              startIcon={<AutoAwesomeIcon sx={{ color: '#65a30d', fontSize: 16 }} />}
+              startIcon={<AutoAwesomeIcon sx={{ color: '#4338ca', fontSize: 16 }} />}
               size="small"
               onClick={() => { setOpenAICopilot(true); if (!openDrawer) handleOpenAddDrawer(); }}
               sx={{
@@ -1170,10 +1170,10 @@ export default function ResponseRules() {
                 fontSize: '0.78rem',
                 height: 34,
                 borderRadius: '8px',
-                color: '#4d7c0f',
+                color: '#3730a3',
                 borderColor: 'rgba(132, 204, 22, 0.5)',
-                bgcolor: 'rgba(132, 204, 22, 0.08)',
-                '&:hover': { bgcolor: 'rgba(132, 204, 22, 0.16)', borderColor: '#84cc16' }
+                bgcolor: 'rgba(79, 70, 229, 0.08)',
+                '&:hover': { bgcolor: 'rgba(79, 70, 229, 0.12)', borderColor: '#4f46e5' }
               }}
             >
               AI Copilot
@@ -1238,17 +1238,16 @@ export default function ResponseRules() {
               size="small"
               onClick={handleOpenCreateModal}
               sx={{
-                bgcolor: '#84cc16',
-                color: '#0f172a',
+                bgcolor: '#4f46e5', color: '#ffffff',
                 px: 1.5,
                 height: 34,
                 borderRadius: '8px',
                 fontSize: '0.78rem',
                 fontWeight: 800,
                 textTransform: 'none',
-                boxShadow: '0 2px 8px rgba(132, 204, 22, 0.3)',
+                boxShadow: '0 2px 8px rgba(79, 70, 229, 0.25)',
                 '&:hover': {
-                  bgcolor: '#65a30d',
+                  bgcolor: '#4338ca',
                   color: '#ffffff'
                 }
               }}
@@ -1279,7 +1278,7 @@ export default function ResponseRules() {
                 transition: 'all 0.2s ease',
                 '&.Mui-selected': { color: '#0f172a', bgcolor: '#f8fafc' }
               },
-              '& .MuiTabs-indicator': { backgroundColor: '#84cc16', height: 3, borderRadius: '3px' }
+              '& .MuiTabs-indicator': { backgroundColor: '#4f46e5', height: 3, borderRadius: '3px' }
             }}
           >
             <Tab
@@ -1301,7 +1300,7 @@ export default function ResponseRules() {
                       height: 18,
                       fontSize: '0.68rem',
                       fontWeight: 800,
-                      bgcolor: hubTab === 'RULES' ? '#65a30d' : '#e2e8f0',
+                      bgcolor: hubTab === 'RULES' ? '#4338ca' : '#e2e8f0',
                       color: hubTab === 'RULES' ? '#ffffff' : '#475569'
                     }}
                   />
@@ -1373,8 +1372,8 @@ export default function ResponseRules() {
               bgcolor: '#f8fafc',
               height: '42px',
               fontSize: '0.875rem',
-              '&:hover fieldset': { borderColor: '#84cc16' },
-              '&.Mui-focused fieldset': { borderColor: '#84cc16' }
+              '&:hover fieldset': { borderColor: '#4f46e5' },
+              '&.Mui-focused fieldset': { borderColor: '#4f46e5' }
             }
           }}
           InputProps={{
@@ -1469,7 +1468,7 @@ export default function ResponseRules() {
       {/* Rules Content */}
       {loading ? (
         <Paper sx={{ p: 6, textAlign: 'center', bgcolor: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0' }} elevation={0}>
-          <CircularProgress size={32} sx={{ color: '#84cc16' }} />
+          <CircularProgress size={32} sx={{ color: '#4f46e5' }} />
           <Typography variant="body2" sx={{ color: '#64748b', mt: 2, fontWeight: 600 }}>Loading automation rules...</Typography>
         </Paper>
       ) : rules.length === 0 ? (
@@ -1479,7 +1478,7 @@ export default function ResponseRules() {
               width: 64,
               height: 64,
               borderRadius: '16px',
-              bgcolor: 'rgba(132, 204, 22, 0.15)',
+              bgcolor: 'rgba(79, 70, 229, 0.12)',
               color: '#0f172a',
               display: 'flex',
               alignItems: 'center',
@@ -1488,7 +1487,7 @@ export default function ResponseRules() {
               mb: 2
             }}
           >
-            <FlashOnIcon sx={{ fontSize: 32, color: '#84cc16' }} />
+            <FlashOnIcon sx={{ fontSize: 32, color: '#4f46e5' }} />
           </Box>
           <Typography variant="h6" sx={{ fontWeight: 800, color: '#0f172a', mb: 0.5 }}>
             No Response Rules Yet
@@ -1501,8 +1500,7 @@ export default function ResponseRules() {
             startIcon={<AddIcon />}
             onClick={handleOpenCreateModal}
             sx={{
-              bgcolor: '#84cc16',
-              color: '#0f172a',
+              bgcolor: '#4f46e5', color: '#ffffff',
               fontWeight: 800,
               textTransform: 'none',
               px: 3,
@@ -1548,7 +1546,7 @@ export default function ResponseRules() {
                   '&:hover': {
                     transform: 'translateY(-3px)',
                     boxShadow: '0 16px 32px -8px rgba(15, 23, 42, 0.14)',
-                    borderColor: rule.isActive ? '#84cc16' : '#cbd5e1'
+                    borderColor: rule.isActive ? '#4f46e5' : '#cbd5e1'
                   }
                 }}
               >
@@ -1560,7 +1558,7 @@ export default function ResponseRules() {
                         width: 8,
                         height: 8,
                         borderRadius: '50%',
-                        bgcolor: rule.isActive ? '#84cc16' : '#94a3b8',
+                        bgcolor: rule.isActive ? '#4f46e5' : '#94a3b8',
                         boxShadow: rule.isActive ? '0 0 8px rgba(132, 204, 22, 0.8)' : 'none'
                       }} />
                       <Typography
@@ -1597,11 +1595,11 @@ export default function ResponseRules() {
                         onChange={() => handleToggleActiveRule(rule._id, rule.isActive)}
                         sx={{
                           '& .MuiSwitch-switchBase.Mui-checked': {
-                            color: '#84cc16',
-                            '&:hover': { backgroundColor: 'rgba(132, 204, 22, 0.08)' }
+                            color: '#4f46e5',
+                            '&:hover': { backgroundColor: 'rgba(79, 70, 229, 0.08)' }
                           },
                           '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
-                            backgroundColor: '#84cc16'
+                            backgroundColor: '#4f46e5'
                           }
                         }}
                       />
@@ -1639,8 +1637,7 @@ export default function ResponseRules() {
                         label={rule.triggerType || 'KEYWORD'}
                         size="small"
                         sx={{
-                          bgcolor: '#84cc16',
-                          color: '#0f172a',
+                          bgcolor: '#4f46e5', color: '#ffffff',
                           fontWeight: 800,
                           fontSize: '11px',
                           height: 22
@@ -1666,7 +1663,7 @@ export default function ResponseRules() {
                   {/* Flow Arrow */}
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#94a3b8' }}>
                     <Box sx={{ height: '1px', flex: 1, bgcolor: '#cbd5e1' }} />
-                    <ArrowDownwardIcon sx={{ fontSize: 13, color: '#84cc16' }} />
+                    <ArrowDownwardIcon sx={{ fontSize: 13, color: '#4f46e5' }} />
                     <Typography variant="caption" sx={{ fontSize: '9px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>
                       Then Execute
                     </Typography>
@@ -1752,7 +1749,7 @@ export default function ResponseRules() {
                       fontWeight: 800,
                       textTransform: 'none',
                       bgcolor: '#0f172a',
-                      color: '#84cc16',
+                      color: '#4f46e5',
                       boxShadow: 'none',
                       '&:hover': { bgcolor: '#1e293b', boxShadow: 'none' }
                     }}
@@ -1798,9 +1795,9 @@ export default function ResponseRules() {
                 fontWeight: 'bold',
                 width: '100%',
                 boxSizing: 'border-box',
-                borderBottom: '2px solid #84cc16'
+                borderBottom: '2px solid #4f46e5'
               }}>
-                <Box sx={{ fontWeight: 800, fontSize: '0.85rem', color: '#84cc16' }}>#</Box>
+                <Box sx={{ fontWeight: 800, fontSize: '0.85rem', color: '#4f46e5' }}>#</Box>
                 <Box sx={{ fontWeight: 800, fontSize: '0.85rem' }}>Rule Name & Creator</Box>
                 <Box sx={{ fontWeight: 800, fontSize: '0.85rem' }}>Trigger Match</Box>
                 <Box sx={{ fontWeight: 800, fontSize: '0.85rem' }}>Action Payload</Box>
@@ -1826,7 +1823,7 @@ export default function ResponseRules() {
                     cursor: 'pointer',
                     transition: 'all 0.15s ease',
                     '&:hover': { 
-                      backgroundColor: 'rgba(132, 204, 22, 0.08)',
+                      backgroundColor: 'rgba(79, 70, 229, 0.08)',
                       transform: 'scale(1.002)'
                     },
                   }}
@@ -1848,7 +1845,7 @@ export default function ResponseRules() {
 
                   {/* Trigger */}
                   <Box>
-                    <Chip label={rule.triggerType || 'KEYWORD'} size="small" sx={{ fontWeight: 800, mb: 0.5, bgcolor: '#84cc16', color: '#0f172a', height: 20, fontSize: '0.7rem' }} />
+                    <Chip label={rule.triggerType || 'KEYWORD'} size="small" sx={{ fontWeight: 800, mb: 0.5, bgcolor: '#4f46e5', color: '#ffffff', height: 20, fontSize: '0.7rem' }} />
                     <Typography variant="body2" sx={{ color: '#0f172a', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       "{rule.triggerValue}"
                     </Typography>
@@ -1875,8 +1872,8 @@ export default function ResponseRules() {
                           checked={rule.isActive}
                           onChange={() => handleToggleActiveRule(rule._id, rule.isActive)}
                           sx={{
-                            '& .MuiSwitch-switchBase.Mui-checked': { color: '#84cc16' },
-                            '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: '#84cc16' }
+                            '& .MuiSwitch-switchBase.Mui-checked': { color: '#4f46e5' },
+                            '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: '#4f46e5' }
                           }}
                         />
                       } 
@@ -1905,7 +1902,7 @@ export default function ResponseRules() {
                       <IconButton 
                         size="small" 
                         onClick={() => handleOpenEditDrawer(rule)}
-                        sx={{ color: '#84cc16', bgcolor: '#0f172a', borderRadius: '8px', '&:hover': { bgcolor: '#1e293b' } }}
+                        sx={{ color: '#818cf8', bgcolor: '#0f172a', borderRadius: '8px', '&:hover': { bgcolor: '#1e293b' } }}
                       >
                         <EditIcon fontSize="small" />
                       </IconButton>
@@ -1954,7 +1951,7 @@ export default function ResponseRules() {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                borderBottom: '2px solid #84cc16'
+                borderBottom: '2px solid #4f46e5'
               }}
             >
               <Stack direction="row" spacing={1.5} alignItems="center">
@@ -1963,8 +1960,7 @@ export default function ResponseRules() {
                     width: 36,
                     height: 36,
                     borderRadius: '10px',
-                    bgcolor: '#84cc16',
-                    color: '#0f172a',
+                    bgcolor: '#4f46e5', color: '#ffffff',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -1979,7 +1975,7 @@ export default function ResponseRules() {
                   </Typography>
                   <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.75rem' }}>
                     Trigger Type: <strong>{selectedDetailRule.triggerType || 'KEYWORD'}</strong> • Status:{' '}
-                    <span style={{ color: selectedDetailRule.isActive ? '#84cc16' : '#94a3b8', fontWeight: 800 }}>
+                    <span style={{ color: selectedDetailRule.isActive ? '#4f46e5' : '#94a3b8', fontWeight: 800 }}>
                       {selectedDetailRule.isActive ? 'ACTIVE (Live)' : 'PAUSED'}
                     </span>
                   </Typography>
@@ -2005,7 +2001,7 @@ export default function ResponseRules() {
                         <Chip
                           label={selectedDetailRule.triggerType || 'KEYWORD'}
                           size="small"
-                          sx={{ bgcolor: '#84cc16', color: '#0f172a', fontWeight: 800, fontSize: '0.75rem' }}
+                          sx={{ bgcolor: '#4f46e5', color: '#ffffff', fontWeight: 800, fontSize: '0.75rem' }}
                         />
                         <Typography variant="body1" sx={{ fontWeight: 800, color: '#0f172a' }}>
                           "{selectedDetailRule.triggerValue}"
@@ -2048,7 +2044,7 @@ export default function ResponseRules() {
                                 </Typography>
                               )}
                               {b.type === 'CARD' && (
-                                <Box sx={{ pl: 1, borderLeft: '2px solid #84cc16' }}>
+                                <Box sx={{ pl: 1, borderLeft: '2px solid #4f46e5' }}>
                                   <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{b.config?.title}</Typography>
                                   <Typography variant="caption" color="text.secondary">{b.config?.description}</Typography>
                                 </Box>
@@ -2195,7 +2191,7 @@ export default function ResponseRules() {
                   }}
                   sx={{
                     bgcolor: '#0f172a',
-                    color: '#84cc16',
+                    color: '#4f46e5',
                     fontWeight: 800,
                     textTransform: 'none',
                     borderRadius: '8px',
@@ -2245,7 +2241,7 @@ export default function ResponseRules() {
             <Grid item xs={6} md={3}>
               <Card elevation={0} sx={{ p: 2, borderRadius: '14px', border: '1px solid #e2e8f0', bgcolor: '#ffffff' }}>
                 <Stack direction="row" spacing={1.5} alignItems="center">
-                  <Box sx={{ width: 42, height: 42, borderRadius: '10px', bgcolor: 'rgba(132, 204, 22, 0.15)', color: '#65a30d', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Box sx={{ width: 42, height: 42, borderRadius: '10px', bgcolor: 'rgba(79, 70, 229, 0.12)', color: '#4338ca', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <CheckCircleIcon />
                   </Box>
                   <Box>
@@ -2359,7 +2355,7 @@ export default function ResponseRules() {
                     color: '#ffffff',
                     alignItems: 'center'
                   }}>
-                    <Box sx={{ fontWeight: 800, fontSize: '0.82rem', color: '#84cc16' }}>#</Box>
+                    <Box sx={{ fontWeight: 800, fontSize: '0.82rem', color: '#4f46e5' }}>#</Box>
                     <Box sx={{ fontWeight: 700, fontSize: '0.82rem' }}>WORKFLOW NAME & DETAILS</Box>
                     <Box sx={{ fontWeight: 700, fontSize: '0.82rem' }}>TRIGGER EVENT</Box>
                     <Box sx={{ fontWeight: 700, fontSize: '0.82rem' }}>EXECUTIONS</Box>
@@ -2422,8 +2418,8 @@ export default function ResponseRules() {
                                   checked={wf.status === 'ACTIVE'}
                                   onChange={() => handleToggleWorkflowStatus(wf)}
                                   sx={{
-                                    '& .MuiSwitch-switchBase.Mui-checked': { color: '#84cc16' },
-                                    '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: '#84cc16' }
+                                    '& .MuiSwitch-switchBase.Mui-checked': { color: '#4f46e5' },
+                                    '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: '#4f46e5' }
                                   }}
                                 />
                               }
@@ -2965,8 +2961,7 @@ export default function ResponseRules() {
                 width: 32,
                 height: 32,
                 borderRadius: '8px',
-                bgcolor: '#84cc16',
-                color: '#0f172a',
+                bgcolor: '#4f46e5', color: '#ffffff',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -2985,8 +2980,8 @@ export default function ResponseRules() {
                   label="INSTANT COPILOT"
                   size="small"
                   sx={{
-                    bgcolor: 'rgba(132, 204, 22, 0.15)',
-                    color: '#84cc16',
+                    bgcolor: 'rgba(79, 70, 229, 0.12)',
+                    color: '#4f46e5',
                     fontWeight: 800,
                     fontSize: '0.68rem',
                     height: 20
@@ -3060,7 +3055,7 @@ export default function ResponseRules() {
                 fontWeight: 700,
                 fontSize: '0.75rem',
                 color: '#0f172a',
-                '&:hover': { bgcolor: '#0f172a', color: '#84cc16' }
+                '&:hover': { bgcolor: '#0f172a', color: '#818cf8' }
               }}
             />
           ))}
@@ -3299,14 +3294,13 @@ export default function ResponseRules() {
               variant="contained"
               onClick={handleSaveQuickRule}
               sx={{
-                bgcolor: '#84cc16',
-                color: '#0f172a',
+                bgcolor: '#4f46e5', color: '#ffffff',
                 fontWeight: 900,
                 borderRadius: '10px',
                 px: 3,
                 boxShadow: '0 4px 14px rgba(132, 204, 22, 0.45)',
                 '&:hover': {
-                  bgcolor: '#65a30d',
+                  bgcolor: '#4338ca',
                   color: '#ffffff'
                 }
               }}

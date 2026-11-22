@@ -1741,7 +1741,7 @@ export default function Conversations() {
                             fontWeight: 600,
                             fontSize: '0.75rem',
                             bgcolor: rep.type === 'professional' ? 'rgba(37,99,235,0.08)' : rep.type === 'friendly' ? 'rgba(132,204,22,0.12)' : 'rgba(245,158,11,0.1)',
-                            color: rep.type === 'professional' ? '#1d4ed8' : rep.type === 'friendly' ? '#4d7c0f' : '#b45309',
+                            color: rep.type === 'professional' ? '#1d4ed8' : rep.type === 'friendly' ? '#10b981' : '#b45309',
                             border: '1px solid',
                             borderColor: rep.type === 'professional' ? 'rgba(37,99,235,0.2)' : rep.type === 'friendly' ? 'rgba(132,204,22,0.3)' : 'rgba(245,158,11,0.25)'
                           }}

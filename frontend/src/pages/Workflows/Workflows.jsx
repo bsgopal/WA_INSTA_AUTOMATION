@@ -73,7 +73,7 @@ export default function Workflows() {
   const [categoryForm, setCategoryForm] = useState({
     name: '',
     description: '',
-    color: '#84cc16',
+    color: '#4f46e5',
     icon: 'folder'
   });
 
@@ -627,7 +627,7 @@ export default function Workflows() {
       });
       setCategories([...categories, response.data]);
       setSnackbar({ open: true, message: 'Category created successfully!', severity: 'success' });
-      setCategoryForm({ name: '', description: '', color: '#84cc16', icon: 'folder' });
+      setCategoryForm({ name: '', description: '', color: '#4f46e5', icon: 'folder' });
       setOpenCategoryDialog(false);
     } catch (error) {
       setSnackbar({ open: true, message: 'Failed to create category', severity: 'error' });
@@ -766,11 +766,11 @@ export default function Workflows() {
                 width: 38,
                 height: 38,
                 borderRadius: '10px',
-                bgcolor: 'rgba(132, 204, 22, 0.15)',
+                bgcolor: 'rgba(79, 70, 229, 0.12)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#4d7c0f'
+                color: '#3730a3'
               }}
             >
               <AccountTreeIcon sx={{ fontSize: 22 }} />
@@ -784,8 +784,8 @@ export default function Workflows() {
                   label="Flow Engine"
                   size="small"
                   sx={{
-                    backgroundColor: 'rgba(132, 204, 22, 0.15)',
-                    color: '#4d7c0f',
+                    backgroundColor: 'rgba(79, 70, 229, 0.12)',
+                    color: '#3730a3',
                     fontWeight: 700,
                     fontSize: '0.68rem',
                     height: 20
@@ -832,7 +832,7 @@ export default function Workflows() {
                 fontSize: '0.78rem',
                 height: 34,
                 borderRadius: '8px',
-                '&:hover': { borderColor: '#84cc16', backgroundColor: 'rgba(132,204,22,0.06)', color: '#0f172a' }
+                '&:hover': { borderColor: '#4f46e5', backgroundColor: 'rgba(79, 70, 229, 0.06)', color: '#0f172a' }
               }}
             >
               Category
@@ -874,8 +874,7 @@ export default function Workflows() {
                 setOpenCreateRuleModal(true);
               }}
               sx={{
-                backgroundColor: '#84cc16',
-                color: '#0f172a',
+                backgroundColor: '#4f46e5', color: '#ffffff',
                 textDecoration: 'none',
                 textTransform: 'none',
                 fontWeight: 800,
@@ -883,8 +882,8 @@ export default function Workflows() {
                 height: 34,
                 borderRadius: '8px',
                 px: 1.5,
-                boxShadow: '0 2px 8px rgba(132, 204, 22, 0.3)',
-                '&:hover': { backgroundColor: '#65a30d' }
+                boxShadow: '0 2px 8px rgba(79, 70, 229, 0.25)',
+                '&:hover': { backgroundColor: '#4338ca' }
               }}
             >
               + New Rule
@@ -933,7 +932,7 @@ export default function Workflows() {
                 transition: 'all 0.2s ease',
                 '&.Mui-selected': { color: '#0f172a', bgcolor: '#f8fafc' }
               },
-              '& .MuiTabs-indicator': { backgroundColor: '#84cc16', height: 3, borderRadius: '3px' }
+              '& .MuiTabs-indicator': { backgroundColor: '#4f46e5', height: 3, borderRadius: '3px' }
             }}
           >
             <Tab
@@ -981,7 +980,7 @@ export default function Workflows() {
                       height: 18,
                       fontSize: '0.68rem',
                       fontWeight: 800,
-                      bgcolor: hubTab === 'RULES' ? '#65a30d' : '#e2e8f0',
+                      bgcolor: hubTab === 'RULES' ? '#4338ca' : '#e2e8f0',
                       color: hubTab === 'RULES' ? '#ffffff' : '#475569'
                     }}
                   />
@@ -1026,7 +1025,7 @@ export default function Workflows() {
                 {categories.map((cat) => (
                   <MenuItem key={cat._id} value={cat._id}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Box sx={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: cat.color || '#84cc16' }} />
+                      <Box sx={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: cat.color || '#4f46e5' }} />
                       {cat.name}
                     </Box>
                   </MenuItem>
@@ -1051,7 +1050,7 @@ export default function Workflows() {
             sx={{
               '& .MuiTab-root': { textTransform: 'none', fontWeight: 700, fontSize: '0.875rem' },
               '& .Mui-selected': { color: '#0f172a' },
-              '& .MuiTabs-indicator': { backgroundColor: '#84cc16', height: 3 }
+              '& .MuiTabs-indicator': { backgroundColor: '#4f46e5', height: 3 }
             }}
           >
             <Tab
@@ -1068,7 +1067,7 @@ export default function Workflows() {
               label={
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <span>Active</span>
-                  <Chip label={activeCount} size="small" sx={{ height: 20, fontSize: '0.7rem', fontWeight: 700, bgcolor: '#84cc16', color: '#0f172a' }} />
+                  <Chip label={activeCount} size="small" sx={{ height: 20, fontSize: '0.7rem', fontWeight: 700, bgcolor: '#4f46e5', color: '#ffffff' }} />
                 </Box>
               }
             />
@@ -1088,11 +1087,11 @@ export default function Workflows() {
       {/* WORKFLOWS TABLE */}
       {loading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-          <CircularProgress sx={{ color: '#84cc16' }} />
+          <CircularProgress sx={{ color: '#4f46e5' }} />
         </Box>
       ) : filteredWorkflows.length === 0 ? (
         <Paper sx={{ p: 6, textAlign: 'center', borderRadius: '16px', border: '1px dashed #cbd5e1', bgcolor: '#ffffff' }}>
-          <AutoAwesomeIcon sx={{ fontSize: 60, color: '#84cc16', mb: 2 }} />
+          <AutoAwesomeIcon sx={{ fontSize: 60, color: '#4f46e5', mb: 2 }} />
           <Typography variant="h6" gutterBottom sx={{ fontWeight: 800, color: '#0f172a' }}>
             No workflows found
           </Typography>
@@ -1104,13 +1103,12 @@ export default function Workflows() {
             startIcon={<AddIcon />}
             onClick={handleOpenQuickCreate}
             sx={{
-              backgroundColor: '#84cc16',
-              color: '#0f172a',
+              backgroundColor: '#4f46e5', color: '#ffffff',
               textTransform: 'none',
               fontWeight: 800,
               borderRadius: '8px',
               px: 3,
-              '&:hover': { backgroundColor: '#65a30d' }
+              '&:hover': { backgroundColor: '#4338ca' }
             }}
           >
             Create Quick Automation
@@ -1132,7 +1130,7 @@ export default function Workflows() {
                   alignItems: 'center'
                 }}
               >
-                <Box sx={{ fontWeight: 800, fontSize: '0.85rem', color: '#84cc16' }}>#</Box>
+                <Box sx={{ fontWeight: 800, fontSize: '0.85rem', color: '#4f46e5' }}>#</Box>
                 <Box sx={{ fontWeight: 700, fontSize: '0.85rem' }}>WORKFLOW NAME & DETAILS</Box>
                 <Box sx={{ fontWeight: 700, fontSize: '0.85rem' }}>TRIGGER EVENT</Box>
                 <Box sx={{ fontWeight: 700, fontSize: '0.85rem' }}>CATEGORY</Box>
@@ -1195,9 +1193,9 @@ export default function Workflows() {
                           label={category.name}
                           size="small"
                           sx={{
-                            backgroundColor: `${category.color || '#84cc16'}18`,
-                            color: category.color || '#65a30d',
-                            border: `1px solid ${category.color || '#84cc16'}40`,
+                            backgroundColor: `${category.color || '#4f46e5'}18`,
+                            color: category.color || '#4338ca',
+                            border: `1px solid ${category.color || '#4f46e5'}40`,
                             fontWeight: 700,
                             fontSize: '0.75rem'
                           }}
@@ -1226,8 +1224,8 @@ export default function Workflows() {
                             checked={workflow.status === 'ACTIVE'}
                             onChange={() => handleToggleStatus(workflow)}
                             sx={{
-                              '& .MuiSwitch-switchBase.Mui-checked': { color: '#84cc16' },
-                              '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: '#84cc16' }
+                              '& .MuiSwitch-switchBase.Mui-checked': { color: '#4f46e5' },
+                              '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: '#4f46e5' }
                             }}
                           />
                         }
@@ -1284,7 +1282,7 @@ export default function Workflows() {
           <Grid container spacing={2.5} sx={{ mb: 3 }}>
             <Grid item xs={12} sm={4}>
               <Paper elevation={0} sx={{ p: 2.5, borderRadius: '12px', border: '1px solid #e2e8f0', bgcolor: '#ffffff', display: 'flex', alignItems: 'center', gap: 2 }}>
-                <Avatar sx={{ bgcolor: 'rgba(132, 204, 22, 0.15)', color: '#65a30d', width: 48, height: 48 }}>
+                <Avatar sx={{ bgcolor: 'rgba(79, 70, 229, 0.12)', color: '#4338ca', width: 48, height: 48 }}>
                   <SmartToyIcon />
                 </Avatar>
                 <Box>
@@ -1352,13 +1350,12 @@ export default function Workflows() {
                   startIcon={<AddIcon />}
                   onClick={() => setOpenCreateRuleModal(true)}
                   sx={{
-                    bgcolor: '#84cc16',
-                    color: '#0f172a',
+                    bgcolor: '#4f46e5', color: '#ffffff',
                     fontWeight: 800,
                     textTransform: 'none',
                     borderRadius: '8px',
                     px: 2,
-                    '&:hover': { bgcolor: '#65a30d' }
+                    '&:hover': { bgcolor: '#4338ca' }
                   }}
                 >
                   + New Response Rule
@@ -1374,7 +1371,7 @@ export default function Workflows() {
             return (r.name || '').toLowerCase().includes(q) || (r.triggerValue || '').toLowerCase().includes(q);
           }).length === 0 ? (
             <Paper sx={{ p: 6, textAlign: 'center', borderRadius: '16px', border: '1px dashed #cbd5e1', bgcolor: '#f8fafc' }} elevation={0}>
-              <SmartToyIcon sx={{ fontSize: 48, color: '#84cc16', mb: 1.5 }} />
+              <SmartToyIcon sx={{ fontSize: 48, color: '#4f46e5', mb: 1.5 }} />
               <Typography variant="h6" sx={{ fontWeight: 800, color: '#0f172a', mb: 0.5 }}>
                 No Response Rules Found
               </Typography>
@@ -1385,7 +1382,7 @@ export default function Workflows() {
                 variant="contained"
                 startIcon={<AddIcon />}
                 onClick={() => setOpenCreateRuleModal(true)}
-                sx={{ bgcolor: '#84cc16', color: '#0f172a', fontWeight: 800, textTransform: 'none', borderRadius: '8px', px: 3, '&:hover': { bgcolor: '#65a30d' } }}
+                sx={{ bgcolor: '#4f46e5', color: '#ffffff', fontWeight: 800, textTransform: 'none', borderRadius: '8px', px: 3, '&:hover': { bgcolor: '#4338ca' } }}
               >
                 Create Response Rule
               </Button>
@@ -1404,7 +1401,7 @@ export default function Workflows() {
                     color: '#ffffff',
                     alignItems: 'center'
                   }}>
-                    <Box sx={{ fontWeight: 800, fontSize: '0.82rem', color: '#84cc16' }}>#</Box>
+                    <Box sx={{ fontWeight: 800, fontSize: '0.82rem', color: '#4f46e5' }}>#</Box>
                     <Box sx={{ fontWeight: 700, fontSize: '0.82rem' }}>RULE NAME</Box>
                     <Box sx={{ fontWeight: 700, fontSize: '0.82rem' }}>CUSTOMER TRIGGER KEYWORDS</Box>
                     <Box sx={{ fontWeight: 700, fontSize: '0.82rem' }}>ACTION TYPE</Box>
@@ -1456,7 +1453,7 @@ export default function Workflows() {
                           <Chip
                             label={r.actionType?.replace('_', ' ') || 'SEND TEXT'}
                             size="small"
-                            sx={{ fontWeight: 700, fontSize: '0.7rem', bgcolor: 'rgba(132, 204, 22, 0.12)', color: '#4d7c0f' }}
+                            sx={{ fontWeight: 700, fontSize: '0.7rem', bgcolor: 'rgba(79, 70, 229, 0.12)', color: '#3730a3' }}
                           />
                         </Box>
                         <Box>
@@ -1467,8 +1464,8 @@ export default function Workflows() {
                                 checked={Boolean(r.isActive)}
                                 onChange={() => handleToggleRuleStatus(r)}
                                 sx={{
-                                  '& .MuiSwitch-switchBase.Mui-checked': { color: '#84cc16' },
-                                  '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: '#84cc16' }
+                                  '& .MuiSwitch-switchBase.Mui-checked': { color: '#4f46e5' },
+                                  '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: '#4f46e5' }
                                 }}
                               />
                             }
@@ -1625,7 +1622,7 @@ export default function Workflows() {
         <DialogTitle sx={{ bgcolor: '#0f172a', color: '#ffffff', px: 3, py: 2 }}>
           <Stack direction="row" alignItems="center" justifyContent="space-between">
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <SmartToyIcon sx={{ color: '#84cc16' }} />
+              <SmartToyIcon sx={{ color: '#4f46e5' }} />
               <Typography variant="h6" sx={{ fontWeight: 800, color: '#ffffff', fontSize: '1.05rem' }}>
                 Create Response Rule
               </Typography>
@@ -1684,7 +1681,7 @@ export default function Workflows() {
           <Button
             variant="contained"
             onClick={handleSaveQuickRule}
-            sx={{ bgcolor: '#84cc16', color: '#0f172a', fontWeight: 800, borderRadius: '8px', px: 2.5, '&:hover': { bgcolor: '#65a30d' } }}
+            sx={{ bgcolor: '#4f46e5', color: '#ffffff', fontWeight: 800, borderRadius: '8px', px: 2.5, '&:hover': { bgcolor: '#4338ca' } }}
           >
             Create Rule
           </Button>
@@ -1725,8 +1722,8 @@ export default function Workflows() {
                 width: 40,
                 height: 40,
                 borderRadius: '12px',
-                bgcolor: 'rgba(132, 204, 22, 0.15)',
-                color: '#84cc16',
+                bgcolor: 'rgba(79, 70, 229, 0.12)',
+                color: '#4f46e5',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center'
@@ -1755,14 +1752,13 @@ export default function Workflows() {
               startIcon={<SaveIcon />}
               onClick={handleSaveWorkflow}
               sx={{
-                backgroundColor: '#84cc16',
-                color: '#0f172a',
+                backgroundColor: '#4f46e5', color: '#ffffff',
                 textTransform: 'none',
                 fontWeight: 800,
                 borderRadius: '10px',
                 px: 2.5,
-                boxShadow: '0 2px 10px rgba(132, 204, 22, 0.3)',
-                '&:hover': { backgroundColor: '#65a30d', color: '#ffffff' }
+                boxShadow: '0 2px 10px rgba(79, 70, 229, 0.25)',
+                '&:hover': { backgroundColor: '#4338ca', color: '#ffffff' }
               }}
             >
               {editingId ? 'Update Workflow' : 'Deploy & Activate'}
@@ -1778,12 +1774,12 @@ export default function Workflows() {
                 onClick={() => setWizardStep(0)}
                 sx={{
                   '& .MuiStepLabel-label': {
-                    color: wizardStep === 0 ? '#84cc16 !important' : '#94a3b8 !important',
+                    color: wizardStep === 0 ? '#4f46e5 !important' : '#94a3b8 !important',
                     fontWeight: wizardStep === 0 ? 800 : 600,
                     fontSize: '0.82rem'
                   },
                   '& .MuiStepIcon-root': {
-                    color: wizardStep === 0 ? '#84cc16 !important' : wizardStep > 0 ? '#22c55e !important' : '#475569 !important'
+                    color: wizardStep === 0 ? '#4f46e5 !important' : wizardStep > 0 ? '#22c55e !important' : '#475569 !important'
                   }
                 }}
               >
@@ -1795,12 +1791,12 @@ export default function Workflows() {
                 onClick={() => setWizardStep(1)}
                 sx={{
                   '& .MuiStepLabel-label': {
-                    color: wizardStep === 1 ? '#84cc16 !important' : '#94a3b8 !important',
+                    color: wizardStep === 1 ? '#4f46e5 !important' : '#94a3b8 !important',
                     fontWeight: wizardStep === 1 ? 800 : 600,
                     fontSize: '0.82rem'
                   },
                   '& .MuiStepIcon-root': {
-                    color: wizardStep === 1 ? '#84cc16 !important' : wizardStep > 1 ? '#22c55e !important' : '#475569 !important'
+                    color: wizardStep === 1 ? '#4f46e5 !important' : wizardStep > 1 ? '#22c55e !important' : '#475569 !important'
                   }
                 }}
               >
@@ -1812,12 +1808,12 @@ export default function Workflows() {
                 onClick={() => setWizardStep(2)}
                 sx={{
                   '& .MuiStepLabel-label': {
-                    color: wizardStep === 2 ? '#84cc16 !important' : '#94a3b8 !important',
+                    color: wizardStep === 2 ? '#4f46e5 !important' : '#94a3b8 !important',
                     fontWeight: wizardStep === 2 ? 800 : 600,
                     fontSize: '0.82rem'
                   },
                   '& .MuiStepIcon-root': {
-                    color: wizardStep === 2 ? '#84cc16 !important' : '#475569 !important'
+                    color: wizardStep === 2 ? '#4f46e5 !important' : '#475569 !important'
                   }
                 }}
               >
@@ -1856,9 +1852,9 @@ export default function Workflows() {
                         transition: 'all 0.25s ease',
                         cursor: 'pointer',
                         '&:hover': {
-                          borderColor: '#84cc16',
+                          borderColor: '#4f46e5',
                           transform: 'translateY(-3px)',
-                          boxShadow: '0 12px 24px -6px rgba(132, 204, 22, 0.2)'
+                          boxShadow: '0 12px 24px -6px rgba(79, 70, 229, 0.2)'
                         }
                       }}
                       onClick={() => handleApplyPreset(preset)}
@@ -1952,7 +1948,7 @@ export default function Workflows() {
                             textTransform: 'none',
                             borderRadius: '8px',
                             mt: 'auto',
-                            '&:hover': { bgcolor: '#84cc16', color: '#0f172a' }
+                            '&:hover': { bgcolor: '#4f46e5', color: '#ffffff' }
                           }}
                         >
                           Use Blueprint
@@ -2117,8 +2113,8 @@ export default function Workflows() {
                               sx={{
                                 p: 1.8,
                                 borderRadius: '12px',
-                                border: workflowForm.triggerType === 'KEYWORD' ? '2px solid #84cc16' : '1px solid #cbd5e1',
-                                bgcolor: workflowForm.triggerType === 'KEYWORD' ? 'rgba(132, 204, 22, 0.08)' : '#f8fafc',
+                                border: workflowForm.triggerType === 'KEYWORD' ? '2px solid #4f46e5' : '1px solid #cbd5e1',
+                                bgcolor: workflowForm.triggerType === 'KEYWORD' ? 'rgba(79, 70, 229, 0.08)' : '#f8fafc',
                                 cursor: 'pointer',
                                 transition: 'all 0.2s ease',
                                 textAlign: 'center'
@@ -2140,8 +2136,8 @@ export default function Workflows() {
                               sx={{
                                 p: 1.8,
                                 borderRadius: '12px',
-                                border: workflowForm.triggerType === 'RESPONSE_RULE' ? '2px solid #84cc16' : '1px solid #cbd5e1',
-                                bgcolor: workflowForm.triggerType === 'RESPONSE_RULE' ? 'rgba(132, 204, 22, 0.08)' : '#f8fafc',
+                                border: workflowForm.triggerType === 'RESPONSE_RULE' ? '2px solid #4f46e5' : '1px solid #cbd5e1',
+                                bgcolor: workflowForm.triggerType === 'RESPONSE_RULE' ? 'rgba(79, 70, 229, 0.08)' : '#f8fafc',
                                 cursor: 'pointer',
                                 transition: 'all 0.2s ease',
                                 textAlign: 'center'
@@ -2163,8 +2159,8 @@ export default function Workflows() {
                               sx={{
                                 p: 1.8,
                                 borderRadius: '12px',
-                                border: workflowForm.triggerType === 'INTENT' ? '2px solid #84cc16' : '1px solid #cbd5e1',
-                                bgcolor: workflowForm.triggerType === 'INTENT' ? 'rgba(132, 204, 22, 0.08)' : '#f8fafc',
+                                border: workflowForm.triggerType === 'INTENT' ? '2px solid #4f46e5' : '1px solid #cbd5e1',
+                                bgcolor: workflowForm.triggerType === 'INTENT' ? 'rgba(79, 70, 229, 0.08)' : '#f8fafc',
                                 cursor: 'pointer',
                                 transition: 'all 0.2s ease',
                                 textAlign: 'center'
@@ -2211,7 +2207,7 @@ export default function Workflows() {
                                       fontWeight: 700,
                                       bgcolor: '#ffffff',
                                       border: '1px solid #cbd5e1',
-                                      '&:hover': { bgcolor: '#84cc16', color: '#0f172a', borderColor: '#84cc16' }
+                                      '&:hover': { bgcolor: '#4f46e5', color: '#ffffff', borderColor: '#4f46e5' }
                                     }}
                                   />
                                 ))}
@@ -2292,7 +2288,7 @@ export default function Workflows() {
                             fontWeight: 800,
                             borderRadius: '8px',
                             px: 3,
-                            '&:hover': { backgroundColor: '#84cc16', color: '#0f172a' }
+                            '&:hover': { backgroundColor: '#4f46e5', color: '#ffffff' }
                           }}
                         >
                           Next: Configure WhatsApp Reply ➔
@@ -2472,14 +2468,13 @@ export default function Workflows() {
                           startIcon={<SaveIcon />}
                           onClick={handleSaveWorkflow}
                           sx={{
-                            backgroundColor: '#84cc16',
-                            color: '#0f172a',
+                            backgroundColor: '#4f46e5', color: '#ffffff',
                             textTransform: 'none',
                             fontWeight: 800,
                             borderRadius: '8px',
                             px: 3,
-                            boxShadow: '0 2px 10px rgba(132, 204, 22, 0.3)',
-                            '&:hover': { backgroundColor: '#65a30d', color: '#ffffff' }
+                            boxShadow: '0 2px 10px rgba(79, 70, 229, 0.25)',
+                            '&:hover': { backgroundColor: '#4338ca', color: '#ffffff' }
                           }}
                         >
                           {editingId ? 'Update Workflow' : 'Deploy & Activate Flow 🚀'}
@@ -2509,7 +2504,7 @@ export default function Workflows() {
                       <Chip
                         label="REAL-TIME"
                         size="small"
-                        sx={{ bgcolor: '#84cc16', color: '#0f172a', fontWeight: 800, fontSize: '0.65rem', height: 20 }}
+                        sx={{ bgcolor: '#4f46e5', color: '#ffffff', fontWeight: 800, fontSize: '0.65rem', height: 20 }}
                       />
                     </Box>
 
@@ -2530,7 +2525,7 @@ export default function Workflows() {
                     >
                       {/* WhatsApp Header */}
                       <Box sx={{ bgcolor: '#075e54', p: 1.2, px: 1.5, display: 'flex', alignItems: 'center', gap: 1, color: '#ffffff' }}>
-                        <Avatar sx={{ width: 28, height: 28, bgcolor: '#84cc16', color: '#0f172a', fontWeight: 800, fontSize: '0.75rem' }}>
+                        <Avatar sx={{ width: 28, height: 28, bgcolor: '#4f46e5', color: '#ffffff', fontWeight: 800, fontSize: '0.75rem' }}>
                           WA
                         </Avatar>
                         <Box sx={{ flexGrow: 1, minWidth: 0 }}>
@@ -2687,7 +2682,7 @@ export default function Workflows() {
                 label="Folder Tag Color"
                 onChange={(e) => setCategoryForm({ ...categoryForm, color: e.target.value })}
               >
-                <MenuItem value="#84cc16">Renic Lime (#84cc16)</MenuItem>
+                <MenuItem value="#4f46e5">Renic Lime (#4f46e5)</MenuItem>
                 <MenuItem value="#2563eb">Electric Blue (#2563eb)</MenuItem>
                 <MenuItem value="#16a34a">Forest Green (#16a34a)</MenuItem>
                 <MenuItem value="#ea580c">Warm Orange (#ea580c)</MenuItem>
@@ -2705,13 +2700,12 @@ export default function Workflows() {
             variant="contained"
             onClick={handleCreateCategory}
             sx={{
-              backgroundColor: '#84cc16',
-              color: '#0f172a',
+              backgroundColor: '#4f46e5', color: '#ffffff',
               textTransform: 'none',
               fontWeight: 800,
               borderRadius: '8px',
               px: 2.5,
-              '&:hover': { backgroundColor: '#65a30d' }
+              '&:hover': { backgroundColor: '#4338ca' }
             }}
           >
             Create Category

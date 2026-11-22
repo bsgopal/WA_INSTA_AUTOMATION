@@ -375,8 +375,8 @@ const EditCampaignForm = React.memo(({
               width: 38,
               height: 38,
               borderRadius: '10px',
-              bgcolor: 'rgba(132, 204, 22, 0.15)',
-              color: '#84cc16',
+              bgcolor: 'rgba(79, 70, 229, 0.15)',
+              color: '#818cf8',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center'
@@ -645,13 +645,13 @@ const EditCampaignForm = React.memo(({
             disabled={loading || isRunning}
             startIcon={loading ? <CircularProgress size={18} color="inherit" /> : <SaveIcon />}
             sx={{
-              bgcolor: '#84cc16',
-              color: '#0f172a',
+              bgcolor: '#0f172a',
+              color: '#ffffff',
               textTransform: 'none',
               fontWeight: 800,
               px: 3,
               borderRadius: '8px',
-              '&:hover': { bgcolor: '#65a30d', color: '#ffffff' }
+              '&:hover': { bgcolor: '#1e293b', color: '#ffffff' }
             }}
           >
             {loading ? 'Saving...' : 'Save Changes'}

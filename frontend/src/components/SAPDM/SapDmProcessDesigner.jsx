@@ -72,7 +72,7 @@ import { broadcastWorkspaceEvent } from '../../utils/workspaceSync';
 // ========================================================
 const FLOW_CONTROLS = [
   { type: 'START', label: 'Start Trigger', icon: '▷', desc: 'Process entry point trigger on keyword', color: '#D97706', shape: 'circle_start' },
-  { type: 'RESPONSE_RULE', label: 'AI Response Rule Trigger', icon: '⚡', desc: 'Trigger flow when an AI Response Rule fires', color: '#84CC16', shape: 'circle_rule' },
+  { type: 'RESPONSE_RULE', label: 'AI Response Rule Trigger', icon: '⚡', desc: 'Trigger flow when an AI Response Rule fires', color: '#4F46E5', shape: 'circle_rule' },
   { type: 'IF_ELSE', label: 'Condition Split', icon: '✕', desc: 'Branch based on user selection or keyword', color: '#10B981', shape: 'diamond_condition' },
   { type: 'PARALLEL_SPLIT', label: 'Parallel Split', icon: '+', desc: 'Run concurrent actions simultaneously', color: '#0D9488', shape: 'diamond_parallel' },
   { type: 'WAIT_TIMER', label: 'Wait / Delay', icon: '⏱️', desc: 'Pause execution for seconds or minutes', color: '#059669', shape: 'circle_wait' },

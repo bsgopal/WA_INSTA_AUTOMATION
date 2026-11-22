@@ -780,7 +780,7 @@ export default function Settings() {
                   <CardContent sx={{ p: 2 }}>
                     <Stack direction="row" spacing={1.2} sx={{ alignItems: 'center', mb: 1.5 }}>
                       <Box sx={{ width: 32, height: 32, borderRadius: '6px', bgcolor: 'rgba(132, 204, 22, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <StorefrontIcon sx={{ color: '#4d7c0f', fontSize: 18 }} />
+                        <StorefrontIcon sx={{ color: '#4f46e5', fontSize: 18 }} />
                       </Box>
                       <Box>
                         <Typography sx={{ fontWeight: 800, color: '#0f172a', fontSize: '0.9rem' }}>
@@ -870,7 +870,7 @@ export default function Settings() {
                   <CardContent sx={{ p: 2 }}>
                     <Stack direction="row" spacing={1.2} sx={{ alignItems: 'center', mb: 1.5 }}>
                       <Box sx={{ width: 32, height: 32, borderRadius: '6px', bgcolor: 'rgba(132, 204, 22, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <DescriptionIcon sx={{ color: '#4d7c0f', fontSize: 18 }} />
+                        <DescriptionIcon sx={{ color: '#4f46e5', fontSize: 18 }} />
                       </Box>
                       <Box>
                         <Typography sx={{ fontWeight: 800, color: '#0f172a', fontSize: '0.9rem' }}>
@@ -1415,7 +1415,7 @@ export default function Settings() {
                     <CardContent sx={{ p: 2 }}>
                       <Stack direction="row" spacing={1.2} sx={{ alignItems: 'center', mb: 1.5 }}>
                         <Box sx={{ width: 32, height: 32, borderRadius: '6px', bgcolor: 'rgba(132, 204, 22, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <CloudIcon sx={{ color: '#4d7c0f', fontSize: 18 }} />
+                          <CloudIcon sx={{ color: '#4f46e5', fontSize: 18 }} />
                         </Box>
                         <Box>
                           <Typography sx={{ fontWeight: 800, color: '#0f172a', fontSize: '0.9rem' }}>
@@ -1594,7 +1594,7 @@ export default function Settings() {
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
                       <Box sx={{ width: 36, height: 36, borderRadius: '8px', bgcolor: 'rgba(132, 204, 22, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <KeyIcon sx={{ color: '#65a30d', fontSize: 20 }} />
+                        <KeyIcon sx={{ color: '#4f46e5', fontSize: 20 }} />
                       </Box>
                       <Box>
                         <Typography sx={{ fontWeight: 800, color: '#0f172a', fontSize: '1rem' }}>

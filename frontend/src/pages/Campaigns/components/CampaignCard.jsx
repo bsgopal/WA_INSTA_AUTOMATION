@@ -33,7 +33,7 @@ import StatusBadge from './StatusBadge';
 import SkeletonCard from './SkeletonCard';
 
 const typeMeta = {
-  ONE_TIME: { label: 'One-time', icon: CampaignIcon, color: '#84cc16', bg: 'rgba(132,204,22,0.15)' },
+  ONE_TIME: { label: 'One-time', icon: CampaignIcon, color: '#4f46e5', bg: 'rgba(79,70,229,0.15)' },
   RECURRING: { label: 'Recurring', icon: RepeatIcon, color: '#818cf8', bg: 'rgba(129,140,248,0.15)' },
   AUTOMATED: { label: 'Automated', icon: AutoAwesomeIcon, color: '#34d399', bg: 'rgba(52,211,153,0.15)' },
   TRIGGERED: { label: 'Triggered', icon: FlashOnIcon, color: '#fbbf24', bg: 'rgba(251,191,36,0.15)' }
@@ -116,7 +116,7 @@ const CampaignCard = React.memo(({
           '&:hover': {
             transform: 'translateY(-3px)',
             boxShadow: '0 16px 32px -8px rgba(15, 23, 42, 0.16)',
-            borderColor: '#84cc16'
+            borderColor: '#4f46e5'
           }
         }}
         onClick={() => onView(campaign)}
@@ -139,8 +139,8 @@ const CampaignCard = React.memo(({
               sx={{
                 width: 32,
                 height: 32,
-                bgcolor: '#84cc16',
-                color: '#0f172a',
+                bgcolor: '#4f46e5',
+                color: '#ffffff',
                 fontWeight: 900,
                 fontSize: '14px',
                 boxShadow: '0 2px 6px rgba(0,0,0,0.2)'
@@ -227,7 +227,7 @@ const CampaignCard = React.memo(({
                 borderRadius: 3,
                 bgcolor: '#f1f5f9',
                 '& .MuiLinearProgress-bar': {
-                  bgcolor: '#84cc16',
+                  bgcolor: '#4f46e5',
                   borderRadius: 3
                 }
               }}
@@ -292,11 +292,11 @@ const CampaignCard = React.memo(({
               borderRadius: '8px',
               textTransform: 'none',
               bgcolor: '#0f172a',
-              color: '#84cc16',
+              color: '#ffffff',
               boxShadow: 'none',
               '&:hover': {
                 bgcolor: '#1e293b',
-                color: '#a3e635',
+                color: '#ffffff',
                 boxShadow: '0 4px 10px rgba(15, 23, 42, 0.2)'
               }
             }}

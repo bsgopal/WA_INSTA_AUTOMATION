@@ -76,8 +76,8 @@ const CampaignHeader = React.memo(({
       sublabel: 'All Broadcasts',
       value: stats.total || 0,
       gradient: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
-      accent: '#84cc16',
-      iconColor: '#84cc16'
+      accent: '#4f46e5',
+      iconColor: '#818cf8'
     },
     {
       icon: PlayArrowIcon,
@@ -218,17 +218,17 @@ const CampaignHeader = React.memo(({
             onClick={onCreate}
             size="small"
             sx={{
-              bgcolor: '#84cc16',
-              color: '#0f172a',
+              bgcolor: '#4f46e5',
+              color: '#ffffff',
               px: 2,
               height: '36px',
               borderRadius: '8px',
               fontSize: '0.825rem',
               fontWeight: 800,
               textTransform: 'none',
-              boxShadow: '0 2px 8px rgba(132, 204, 22, 0.3)',
+              boxShadow: '0 2px 8px rgba(79, 70, 229, 0.3)',
               '&:hover': {
-                bgcolor: '#65a30d',
+                bgcolor: '#4338ca',
                 color: '#ffffff'
               }
             }}
@@ -269,8 +269,8 @@ const CampaignHeader = React.memo(({
               bgcolor: '#f8fafc',
               height: '36px',
               fontSize: '0.8125rem',
-              '&:hover fieldset': { borderColor: '#84cc16' },
-              '&.Mui-focused fieldset': { borderColor: '#84cc16' }
+              '&:hover fieldset': { borderColor: '#4f46e5' },
+              '&.Mui-focused fieldset': { borderColor: '#4f46e5' }
             }
           }}
           InputProps={{
@@ -357,7 +357,7 @@ const CampaignHeader = React.memo(({
                 onClick={() => onViewModeChange('CARDS')}
                 sx={{
                   bgcolor: viewMode === 'CARDS' ? '#0f172a' : '#f1f5f9',
-                  color: viewMode === 'CARDS' ? '#84cc16' : '#64748b',
+                  color: viewMode === 'CARDS' ? '#818cf8' : '#64748b',
                   borderRadius: '8px',
                   width: 34,
                   height: 34,
@@ -374,7 +374,7 @@ const CampaignHeader = React.memo(({
                 onClick={() => onViewModeChange('TABLE')}
                 sx={{
                   bgcolor: viewMode === 'TABLE' ? '#0f172a' : '#f1f5f9',
-                  color: viewMode === 'TABLE' ? '#84cc16' : '#64748b',
+                  color: viewMode === 'TABLE' ? '#818cf8' : '#64748b',
                   borderRadius: '8px',
                   width: 34,
                   height: 34,

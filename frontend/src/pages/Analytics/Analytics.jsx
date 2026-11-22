@@ -374,7 +374,7 @@ export default function Analytics() {
                             {campaign.name}
                           </TableCell>
                           <TableCell sx={{ py: 0.5 }}>
-                            <Chip label={campaign.status} size="small" sx={{ height: 18, fontSize: '0.62rem', fontWeight: 700, bgcolor: campaign.status === 'COMPLETED' ? '#dcfce7' : 'rgba(132, 204, 22, 0.15)', color: campaign.status === 'COMPLETED' ? '#166534' : '#4d7c0f' }} />
+                            <Chip label={campaign.status} size="small" sx={{ height: 18, fontSize: '0.62rem', fontWeight: 700, bgcolor: campaign.status === 'COMPLETED' ? '#dcfce7' : 'rgba(79, 70, 229, 0.12)', color: campaign.status === 'COMPLETED' ? '#166534' : '#4f46e5' }} />
                           </TableCell>
                           <TableCell align="right" sx={{ py: 0.5, fontSize: '0.75rem' }}>{campaign.totalSent || 0}</TableCell>
                           <TableCell align="right" sx={{ py: 0.5, fontSize: '0.75rem', fontWeight: 700, color: '#16a34a' }}>
