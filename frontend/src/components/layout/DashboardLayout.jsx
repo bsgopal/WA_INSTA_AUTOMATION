@@ -183,19 +183,19 @@ const RenicBrand = ({ collapsed, onClick }) => (
           <Typography sx={{ 
             fontSize: '0.65rem', 
             fontWeight: 800, 
-            color: '#0f172a', 
-            bgcolor: '#84cc16', 
-            px: 0.6,
-            py: 0.15,
-            borderRadius: '3px',
+            color: '#ffffff', 
+            bgcolor: '#4f46e5', 
+            px: 0.65,
+            py: 0.2,
+            borderRadius: '4px',
             textTransform: 'uppercase',
             letterSpacing: '0.5px'
           }}>
-            TECH
+            ENGAGE
           </Typography>
         </Box>
         <Typography sx={{ fontSize: '0.62rem', color: '#94a3b8', fontWeight: 600, mt: 0.35, letterSpacing: '0.4px' }}>
-          Automation & CRM
+          WhatsApp CRM & Marketing
         </Typography>
       </Box>
     )}
@@ -1320,7 +1320,9 @@ export default function DashboardLayout() {
                   </Box>
                 }
               >
-                <Outlet />
+                <Box key={location.pathname} className="smooth-page-transition" sx={{ width: '100%', minHeight: '100%' }}>
+                  <Outlet />
+                </Box>
               </Suspense>
             );
           })()}

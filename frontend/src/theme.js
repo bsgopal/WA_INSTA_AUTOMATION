@@ -1,52 +1,59 @@
 import { createTheme } from '@mui/material/styles';
 
+/**
+ * RENIC CLOUD - Enterprise Design System (Obsidian & Sapphire)
+ * Professional B2B SaaS theme inspired by Stripe, Linear & Supabase
+ */
 export const renicTheme = createTheme({
   palette: {
     mode: 'light',
+    // Primary: Deep Obsidian Slate (Clean, Executive, Authoritative)
     primary: {
-      main: '#84cc16', // Renic Tech Lime Green
-      light: '#a3e635',
-      dark: '#65a30d',
-      contrastText: '#0f172a', // Deep Slate text for high contrast on lime
-      50: '#f7fee7',
-      100: '#ecfccb',
-      200: '#d9f99d',
-      300: '#bef264',
-      400: '#a3e635',
-      500: '#84cc16',
-      600: '#65a30d',
-      700: '#4d7c0f',
-      800: '#3f6212',
-      900: '#365314',
+      main: '#0f172a', // Slate 900
+      light: '#1e293b', // Slate 800
+      dark: '#020617', // Slate 950
+      contrastText: '#ffffff',
+      50: '#f8fafc',
+      100: '#f1f5f9',
+      200: '#e2e8f0',
+      300: '#cbd5e1',
+      400: '#94a3b8',
+      500: '#64748b',
+      600: '#475569',
+      700: '#334155',
+      800: '#1e293b',
+      900: '#0f172a',
     },
+    // Secondary / Accent: Electric Sapphire / Indigo (Active states, brand accents)
     secondary: {
-      main: '#0f172a', // Renic Tech Deep Charcoal / Obsidian Slate
-      light: '#1e293b',
-      dark: '#020617',
+      main: '#4f46e5', // Indigo 600
+      light: '#6366f1', // Indigo 500
+      dark: '#4338ca', // Indigo 700
+      contrastText: '#ffffff',
+    },
+    // Success / WhatsApp: Refined Emerald (Live connections, verified checks)
+    success: {
+      main: '#059669', // Emerald 600
+      light: '#10b981', // Emerald 500
+      dark: '#047857',
       contrastText: '#ffffff',
     },
     warning: {
-      main: '#f59e0b',
-      light: '#fbbf24',
-      dark: '#d97706',
+      main: '#d97706', // Amber 600
+      light: '#f59e0b',
+      dark: '#b45309',
       contrastText: '#ffffff',
     },
     error: {
-      main: '#ef4444',
-      light: '#f87171',
-      dark: '#dc2626',
-      contrastText: '#ffffff',
-    },
-    success: {
-      main: '#10b981',
-      light: '#34d399',
-      dark: '#059669',
+      main: '#dc2626', // Red 600
+      light: '#ef4444',
+      dark: '#b91c1c',
       contrastText: '#ffffff',
     },
     info: {
-      main: '#0284c7',
-      light: '#38bdf8',
-      dark: '#0369a1',
+      main: '#2563eb', // Blue 600
+      light: '#3b82f6',
+      dark: '#1d4ed8',
       contrastText: '#ffffff',
     },
     background: {
@@ -63,40 +70,40 @@ export const renicTheme = createTheme({
   typography: {
     fontFamily: '"Plus Jakarta Sans", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
     h1: {
-      fontSize: '2.25rem',
+      fontSize: '2rem',
       fontWeight: 800,
-      lineHeight: 1.2,
+      lineHeight: 1.25,
       color: '#0f172a',
       letterSpacing: '-0.025em',
     },
     h2: {
-      fontSize: '1.875rem',
-      fontWeight: 800,
-      lineHeight: 1.25,
+      fontSize: '1.625rem',
+      fontWeight: 700,
+      lineHeight: 1.3,
       color: '#0f172a',
       letterSpacing: '-0.02em',
     },
     h3: {
-      fontSize: '1.5rem',
+      fontSize: '1.375rem',
       fontWeight: 700,
-      lineHeight: 1.3,
+      lineHeight: 1.35,
       color: '#0f172a',
       letterSpacing: '-0.015em',
     },
     h4: {
-      fontSize: '1.25rem',
+      fontSize: '1.125rem',
       fontWeight: 700,
       lineHeight: 1.4,
       color: '#0f172a',
     },
     h5: {
-      fontSize: '1.125rem',
+      fontSize: '1rem',
       fontWeight: 600,
-      lineHeight: 1.4,
+      lineHeight: 1.45,
       color: '#0f172a',
     },
     h6: {
-      fontSize: '1rem',
+      fontSize: '0.875rem',
       fontWeight: 600,
       lineHeight: 1.5,
       color: '#0f172a',
@@ -125,8 +132,8 @@ export const renicTheme = createTheme({
     },
     button: {
       textTransform: 'none',
-      fontWeight: 700,
-      fontSize: '0.875rem',
+      fontWeight: 600,
+      fontSize: '0.8125rem',
       letterSpacing: '0.1px',
     },
     caption: {
@@ -152,7 +159,7 @@ export const renicTheme = createTheme({
         root: {
           backgroundColor: '#0f172a', // Renic Obsidian Slate Header
           color: '#ffffff',
-          boxShadow: '0 4px 20px -4px rgba(15, 23, 42, 0.15)',
+          boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
           borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
         },
       },
@@ -161,50 +168,49 @@ export const renicTheme = createTheme({
       styleOverrides: {
         root: {
           textTransform: 'none',
-          fontWeight: 700,
+          fontWeight: 600,
           borderRadius: 8,
-          padding: '8px 18px',
-          transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+          padding: '7px 16px',
+          fontSize: '0.8125rem',
+          transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
         },
         contained: {
           color: '#ffffff !important',
-          '& .MuiButton-startIcon': { color: '#ffffff !important' },
-          '& .MuiButton-endIcon': { color: '#ffffff !important' },
-          '& svg': { color: '#ffffff !important' },
+          boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+          '&:hover': {
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)',
+          },
         },
         containedPrimary: {
-          backgroundColor: '#10b981',
-          color: '#ffffff !important',
-          boxShadow: '0 2px 8px rgba(16, 185, 129, 0.35)',
-          '&:hover': {
-            backgroundColor: '#059669',
-            color: '#ffffff !important',
-            boxShadow: '0 4px 14px rgba(16, 185, 129, 0.45)',
-          },
-          '& .MuiButton-startIcon': { color: '#ffffff !important' },
-          '& .MuiButton-endIcon': { color: '#ffffff !important' },
-          '& svg': { color: '#ffffff !important' },
-        },
-        containedSecondary: {
           backgroundColor: '#0f172a',
           color: '#ffffff !important',
-          boxShadow: '0 2px 8px rgba(15, 23, 42, 0.25)',
           '&:hover': {
             backgroundColor: '#1e293b',
-            color: '#ffffff !important',
-            boxShadow: '0 4px 14px rgba(15, 23, 42, 0.35)',
           },
-          '& .MuiButton-startIcon': { color: '#ffffff !important' },
-          '& .MuiButton-endIcon': { color: '#ffffff !important' },
-          '& svg': { color: '#ffffff !important' },
+        },
+        containedSecondary: {
+          backgroundColor: '#4f46e5',
+          color: '#ffffff !important',
+          '&:hover': {
+            backgroundColor: '#4338ca',
+          },
+        },
+        outlined: {
+          borderColor: '#e2e8f0',
+          color: '#334155',
+          backgroundColor: '#ffffff',
+          '&:hover': {
+            backgroundColor: '#f8fafc',
+            borderColor: '#cbd5e1',
+          },
         },
         outlinedPrimary: {
-          borderColor: '#10b981',
-          color: '#059669',
-          backgroundColor: 'transparent',
+          borderColor: '#e2e8f0',
+          color: '#0f172a',
+          backgroundColor: '#ffffff',
           '&:hover': {
-            backgroundColor: 'rgba(16, 185, 129, 0.08)',
-            borderColor: '#059669',
+            backgroundColor: '#f1f5f9',
+            borderColor: '#94a3b8',
           },
         },
       },
@@ -215,10 +221,10 @@ export const renicTheme = createTheme({
           borderRadius: 12,
           border: '1px solid #e2e8f0',
           backgroundColor: '#ffffff',
-          boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px -1px rgba(0, 0, 0, 0.04)',
-          transition: 'all 0.2s ease-in-out',
+          boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.04)',
+          transition: 'all 0.15s ease-in-out',
           '&:hover': {
-            boxShadow: '0 10px 25px -5px rgba(15, 23, 42, 0.08), 0 8px 10px -6px rgba(15, 23, 42, 0.04)',
+            boxShadow: '0 4px 6px -1px rgba(15, 23, 42, 0.06), 0 2px 4px -2px rgba(15, 23, 42, 0.04)',
           },
         },
       },
@@ -243,15 +249,16 @@ export const renicTheme = createTheme({
           '& .MuiOutlinedInput-root': {
             borderRadius: 8,
             backgroundColor: '#ffffff',
+            fontSize: '0.8125rem',
             '& fieldset': {
               borderColor: '#e2e8f0',
             },
             '&:hover fieldset': {
-              borderColor: '#84cc16',
+              borderColor: '#94a3b8',
             },
             '&.Mui-focused fieldset': {
-              borderColor: '#84cc16',
-              borderWidth: 2,
+              borderColor: '#4f46e5',
+              borderWidth: 1.5,
             },
           },
         },
@@ -261,16 +268,17 @@ export const renicTheme = createTheme({
       styleOverrides: {
         root: {
           borderRadius: 6,
-          fontWeight: 700,
+          fontWeight: 600,
           fontSize: '0.75rem',
         },
         colorPrimary: {
-          backgroundColor: '#84cc16',
-          color: '#0f172a',
-        },
-        colorSecondary: {
           backgroundColor: '#0f172a',
           color: '#ffffff',
+        },
+        colorSecondary: {
+          backgroundColor: '#eef2ff',
+          color: '#4338ca',
+          border: '1px solid #c7d2fe',
         },
       },
     },
@@ -279,7 +287,7 @@ export const renicTheme = createTheme({
         paper: {
           backgroundColor: '#ffffff',
           borderRight: '1px solid #e2e8f0',
-          boxShadow: '1px 0 10px 0 rgba(0,0,0,0.03)',
+          boxShadow: '1px 0 3px 0 rgba(0, 0, 0, 0.02)',
         },
       },
     },
@@ -288,25 +296,26 @@ export const renicTheme = createTheme({
         root: {
           borderRadius: 8,
           margin: '2px 8px',
-          padding: '8px 14px',
+          padding: '7px 12px',
           color: '#475569',
-          transition: 'all 0.2s ease',
+          fontSize: '0.8125rem',
+          transition: 'all 0.15s ease',
           '&.Mui-selected': {
-            backgroundColor: 'rgba(132, 204, 22, 0.14)',
-            color: '#3f6212',
+            backgroundColor: '#f1f5f9',
+            color: '#0f172a',
             fontWeight: 700,
             '& .MuiListItemIcon-root': {
-              color: '#65a30d',
+              color: '#4f46e5',
             },
             '&:hover': {
-              backgroundColor: 'rgba(132, 204, 22, 0.22)',
+              backgroundColor: '#e2e8f0',
             },
           },
           '&:hover': {
-            backgroundColor: '#f1f5f9',
+            backgroundColor: '#f8fafc',
             color: '#0f172a',
             '& .MuiListItemIcon-root': {
-              color: '#65a30d',
+              color: '#4f46e5',
             },
           },
         },
@@ -316,7 +325,7 @@ export const renicTheme = createTheme({
       styleOverrides: {
         root: {
           color: '#64748b',
-          minWidth: 36,
+          minWidth: 34,
         },
       },
     },
@@ -324,24 +333,26 @@ export const renicTheme = createTheme({
       styleOverrides: {
         root: {
           borderColor: '#f1f5f9',
-          padding: '12px 16px',
-          fontSize: '0.875rem',
+          padding: '11px 16px',
+          fontSize: '0.8125rem',
         },
         head: {
           backgroundColor: '#f8fafc',
           fontWeight: 700,
-          color: '#0f172a',
-          fontSize: '0.8125rem',
-          borderBottom: '2px solid #e2e8f0',
+          color: '#475569',
+          fontSize: '0.75rem',
+          textTransform: 'uppercase',
+          letterSpacing: '0.5px',
+          borderBottom: '1px solid #e2e8f0',
         },
       },
     },
     MuiDialog: {
       styleOverrides: {
         paper: {
-          borderRadius: 16,
+          borderRadius: 14,
           border: '1px solid #e2e8f0',
-          boxShadow: '0 20px 40px -15px rgba(15, 23, 42, 0.2)',
+          boxShadow: '0 20px 25px -5px rgba(15, 23, 42, 0.1), 0 8px 10px -6px rgba(15, 23, 42, 0.1)',
         },
       },
     },
