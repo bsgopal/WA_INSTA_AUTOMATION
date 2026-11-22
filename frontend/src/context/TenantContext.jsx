@@ -62,6 +62,18 @@ export const TenantProvider = ({ children }) => {
   const [licenseRequired, setLicenseRequired] = useState(false);
   const [isLocked, setIsLocked] = useState(() => localStorage.getItem('wa_is_locked') === 'true');
   const [allowWithoutBalance, setAllowWithoutBalance] = useState(() => localStorage.getItem('wa_allow_without_balance') === 'true');
+  const [walletBalance, setWalletBalance] = useState(() => {
+    const cached = localStorage.getItem('wa_wallet_balance');
+    return cached !== null ? Number(cached) : 0;
+  });
+  const [messageRate, setMessageRate] = useState(() => {
+    const cached = localStorage.getItem('wa_message_rate');
+    return cached !== null ? Number(cached) : 0.90;
+  });
+  const [availableCredits, setAvailableCredits] = useState(() => {
+    const cached = localStorage.getItem('wa_available_credits');
+    return cached !== null ? Number(cached) : 0;
+  });
   const [loading, setLoading] = useState(true);
 
   const fetchingRef = useRef(false);
@@ -146,6 +158,18 @@ export const TenantProvider = ({ children }) => {
         if (res.data.allowWithoutBalance !== undefined) {
           setAllowWithoutBalance(Boolean(res.data.allowWithoutBalance));
           setItemIfChanged('wa_allow_without_balance', String(res.data.allowWithoutBalance));
+        }
+        if (res.data.walletBalance !== undefined) {
+          setWalletBalance(Number(res.data.walletBalance));
+          setItemIfChanged('wa_wallet_balance', String(res.data.walletBalance));
+        }
+        if (res.data.messageRate !== undefined) {
+          setMessageRate(Number(res.data.messageRate));
+          setItemIfChanged('wa_message_rate', String(res.data.messageRate));
+        }
+        if (res.data.availableCredits !== undefined) {
+          setAvailableCredits(Number(res.data.availableCredits));
+          setItemIfChanged('wa_available_credits', String(res.data.availableCredits));
         }
       }
     } catch (err) {
@@ -254,6 +278,7 @@ export const TenantProvider = ({ children }) => {
 
   const isOauthLocked = Boolean(!loading && oauthEnforced && (!oauthStatus?.verified || !oauthStatus?.configured));
   const isLicenseLocked = Boolean(!loading && (!licenseActive || licenseRequired || isLocked));
+  const isWalletEmpty = Boolean(!allowWithoutBalance && walletBalance < messageRate);
 
   return (
     <TenantContext.Provider value={{
@@ -274,6 +299,10 @@ export const TenantProvider = ({ children }) => {
       oauthStatus,
       isOauthLocked,
       allowWithoutBalance,
+      walletBalance,
+      messageRate,
+      availableCredits,
+      isWalletEmpty,
       setOauthStatus,
       refreshScreens: fetchScreens,
       loading
@@ -301,6 +330,10 @@ export const useTenant = () => useContext(TenantContext) || {
   oauthStatus: { configured: false, verified: false, clientId: '' },
   isOauthLocked: false,
   allowWithoutBalance: false,
+  walletBalance: 0,
+  messageRate: 0.90,
+  availableCredits: 0,
+  isWalletEmpty: true,
   setOauthStatus: () => {},
   loading: false
 };

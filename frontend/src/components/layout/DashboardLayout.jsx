@@ -908,12 +908,17 @@ export default function DashboardLayout() {
                     WhatsApp Wallet
                   </Typography>
                   <Typography sx={{ fontSize: '0.78rem', fontWeight: 800, color: '#34d399' }}>
-                    ₹{Number(walletStatus?.walletBalance || 0).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                    ₹{Number(walletStatus?.walletBalance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </Typography>
                 </Box>
                 <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.68rem', display: 'block' }}>
-                  Available Credits: {Number(walletStatus?.availableCredits || 0).toLocaleString('en-IN')} messages
+                  Available Credits: {Number(walletStatus?.availableCredits || 0).toLocaleString('en-IN')} msgs (@ ₹{walletStatus?.messageRate || 0.90}/msg)
                 </Typography>
+                {walletStatus?.allowWithoutBalance && (
+                  <Typography variant="caption" sx={{ color: '#fbbf24', fontSize: '0.66rem', fontWeight: 700, display: 'block', mt: 0.2 }}>
+                    ⚡ Bypass: Send Without Balance Active
+                  </Typography>
+                )}
                 <Button
                   size="small"
                   onClick={() => { setAnchorElStatus(null); navigate('/wallet'); }}
@@ -1378,8 +1383,14 @@ export default function DashboardLayout() {
                   </Box>
                 }
               >
-                <Box key={location.pathname} className="smooth-page-transition" sx={{ width: '100%', minHeight: '100%' }}>
+                <Box key={location.pathname} className="smooth-page-transition" sx={{ width: '100%', minHeight: '100%', display: 'flex', flexDirection: 'column' }}>
                   <Outlet />
+                  {/* Enterprise Copyright Footer */}
+                  <Box sx={{ mt: 'auto', pt: 3, pb: 1, textAlign: 'center', borderTop: '1px solid rgba(226, 232, 240, 0.6)' }}>
+                    <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.68rem', fontWeight: 500 }}>
+                      © 2026 Renic Tech Private Limited. All Rights Reserved. Enterprise WhatsApp Platform.
+                    </Typography>
+                  </Box>
                 </Box>
               </Suspense>
             );

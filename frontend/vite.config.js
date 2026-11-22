@@ -41,6 +41,9 @@ function legacyGridCompat() {
 export default defineConfig({
   plugins: [react(), legacyGridCompat()],
   base: process.env.ELECTRON ? './' : '/',
+  build: {
+    sourcemap: false,
+  },
   server: {
     host: true,
     port: 5173,

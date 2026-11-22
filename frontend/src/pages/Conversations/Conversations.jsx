@@ -28,6 +28,7 @@ import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import apiClient from '../../api/client';
 import CustomSnackbar from '../../components/Snackbar';
 import AIProviderStatus from '../../components/AIProviderStatus';
+import { useTenant } from '../../context/TenantContext';
 import { API_ORIGIN } from '../../api/base';
 
 // Helper to resolve backend media URLs
@@ -218,6 +219,7 @@ export default function Conversations() {
   const location = useLocation();
   const navigate = useNavigate();
   const messagesEndRef = useRef(null);
+  const { isWalletEmpty, walletBalance, messageRate, refreshScreens } = useTenant();
   
   const [conversations, setConversations] = useState([]);
 
@@ -526,6 +528,15 @@ export default function Conversations() {
 
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !selectedConversation) return;
+
+    if (isWalletEmpty) {
+      setSnackbar({
+        open: true,
+        message: `🛑 Outbound messaging blocked: WhatsApp wallet is empty (₹${(walletBalance || 0).toFixed(2)}). Rate per message is ₹${(messageRate || 0.90).toFixed(2)}. Please recharge your wallet in Renic Soft.`,
+        severity: 'error'
+      });
+      return;
+    }
 
     try {
       setSending(true);
@@ -1750,12 +1761,29 @@ export default function Conversations() {
                     </Stack>
                   </Box>
                 )}
+                {/* Empty Wallet Pre-flight Gate Notification */}
+                {isWalletEmpty && (
+                  <Box sx={{ mb: 1.5, p: 1.2, bgcolor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+                    <Typography sx={{ fontSize: '0.74rem', color: '#b91c1c', fontWeight: 700 }}>
+                      🛑 WhatsApp Wallet is empty (₹{(walletBalance || 0).toFixed(2)}). Rate: ₹{(messageRate || 0.90).toFixed(2)}/msg. Outbound messaging is paused until recharged.
+                    </Typography>
+                    <Button 
+                      size="small" 
+                      onClick={() => navigate('/wallet')} 
+                      sx={{ fontSize: '0.72rem', fontWeight: 800, color: '#b91c1c', textTransform: 'none', p: 0, textDecoration: 'underline', '&:hover': { bgcolor: 'transparent', textDecoration: 'none' } }}
+                    >
+                      Recharge Wallet &rarr;
+                    </Button>
+                  </Box>
+                )}
+
                 <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
                   <TextField
                     fullWidth
-                    placeholder="Type a response to this customer..."
+                    placeholder={isWalletEmpty ? "Wallet empty: Recharge needed in Renic Soft to send messages..." : "Type a response to this customer..."}
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
+                    disabled={isWalletEmpty}
                     onKeyPress={(e) => {
                       if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();
@@ -1767,7 +1795,7 @@ export default function Conversations() {
                     sx={{
                       '& .MuiOutlinedInput-root': {
                         borderRadius: '24px',
-                        bgcolor: '#ffffff',
+                        bgcolor: isWalletEmpty ? '#f1f5f9' : '#ffffff',
                         border: 'none',
                         px: 2,
                         py: 1,
@@ -1780,7 +1808,7 @@ export default function Conversations() {
                   <Button
                     variant="contained"
                     onClick={handleSendMessage}
-                    disabled={!newMessage.trim() || sending}
+                    disabled={!newMessage.trim() || sending || isWalletEmpty}
                     sx={{
                       borderRadius: '50%',
                       height: 44,
@@ -1788,10 +1816,10 @@ export default function Conversations() {
                       minWidth: 44,
                       p: 0,
                       boxShadow: 'none',
-                      bgcolor: '#008069',
+                      bgcolor: isWalletEmpty ? '#94a3b8' : '#008069',
                       color: '#ffffff',
                       '&:hover': {
-                        bgcolor: '#006653'
+                        bgcolor: isWalletEmpty ? '#94a3b8' : '#006653'
                       }
                     }}
                   >

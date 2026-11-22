@@ -38,51 +38,151 @@ const isMetaConfigured = async (userId) => {
   return !!(config && config.enabled && config.accessToken && config.phoneNumberId);
 };
 
+// Enterprise WhatsApp Prepaid Wallet & Rate Management
+async function getWalletGateInfo() {
+  try {
+    const License = require('../models/License');
+    const license = await License.findOne().sort({ createdAt: -1 });
+    const isBypassActive = !!(license?.allowWithoutBalance);
+    const messageRate = Number(license?.messageRate ?? 0.90);
+    const balance = Number(license?.walletBalance ?? 0);
+    const availableCredits = messageRate > 0 ? Math.floor(balance / messageRate) : 0;
+    return { license, isBypassActive, messageRate, balance, availableCredits };
+  } catch (err) {
+    return { license: null, isBypassActive: false, messageRate: 0.90, balance: 0, availableCredits: 0 };
+  }
+}
+
+async function deductWalletBalance(license, count, description = '', referenceId = '', performedBy = {}) {
+  if (!license || license.allowWithoutBalance) return;
+  try {
+    const messageRate = Number(license.messageRate ?? 0.90);
+    const totalDeduct = count * messageRate;
+    const balanceBefore = Number(license.walletBalance ?? 0);
+    const balanceAfter = Math.max(0, balanceBefore - totalDeduct);
+    license.walletBalance = balanceAfter;
+    license.availableCredits = messageRate > 0 ? Math.floor(balanceAfter / messageRate) : 0;
+    license.totalMessagesSent = (license.totalMessagesSent || 0) + count;
+    await license.save();
+
+    // Log transaction in WalletTransaction ledger
+    const WalletTransaction = require('../models/WalletTransaction');
+    const crypto = require('crypto');
+    await WalletTransaction.create({
+      transactionId: `TXN_${Date.now()}_${crypto.randomBytes(3).toString('hex').toUpperCase()}`,
+      customerCode: license.customerCode || 'default',
+      type: 'MESSAGE_CONSUMPTION',
+      amount: totalDeduct,
+      messagesCount: count,
+      messageRate,
+      balanceBefore,
+      balanceAfter,
+      description: description || `WhatsApp message consumption (${count} msgs @ Rs ${messageRate.toFixed(2)})`,
+      referenceId: referenceId || '',
+      performedBy: {
+        userId: performedBy.userId || '',
+        name: performedBy.name || 'Client User',
+        role: performedBy.role || 'user'
+      }
+    }).catch(e => console.warn('[WhatsAppService] Ledger entry failed:', e.message));
+  } catch (err) {
+    console.warn('[WhatsAppService] Deduct balance error:', err.message);
+  }
+}
+
 const sendMessage = async (to, message, options = {}) => {
+  // 1. Enterprise Wallet Gate Check
+  const { license, isBypassActive, messageRate, balance } = await getWalletGateInfo();
+  if (license && !isBypassActive && balance < messageRate) {
+    console.warn(`[WhatsAppService] 🛑 Pre-flight wallet gate BLOCKED message to '${to}'. Balance: Rs ${balance.toFixed(2)}, Required: Rs ${messageRate.toFixed(2)}`);
+    return {
+      success: false,
+      error: 'INSUFFICIENT_WALLET_BALANCE',
+      message: `Your WhatsApp wallet is empty (Rs ${balance.toFixed(2)}). Rate per message is Rs ${messageRate.toFixed(2)}. Please recharge your wallet in Renic Soft.`,
+      channel: 'whatsapp',
+      to,
+      failureReason: 'EMPTY_WALLET'
+    };
+  }
+
   const userId = options.userId || process.env.DEFAULT_USER_ID;
   const ShopConfig = require('../models/ShopConfig');
   const shop = await ShopConfig.findOne({ userId }) || await ShopConfig.findOne({});
   const senderMode = (options.forceWaha ? 'DOCKER' : options.forceMeta ? 'META' : (shop?.whatsappSenderMode || (shop?.metaApiEnabled ? 'META' : 'DOCKER'))).toUpperCase();
 
+  let sendResult;
   if (senderMode === 'DOCKER') {
-    return WAHAService.sendMessage(to, message, options);
+    sendResult = await WAHAService.sendMessage(to, message, options);
+  } else if (await isMetaConfigured(userId)) {
+    sendResult = await MetaService.sendMessage(to, message, { ...options, userId });
+  } else {
+    sendResult = {
+      success: false,
+      error: 'Meta Cloud API is not configured or missing credentials',
+      channel: 'whatsapp',
+      to,
+      failureReason: 'META_NOT_CONFIGURED'
+    };
   }
 
-  // Meta Cloud API Mode
-  if (await isMetaConfigured(userId)) {
-    return MetaService.sendMessage(to, message, { ...options, userId });
+  // 2. Deduct message rate from client wallet upon successful delivery
+  if (sendResult?.success && license && !isBypassActive) {
+    await deductWalletBalance(license, 1, `Direct message to ${to}`, sendResult.id || sendResult.messageId || '', {
+      userId: options.userId,
+      name: options.userName
+    });
   }
 
-  return {
-    success: false,
-    error: 'Meta Cloud API is not configured or missing credentials',
-    channel: 'whatsapp',
-    to,
-    failureReason: 'META_NOT_CONFIGURED'
-  };
+  return sendResult;
 };
 
 const sendBulkMessages = async (recipients, messageTemplate, options = {}) => {
+  // 1. Enterprise Bulk Wallet Gate Check
+  const count = recipients.length;
+  const { license, isBypassActive, messageRate, balance } = await getWalletGateInfo();
+  const totalCost = count * messageRate;
+
+  if (license && !isBypassActive && balance < totalCost) {
+    const availableMsgs = messageRate > 0 ? Math.floor(balance / messageRate) : 0;
+    console.warn(`[WhatsAppService] 🛑 Pre-flight bulk wallet gate BLOCKED. Targets: ${count}, Available: ${availableMsgs} (Bal: Rs ${balance.toFixed(2)} @ Rs ${messageRate.toFixed(2)}/msg)`);
+    return {
+      success: false,
+      error: 'INSUFFICIENT_WALLET_BALANCE',
+      message: `Insufficient message credits. Bulk dispatch requires ${count} messages (Rs ${totalCost.toFixed(2)}), but your wallet only has Rs ${balance.toFixed(2)} (${availableMsgs} messages remaining @ Rs ${messageRate.toFixed(2)}/msg). Please recharge your wallet in Renic Soft.`,
+      sentCount: 0,
+      failedCount: count
+    };
+  }
+
   const userId = options.userId || process.env.DEFAULT_USER_ID;
   const ShopConfig = require('../models/ShopConfig');
   const shop = await ShopConfig.findOne({ userId }) || await ShopConfig.findOne({});
   const senderMode = (options.forceWaha ? 'DOCKER' : options.forceMeta ? 'META' : (shop?.whatsappSenderMode || (shop?.metaApiEnabled ? 'META' : 'DOCKER'))).toUpperCase();
 
+  let sendResult;
   if (senderMode === 'DOCKER') {
     const throttleDelay = (shop?.dockerThrottleSeconds || 6) * 1000;
-    return WAHAService.sendBulkMessages(recipients, messageTemplate, { ...options, throttleDelay });
+    sendResult = await WAHAService.sendBulkMessages(recipients, messageTemplate, { ...options, throttleDelay });
+  } else if (await isMetaConfigured(userId)) {
+    sendResult = await MetaService.sendBulkMessages(recipients, messageTemplate, { ...options, userId });
+  } else {
+    sendResult = {
+      success: false,
+      error: 'Meta WhatsApp Cloud API is not configured or enabled',
+      sentCount: 0,
+      failedCount: recipients.length
+    };
   }
 
-  if (await isMetaConfigured(userId)) {
-    return MetaService.sendBulkMessages(recipients, messageTemplate, { ...options, userId });
+  // 2. Deduct actual sent messages from client wallet
+  if (sendResult?.sentCount > 0 && license && !isBypassActive) {
+    await deductWalletBalance(license, sendResult.sentCount, `Bulk campaign dispatch (${sendResult.sentCount} sent)`, '', {
+      userId: options.userId,
+      name: options.userName
+    });
   }
 
-  return {
-    success: false,
-    error: 'Meta WhatsApp Cloud API is not configured or enabled',
-    sentCount: 0,
-    failedCount: recipients.length
-  };
+  return sendResult;
 };
 
 const handleIncomingMessage = async (data) => {

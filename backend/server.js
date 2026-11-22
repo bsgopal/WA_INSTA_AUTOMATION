@@ -102,6 +102,14 @@ app.use((req, res, next) => {
 });
 
 // ============ MIDDLEWARE ============
+// Enterprise Copyright, Security & Anti-Leak Headers
+app.use((req, res, next) => {
+  res.setHeader('X-Copyright', 'Renic Tech Private Limited (c) 2026. All rights reserved.');
+  res.setHeader('X-Powered-By', 'Renic Enterprise Core Engine');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  next();
+});
+
 app.use(helmet({
   crossOriginResourcePolicy: false,
   contentSecurityPolicy: false
@@ -489,6 +497,8 @@ app.get('/api/tenant/screens', async (req, res) => {
       customTerminology: config?.customTerminology || {},
       allowWithoutBalance: !!license?.allowWithoutBalance,
       walletBalance: Number(license?.walletBalance || 0),
+      messageRate: Number(license?.messageRate ?? 0.90),
+      availableCredits: Number(license?.availableCredits ?? (license?.messageRate > 0 ? Math.floor((license?.walletBalance || 0) / license?.messageRate) : 0)),
       customerCode: (license?.customerCode || config?.customerCode || req.customerCode || '').toLowerCase()
     });
   } catch (err) {

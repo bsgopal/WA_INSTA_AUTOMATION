@@ -505,40 +505,53 @@ export default function ScreenLocked({ isOauthLock = false, isLicenseLock = fals
         <Divider sx={{ my: 2.5 }} />
 
         <Box sx={{ display: 'flex', gap: 1.5, justifyContent: 'center' }}>
+          {!isLicenseLock && (
+            <Button
+              variant="outlined"
+              startIcon={<SettingsIcon />}
+              onClick={() => navigate('/settings')}
+              sx={{
+                borderColor: '#cbd5e1',
+                color: '#0f172a',
+                px: 3,
+                py: 1,
+                fontWeight: 700,
+                textTransform: 'none',
+                borderRadius: 2,
+                '&:hover': { bgcolor: '#f8fafc' }
+              }}
+            >
+              Go to Settings
+            </Button>
+          )}
           <Button
-            variant="outlined"
-            startIcon={<SettingsIcon />}
-            onClick={() => navigate('/settings')}
-            sx={{
-              borderColor: '#cbd5e1',
-              color: '#0f172a',
-              px: 3,
-              py: 1,
-              fontWeight: 700,
-              textTransform: 'none',
-              borderRadius: 2,
-              '&:hover': { bgcolor: '#f8fafc' }
-            }}
-          >
-            Go to Settings
-          </Button>
-          <Button
-            variant="text"
+            variant={isLicenseLock ? "contained" : "text"}
             startIcon={<RefreshIcon />}
             onClick={() => refreshScreens()}
             disabled={loading}
             sx={{
-              color: '#64748b',
-              px: 2,
+              bgcolor: isLicenseLock ? '#0f172a' : 'transparent',
+              color: isLicenseLock ? '#ffffff' : '#64748b',
+              px: isLicenseLock ? 3 : 2,
               py: 1,
               fontWeight: 700,
               textTransform: 'none',
               borderRadius: 2,
-              '&:hover': { bgcolor: '#f8fafc', color: '#0f172a' }
+              '&:hover': { bgcolor: isLicenseLock ? '#1e293b' : '#f8fafc', color: isLicenseLock ? '#ffffff' : '#0f172a' }
             }}
           >
-            {loading ? 'Refreshing...' : 'Refresh Status'}
+            {loading ? 'Verifying with Platform...' : 'Re-check License Status'}
           </Button>
+        </Box>
+
+        {/* Enterprise Copyright & Legal Notice */}
+        <Box sx={{ mt: 3, pt: 2, borderTop: '1px solid #f1f5f9', textAlign: 'center' }}>
+          <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.68rem', display: 'block', fontWeight: 600 }}>
+            © 2026 Renic Tech Private Limited. All Rights Reserved.
+          </Typography>
+          <Typography variant="caption" sx={{ color: '#cbd5e1', fontSize: '0.64rem', display: 'block', mt: 0.3 }}>
+            Proprietary Software • Unauthorized Access or Decompilation Prohibited
+          </Typography>
         </Box>
       </Paper>
     </Box>
