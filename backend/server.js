@@ -445,13 +445,14 @@ app.get('/api/tenant/screens', async (req, res) => {
             }
           }
 
-          if (client && client.licenseStatus === 'active') {
-            let validEnd = client.licenseEnd;
-            if (!validEnd || new Date(validEnd) <= new Date()) {
-              validEnd = new Date(Date.now() + 365 * 24 * 3600 * 1000);
-            }
-            if (license && (!license.licenseEnd || new Date(license.licenseEnd) <= new Date())) {
-              license.licenseEnd = validEnd;
+          if (client) {
+            const isClientExpired = Boolean(client.licenseEnd && new Date(client.licenseEnd) <= new Date());
+            const isClientInactive = ['expired', 'locked', 'disabled', 'suspended', 'cancelled', 'inactive', 'revoked'].includes(client.licenseStatus);
+            if (license) {
+              if (client.licenseEnd) license.licenseEnd = client.licenseEnd;
+              if (isClientExpired || isClientInactive) {
+                license.licenseStatus = 'expired';
+              }
               try { await license.save(); } catch (e) {}
             }
           }
@@ -462,16 +463,20 @@ app.get('/api/tenant/screens', async (req, res) => {
     }
 
     const oauthStatus = await getOauthStatus(req.customerCode);
+    const isLicenseExpired = Boolean(license?.licenseEnd && new Date(license.licenseEnd) <= new Date());
+    const isStatusInactive = Boolean(license && ['expired', 'locked', 'disabled', 'suspended', 'cancelled', 'inactive', 'revoked'].includes(license.licenseStatus));
     const isActive = Boolean(
       license &&
       !config?.emergencyLock &&
-      (license.licenseStatus === 'active' || !license.licenseEnd || new Date(license.licenseEnd) > new Date())
+      !isLicenseExpired &&
+      !isStatusInactive
     );
     res.json({
       success: true,
       active: isActive,
       licenseRequired: !license,
-      isLocked: Boolean(config?.emergencyLock),
+      isLocked: Boolean(config?.emergencyLock || isLicenseExpired || isStatusInactive),
+      isExpired: isLicenseExpired,
       clientName: license?.companyName || config?.shopName || 'WhatsApp Automation',
       screenPermissions: config?.screenPermissions || cachedScreenPermissions || {},
       oauthEnforced: config?.oauthEnforced !== undefined ? config.oauthEnforced : cachedOauthEnforced,

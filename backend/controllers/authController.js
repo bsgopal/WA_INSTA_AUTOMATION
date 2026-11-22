@@ -205,7 +205,7 @@ exports.login = async (req, res) => {
 
       licenseStatus = getLicenseStatus(license);
 
-      if (licenseStatus.status === 'expired' && user.role !== 'PLATFORM_OWNER' && user.role !== 'ADMIN') {
+      if (licenseStatus.status === 'expired' && user.role !== 'PLATFORM_OWNER') {
         return res.status(403).json({
           message: `Your license has expired on ${new Date(licenseStatus.expiresAt).toLocaleDateString()}. Please contact your provider to renew your license.`
         });

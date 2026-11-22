@@ -1361,7 +1361,7 @@ export default function DashboardLayout() {
               );
             }
 
-            if (isLicenseLocked && location.pathname !== '/settings') {
+            if ((isLicenseLocked || licenseStatus?.isExpired || licenseStatus?.status === 'expired') && location.pathname !== '/settings') {
               return <ScreenLocked isLicenseLock={true} />;
             }
             if (isOauthLocked && location.pathname !== '/settings') {
