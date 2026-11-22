@@ -26,7 +26,7 @@ apiClient.interceptors.request.use(
       config.headers['X-Client-Secret'] = clientSecret;
     }
 
-    const token = localStorage.getItem('oauth_token') || localStorage.getItem('token');
+    const token = localStorage.getItem('token') || localStorage.getItem('oauth_token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -41,11 +41,23 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response && error.response.status === 401) {
-      // Handle unauthorized access (e.g., clear token and redirect to login)
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      // HashRouter-compatible navigation (works in packaged Electron file:// mode too)
-      window.location.hash = '#/login';
+      const url = String(error.config?.url || '');
+      // Do not log out on secondary background/health checks
+      const isBackgroundCheck = 
+        url.includes('/wallet') || 
+        url.includes('/license') || 
+        url.includes('/whatsapp/status') || 
+        url.includes('/whatsapp/waha-status');
+
+      if (!isBackgroundCheck) {
+        // Genuine authentication expiration on a main protected route
+        localStorage.removeItem('token');
+        localStorage.removeItem('oauth_token');
+        localStorage.removeItem('user');
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login';
+        }
+      }
     }
     return Promise.reject(error);
   }

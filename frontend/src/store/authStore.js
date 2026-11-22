@@ -24,6 +24,7 @@ const useAuthStore = create((set) => ({
   },
   logout: () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('oauth_token');
     localStorage.removeItem('user');
     // Note: Do not remove tenant credentials (customerCode, clientId, clientSecret) on user logout
     set({ user: null, isAuthenticated: false });
