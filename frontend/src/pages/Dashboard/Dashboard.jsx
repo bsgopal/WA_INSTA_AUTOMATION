@@ -14,7 +14,7 @@ import apiClient from '../../api/client';
 import renicLogo from '../../assets/logo.jpeg';
 import renicIcon from '../../assets/logo-icon.jpeg';
 
-const StatCard = ({ title, value, icon, trend, trendUp = true, color = '#84cc16', iconColor = '#0f172a', onClick }) => (
+const StatCard = ({ title, value, icon, trend, trendUp = true, color = '#4f46e5', iconColor = '#ffffff', onClick }) => (
   <Paper 
     elevation={0} 
     onClick={onClick}
@@ -193,10 +193,10 @@ export default function Dashboard() {
                 Renic Automation Hub
               </Typography>
               <Chip 
-                icon={<StarIcon sx={{ color: '#0f172a !important', fontSize: 13 }} />}
+                icon={<StarIcon sx={{ color: '#fbbf24 !important', fontSize: 13 }} />}
                 label="Full Admin" 
                 size="small" 
-                sx={{ height: 20, bgcolor: '#84cc16', color: '#0f172a', fontWeight: 800, fontSize: '0.65rem' }}
+                sx={{ height: 20, bgcolor: 'rgba(251, 191, 36, 0.15)', color: '#fbbf24', fontWeight: 800, fontSize: '0.65rem' }}
               />
             </Box>
             <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.75rem', display: { xs: 'none', md: 'block' } }}>
@@ -249,15 +249,15 @@ export default function Dashboard() {
             startIcon={<AddCircleIcon sx={{ fontSize: 16 }} />}
             onClick={() => navigate('/campaigns')}
             sx={{
-              bgcolor: '#84cc16',
-              color: '#0f172a',
+              bgcolor: '#4f46e5',
+              color: '#ffffff',
               fontWeight: 800,
               fontSize: '0.75rem',
               py: 0.4,
               px: 1.2,
               borderRadius: '6px',
-              boxShadow: '0 2px 8px rgba(132, 204, 22, 0.35)',
-              '&:hover': { bgcolor: '#65a30d' }
+              boxShadow: '0 2px 8px rgba(79, 70, 229, 0.35)',
+              '&:hover': { bgcolor: '#4338ca' }
             }}
           >
             New Campaign
@@ -282,8 +282,8 @@ export default function Dashboard() {
           value={stats.totalCustomers.toLocaleString()} 
           icon={<PeopleIcon sx={{ fontSize: 20 }} />} 
           trend="+18%"
-          color="#84cc16"
-          iconColor="#0f172a"
+          color="#4f46e5"
+          iconColor="#ffffff"
           onClick={() => navigate('/customers')}
         />
         <StatCard 
@@ -344,7 +344,7 @@ export default function Dashboard() {
               <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#0f172a', fontSize: '0.85rem' }}>
                 Weekly Message Traffic &amp; Engagement
               </Typography>
-              <Chip label="Live Metrics" size="small" sx={{ height: 20, fontSize: '0.65rem', bgcolor: 'rgba(132, 204, 22, 0.12)', color: '#4d7c0f', fontWeight: 800 }} />
+              <Chip label="Live Metrics" size="small" sx={{ height: 20, fontSize: '0.65rem', bgcolor: 'rgba(79, 70, 229, 0.12)', color: '#4f46e5', fontWeight: 800 }} />
             </Box>
             <Divider sx={{ mb: 1, borderColor: '#f1f5f9' }} />
             <Box sx={{ width: '100%', flexGrow: 1, minHeight: 0, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
@@ -383,7 +383,7 @@ export default function Dashboard() {
             }}>
               {activities.length === 0 ? (
                 <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '100%', py: 4, px: 2, textAlign: 'center' }}>
-                  <Box sx={{ width: 34, height: 34, borderRadius: '8px', bgcolor: 'rgba(132, 204, 22, 0.12)', color: '#4d7c0f', display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1, fontSize: '1rem' }}>
+                  <Box sx={{ width: 34, height: 34, borderRadius: '8px', bgcolor: 'rgba(79, 70, 229, 0.12)', color: '#4f46e5', display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1, fontSize: '1rem' }}>
                     ⚡
                   </Box>
                   <Typography sx={{ fontWeight: 700, fontSize: '0.78rem', color: '#64748b' }}>
@@ -523,12 +523,12 @@ const EngagementChart = ({ timeline = [] }) => {
       <svg viewBox={`0 0 ${width} ${height}`} width="100%" height="100%" style={{ overflow: 'visible' }}>
         <defs>
           <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#84cc16" stopOpacity="0.25" />
-            <stop offset="60%" stopColor="#84cc16" stopOpacity="0.06" />
-            <stop offset="100%" stopColor="#84cc16" stopOpacity="0.00" />
+            <stop offset="0%" stopColor="#4f46e5" stopOpacity="0.25" />
+            <stop offset="60%" stopColor="#4f46e5" stopOpacity="0.06" />
+            <stop offset="100%" stopColor="#4f46e5" stopOpacity="0.00" />
           </linearGradient>
           <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-            <feDropShadow dx="0" dy="4" stdDeviation="4" floodColor="#84cc16" floodOpacity="0.25" />
+            <feDropShadow dx="0" dy="4" stdDeviation="4" floodColor="#4f46e5" floodOpacity="0.25" />
           </filter>
         </defs>
         
@@ -580,7 +580,7 @@ const EngagementChart = ({ timeline = [] }) => {
         <path d={areaPath} fill="url(#chartGrad)" />
 
         {/* Line stroke with drop shadow */}
-        <path d={linePath} fill="none" stroke="#84cc16" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" filter="url(#glow)" />
+        <path d={linePath} fill="none" stroke="#4f46e5" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" filter="url(#glow)" />
 
         {/* Data points */}
         {points.map((p, idx) => {
@@ -597,7 +597,7 @@ const EngagementChart = ({ timeline = [] }) => {
                 cy={p.y} 
                 r={isHovered ? 8 : 5} 
                 fill="#ffffff" 
-                stroke="#84cc16" 
+                stroke="#4f46e5" 
                 strokeWidth={2.5} 
                 style={{ transition: 'all 0.15s ease' }}
               />
@@ -629,7 +629,7 @@ const EngagementChart = ({ timeline = [] }) => {
               x={0} 
               y={-5} 
               textAnchor="middle" 
-              fill="#84cc16" 
+              fill="#818cf8" 
               fontSize={11} 
               fontWeight={800}
             >

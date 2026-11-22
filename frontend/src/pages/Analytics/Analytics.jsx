@@ -116,13 +116,13 @@ export default function Analytics() {
         )}
       </Box>
       <Box sx={{ 
-        bgcolor: color === 'primary' ? '#84cc16' : color === 'info' ? '#0284c7' : color === 'success' ? '#10b981' : '#f59e0b',
+        bgcolor: color === 'primary' ? '#4f46e5' : color === 'info' ? '#0284c7' : color === 'success' ? '#10b981' : '#f59e0b',
         p: 0.9, 
         borderRadius: '6px', 
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        color: color === 'primary' ? '#0f172a' : '#ffffff',
+        color: '#ffffff',
         flexShrink: 0
       }}>
         {icon}
@@ -138,7 +138,7 @@ export default function Analytics() {
           <Typography sx={{ fontWeight: 800, color: '#0f172a', fontSize: '1rem' }}>
             Analytics &amp; Performance Overview
           </Typography>
-          <Chip label="Live Metrics" size="small" sx={{ height: 20, fontSize: '0.65rem', bgcolor: 'rgba(132, 204, 22, 0.15)', color: '#4d7c0f', fontWeight: 800 }} />
+          <Chip label="Live Metrics" size="small" sx={{ height: 20, fontSize: '0.65rem', bgcolor: 'rgba(79, 70, 229, 0.12)', color: '#4f46e5', fontWeight: 800 }} />
         </Box>
         <Stack direction="row" spacing={1} alignItems="center">
           <FormControl size="small" sx={{ minWidth: 120 }}>
@@ -165,7 +165,7 @@ export default function Analytics() {
       </Box>
 
       {loading ? (
-        <LinearProgress sx={{ borderRadius: 1, bgcolor: 'rgba(132, 204, 22, 0.2)', '& .MuiLinearProgress-bar': { bgcolor: '#84cc16' } }} />
+        <LinearProgress sx={{ borderRadius: 1, bgcolor: 'rgba(79, 70, 229, 0.15)', '& .MuiLinearProgress-bar': { bgcolor: '#4f46e5' } }} />
       ) : (
         <>
           {/* Key Metrics */}
@@ -267,7 +267,7 @@ export default function Analytics() {
                         <LinearProgress
                           variant="determinate"
                           value={overview.totalCustomers ? Math.min((segment.count / overview.totalCustomers) * 100, 100) : 0}
-                          sx={{ height: 5, borderRadius: 1, bgcolor: '#f1f5f9', '& .MuiLinearProgress-bar': { bgcolor: '#84cc16' } }}
+                          sx={{ height: 5, borderRadius: 1, bgcolor: '#f1f5f9', '& .MuiLinearProgress-bar': { bgcolor: '#4f46e5' } }}
                         />
                       </Box>
                     ))

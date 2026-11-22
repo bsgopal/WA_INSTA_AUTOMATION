@@ -797,7 +797,7 @@ export default function Conversations() {
             width: 32, height: 32, borderRadius: '8px',
             bgcolor: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center'
           }}>
-            <ForumIcon sx={{ color: '#84cc16', fontSize: 18 }} />
+            <ForumIcon sx={{ color: '#818cf8', fontSize: 18 }} />
           </Box>
           <Box>
             <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#0f172a', fontSize: '0.98rem', lineHeight: 1.2 }}>
@@ -1694,7 +1694,7 @@ export default function Conversations() {
                   <AIProviderStatus compact />
                   <Button
                     size="small"
-                    startIcon={smartRepliesLoading ? <CircularProgress size={14} sx={{ color: '#0f172a' }} /> : <AutoAwesomeIcon sx={{ fontSize: 16, color: '#84cc16' }} />}
+                    startIcon={smartRepliesLoading ? <CircularProgress size={14} sx={{ color: '#0f172a' }} /> : <AutoAwesomeIcon sx={{ fontSize: 16, color: '#4f46e5' }} />}
                     onClick={() => fetchSmartReplies()}
                     disabled={smartRepliesLoading}
                     sx={{
@@ -1707,7 +1707,7 @@ export default function Conversations() {
                       bgcolor: '#ffffff',
                       border: '1px solid #cbd5e1',
                       boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-                      '&:hover': { bgcolor: '#f8fafc', borderColor: '#84cc16' }
+                      '&:hover': { bgcolor: '#f8fafc', borderColor: '#4f46e5' }
                     }}
                   >
                     AI Suggestions
